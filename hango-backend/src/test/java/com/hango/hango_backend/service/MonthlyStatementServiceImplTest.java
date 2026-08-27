@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -561,13 +562,17 @@ class MonthlyStatementServiceImplTest {
     }
 
     @Test
-    void settleStatementShouldThrowWhenBankTxnRefIsBlank() {
+    void settleStatementShouldAutoGenerateBankTxnRefWhenBlank() {
         User owner = trainer(1L, "owner@example.com");
-        MonthlyStatement statement = MonthlyStatement.builder().id(3L).trainer(owner).periodMonth("2026-07").build();
+        MonthlyStatement statement = MonthlyStatement.builder().id(3L).trainer(owner).periodMonth("2026-07")
+                .statementCode("STMT-202607-003").build();
         when(statementRepository.findById(3L)).thenReturn(Optional.of(statement));
+        when(statementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        assertThrows(IllegalArgumentException.class,
-                () -> statementService.settleStatement(3L, "  ", "note", "https://example.com/r.png"));
+        MonthlyStatementDTO result = statementService.settleStatement(3L, "  ", "note", "https://example.com/r.png");
+        assertEquals("PAID", result.getStatus());
+        assertNotNull(statement.getBankTxnRef());
+        assertTrue(statement.getBankTxnRef().startsWith("TXN-"));
     }
 
     @Test

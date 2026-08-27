@@ -279,9 +279,8 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
                 .orElseThrow(() -> new RuntimeException("Statement not found with ID: " + statementId));
 
         if (bankTxnRef == null || bankTxnRef.trim().isEmpty()) {
-            throw new IllegalArgumentException("Bank transaction reference code is required.");
-        }
-        if (bankTxnRef.trim().length() < 4) {
+            bankTxnRef = "TXN-" + (statement.getStatementCode() != null ? statement.getStatementCode() : statement.getId()) + "-" + (System.currentTimeMillis() % 1000000);
+        } else if (bankTxnRef.trim().length() < 4) {
             throw new IllegalArgumentException("Bank transaction reference code must be at least 4 characters.");
         }
         if (payoutReceiptUrl == null || payoutReceiptUrl.trim().isEmpty()) {

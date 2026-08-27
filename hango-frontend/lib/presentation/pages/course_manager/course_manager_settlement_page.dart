@@ -196,19 +196,12 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
     final bankAccount = statement['bankAccount'] ?? 'N/A';
     final bankAccountName = statement['bankAccountName'] ?? 'N/A';
     final netAmount = statement['netPayoutAmount'] ?? 0;
-
-    final bankRefController = TextEditingController(text: isReadOnly ? (statement['bankTxnRef']?.toString() ?? '') : '');
     final receiptUrlController = TextEditingController(text: isReadOnly ? (statement['payoutReceiptUrl']?.toString() ?? '') : '');
-    final notesController = TextEditingController(text: isReadOnly ? (statement['adminNotes']?.toString() ?? '') : '');
 
     showDialog(
       context: context,
       builder: (context) {
         bool isUploadingReceipt = false;
-        String? aiOcrExtractedRef;
-        double? aiOcrExtractedAmount;
-        bool isAmountMatch = true;
-        bool isAiVerified = false;
 
         return StatefulBuilder(
           builder: (context, setDialogState) {
@@ -259,52 +252,14 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                   final data = jsonDecode(responseBody);
                   final secureUrl = data['secure_url'] ?? data['url'];
                   if (secureUrl != null) {
-                    // 1. Extract Bank Ref via Regex Pattern
-                    final nameUpper = picked.name.toUpperCase();
-                    final regExpRef = RegExp(r'(?:FT|MB|VCB|TPB|BIDV|TCB|ACB|\b)\d{6,14}');
-                    final matchRef = regExpRef.firstMatch(nameUpper);
-                    if (matchRef != null) {
-                      aiOcrExtractedRef = matchRef.group(0);
-                    } else {
-                      final cleanDigits = nameUpper.replaceAll(RegExp(r'[^A-Z0-9]'), '');
-                      if (cleanDigits.length >= 6) {
-                        aiOcrExtractedRef = 'FT${cleanDigits.substring(0, cleanDigits.length > 12 ? 12 : cleanDigits.length)}';
-                      }
-                    }
-
-                    // 2. Extract Amount from filename or OCR & Cross-check with netAmount
-                    final numMatches = RegExp(r'\d[\d\.\,]{3,}').allMatches(nameUpper);
-                    double? extractedVal;
-                    for (final m in numMatches) {
-                      final rawNumStr = m.group(0)!.replaceAll(RegExp(r'[\.\,]'), '');
-                      final parsed = double.tryParse(rawNumStr);
-                      if (parsed != null && parsed >= 1000) {
-                        extractedVal = parsed;
-                        break;
-                      }
-                    }
-
-                    double netVal = (netAmount as num).toDouble();
-                    if (extractedVal != null) {
-                      aiOcrExtractedAmount = extractedVal;
-                      isAmountMatch = (extractedVal == netVal);
-                    } else {
-                      aiOcrExtractedAmount = netVal;
-                      isAmountMatch = true;
-                    }
-
                     setDialogState(() {
                       receiptUrlController.text = secureUrl;
-                      if (aiOcrExtractedRef != null && bankRefController.text.trim().isEmpty) {
-                        bankRefController.text = aiOcrExtractedRef!;
-                      }
-                      isAiVerified = true;
                     });
 
                     if (context.mounted) {
                       ToastHelper.showSuccess(
                         context,
-                        isVi ? 'Đã tải ảnh Bill & AI đối soát dữ liệu thành công!' : 'Receipt proof uploaded & AI verified successfully!',
+                        isVi ? 'Đã tải ảnh Bill chuyển tiền thành công!' : 'Payout receipt proof uploaded successfully!',
                       );
                     }
                   }
@@ -382,68 +337,6 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                       ),
                       const SizedBox(height: 20),
                       Text(
-                        isVi ? 'Mã giao dịch Ngân hàng (Bank Ref No) *' : 'Bank Transaction Reference *',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155), fontFamily: 'Outfit'),
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: bankRefController,
-                        readOnly: isReadOnly,
-                        decoration: InputDecoration(
-                          hintText: isVi ? 'Ví dụ: FT26078129381' : 'Example: FT26078129381',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: Color(0xFF28B79B), width: 2),
-                          ),
-                          filled: isReadOnly,
-                          fillColor: isReadOnly ? const Color(0xFFF1F5F9) : Colors.white,
-                        ),
-                      ),
-                      if (isAiVerified && aiOcrExtractedRef != null) ...[
-                        const SizedBox(height: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: isAmountMatch ? const Color(0xFFF0FDF4) : const Color(0xFFFFFBEB),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: isAmountMatch ? const Color(0xFFBBF7D0) : const Color(0xFFFDE68A)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    isAmountMatch ? Icons.verified_rounded : Icons.warning_amber_rounded,
-                                    size: 15,
-                                    color: isAmountMatch ? const Color(0xFF16A34A) : const Color(0xFFD97706),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: Text(
-                                      isVi
-                                          ? (isAmountMatch
-                                              ? 'AI Đối soát: Mã GD ($aiOcrExtractedRef) & Số tiền (${_formatVND(netAmount)}) khớp 100%!'
-                                              : 'AI Cảnh báo: Số tiền trên Bill (${_formatVND(aiOcrExtractedAmount)}) lệch so với Bảng kê (${_formatVND(netAmount)})!')
-                                          : (isAmountMatch
-                                              ? 'AI Verified: Ref ($aiOcrExtractedRef) & Amount (${_formatVND(netAmount)}) matched 100%!'
-                                              : 'AI Warning: Receipt Amount (${_formatVND(aiOcrExtractedAmount)}) differs from Statement (${_formatVND(netAmount)})!'),
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: isAmountMatch ? const Color(0xFF15803D) : const Color(0xFFB45309),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 16),
-                      Text(
                         isVi ? 'Bằng chứng chuyển khoản (Ảnh Bill) *' : 'Payout Receipt Proof Image *',
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155), fontFamily: 'Outfit'),
                       ),
@@ -454,7 +347,7 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                           onTap: isReadOnly || isUploadingReceipt ? null : handleUploadReceipt,
                           borderRadius: BorderRadius.circular(10),
                           child: Container(
-                            height: 110,
+                            height: 120,
                             width: double.infinity,
                             decoration: BoxDecoration(
                               color: const Color(0xFFF8FAFC),
@@ -471,13 +364,13 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                                     child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF28B79B)),
                                   )
                                 else
-                                  const Icon(Icons.cloud_upload_outlined, size: 34, color: Color(0xFF28B79B)),
-                                const SizedBox(height: 6),
+                                  const Icon(Icons.cloud_upload_outlined, size: 36, color: Color(0xFF28B79B)),
+                                const SizedBox(height: 8),
                                 Text(
                                   isUploadingReceipt
-                                      ? (isVi ? 'Đang tải ảnh Bill & quét AI đối soát...' : 'Uploading & AI cross-checking...')
+                                      ? (isVi ? 'Đang tải ảnh Bill lên hệ thống...' : 'Uploading receipt image...')
                                       : (isVi ? 'Bấm để Tải ảnh Bill chuyển tiền (PNG, JPG)' : 'Click to Upload Receipt Bill Image (PNG, JPG)'),
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
                                 ),
                               ],
                             ),
@@ -485,7 +378,7 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                         ),
                       ] else ...[
                         Container(
-                          height: 160,
+                          height: 180,
                           width: double.infinity,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(10),
@@ -543,7 +436,6 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                                             onTap: () {
                                               setDialogState(() {
                                                 receiptUrlController.clear();
-                                                isAiVerified = false;
                                               });
                                             },
                                             child: Container(
@@ -562,23 +454,6 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                           ),
                         ),
                       ],
-                      const SizedBox(height: 16),
-                      Text(
-                        isVi ? 'Ghi chú / Admin Notes' : 'Admin Notes',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155), fontFamily: 'Outfit'),
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: notesController,
-                        readOnly: isReadOnly,
-                        maxLines: 2,
-                        decoration: InputDecoration(
-                          hintText: isVi ? 'Ghi chú bổ sung (không bắt buộc)...' : 'Optional notes...',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                          filled: isReadOnly,
-                          fillColor: isReadOnly ? const Color(0xFFF1F5F9) : Colors.white,
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -602,19 +477,15 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                   ),
                   ElevatedButton(
                     onPressed: () async {
-                      final ref = bankRefController.text.trim();
                       final receiptUrl = receiptUrlController.text.trim();
 
-                      if (ref.isEmpty) {
-                        ToastHelper.showError(context, 'Bank transaction reference code is required.');
-                        return;
-                      }
-                      if (ref.length < 4) {
-                        ToastHelper.showError(context, 'Transaction reference code too short (Minimum 4 characters required).');
-                        return;
-                      }
                       if (receiptUrl.isEmpty) {
-                        ToastHelper.showError(context, 'Payout receipt proof image is required. Please upload a receipt image.');
+                        ToastHelper.showError(
+                          context,
+                          isVi
+                              ? 'Vui lòng tải lên ảnh Bill chứng từ chuyển tiền.'
+                              : 'Payout receipt proof image is required. Please upload a receipt image.',
+                        );
                         return;
                       }
 
@@ -626,10 +497,11 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
 
                       Navigator.pop(context);
                       setState(() => _isLoading = true);
+                      final autoRef = 'TXN-${DateTime.now().millisecondsSinceEpoch}';
                       final success = await _revenueService.settleStatement(
                         statementId,
-                        bankTxnRef: ref,
-                        notes: notesController.text.trim(),
+                        bankTxnRef: autoRef,
+                        notes: 'Settled via Course Manager',
                         payoutReceiptUrl: receiptUrl,
                       );
                       if (mounted) {
@@ -653,9 +525,9 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                       backgroundColor: const Color(0xFF28B79B),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                     ),
-                    child: Text(isVi ? 'Xác nhận Đã thanh toán' : 'Confirm Paid', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    child: Text(isVi ? 'Xác nhận Đã chuyển' : 'Confirm Paid', style: const TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ],
               ],
