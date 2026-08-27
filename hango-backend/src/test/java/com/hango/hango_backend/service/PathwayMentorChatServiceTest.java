@@ -15,6 +15,7 @@ import com.hango.hango_backend.repository.LearningPathwayRepository;
 import com.hango.hango_backend.repository.LessonProgressRepository;
 import com.hango.hango_backend.repository.LessonRepository;
 import com.hango.hango_backend.repository.PathwayConversationRepository;
+import com.hango.hango_backend.repository.PathwayMessageRepository;
 import com.hango.hango_backend.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -61,6 +62,9 @@ class PathwayMentorChatServiceTest {
 
     @Mock
     private LessonRepository lessonRepository;
+
+    @Mock
+    private PathwayMessageRepository pathwayMessageRepository;
 
     @Mock
     private LessonProgressRepository lessonProgressRepository;

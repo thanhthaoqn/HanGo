@@ -101,7 +101,7 @@ public class LearningPathwayController {
     // Feature Phase 2: Mastery
     @PostMapping("/{id}/nodes/{nodeId}/mastery")
     @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
-    public ResponseEntity<LearningPathwayResponseDTO> submitMastery(
+    public ResponseEntity<com.hango.hango_backend.dto.LearningPathwayResponseDTO> submitMastery(
             @PathVariable Long id,
             @PathVariable Long nodeId,
             @AuthenticationPrincipal UserDetailsImpl userDetails,
@@ -124,7 +124,7 @@ public class LearningPathwayController {
     // Spec 20 - B2: nop bai mastery - server tu cham diem
     @PostMapping("/{id}/nodes/{nodeId}/mastery/submit")
     @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
-    public ResponseEntity<LearningPathwayResponseDTO> submitMasteryAnswers(
+    public ResponseEntity<com.hango.hango_backend.dto.MasterySubmitResponseDTO> submitMasteryAnswers(
             @PathVariable Long id,
             @PathVariable Long nodeId,
             @AuthenticationPrincipal UserDetailsImpl userDetails,

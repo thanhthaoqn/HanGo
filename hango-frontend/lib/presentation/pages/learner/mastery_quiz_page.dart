@@ -32,6 +32,9 @@ class _MasteryQuizPageState extends State<MasteryQuizPage> {
   bool _isSubmitting = false;
   String? _error;
   int? _score;
+  
+  List<dynamic> _evaluations = [];
+  bool _isReviewMode = false;
 
   bool get _dark => widget.isDarkMode;
 
@@ -69,18 +72,23 @@ class _MasteryQuizPageState extends State<MasteryQuizPage> {
     if (_isSubmitting || _answers.length < _questions.length) return;
     setState(() => _isSubmitting = true);
     try {
-      final updatedPathway = await _repository.submitMasteryAnswers(
+      final response = await _repository.submitMasteryAnswers(
         pathwayId: widget.pathwayId,
         nodeId: widget.node.id,
         answers: _answers.map((k, v) => MapEntry(k, v.toList())),
       );
       if (!mounted) return;
+      
+      final updatedPathway = response['pathway'] as LearningPathway;
+      final evaluations = response['evaluations'] as List<dynamic>? ?? [];
+      
       // Diem so moi nhat cua node sau khi nop bai
       setState(() {
         _score = updatedPathway.nodes
             .firstWhere((n) => n.id == widget.node.id,
                 orElse: () => widget.node)
             .masteryScore;
+        _evaluations = evaluations;
         _isSubmitting = false;
       });
       widget.onCompleted?.call(updatedPathway);
@@ -124,7 +132,7 @@ class _MasteryQuizPageState extends State<MasteryQuizPage> {
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF28B79B)))
           : _error != null && _questions.isEmpty
               ? _buildErrorBody(textMain, textSub, cardColor)
-              : _score != null
+              : (_score != null && !_isReviewMode)
                   ? _buildResultBody(textMain, textSub, cardColor)
                   : _buildQuizBody(textMain, textSub, cardColor),
     );
@@ -190,6 +198,20 @@ class _MasteryQuizPageState extends State<MasteryQuizPage> {
               final passage = q['passage'] as String?;
               final selected = _answers[qId];
 
+              Map<String, dynamic>? evaluation;
+              List<int> correctOptions = [];
+              String? explanation;
+              if (_isReviewMode) {
+                evaluation = _evaluations.cast<Map<String, dynamic>>().firstWhere(
+                  (e) => e['questionId'] == qId,
+                  orElse: () => <String, dynamic>{},
+                );
+                if (evaluation.isNotEmpty) {
+                  correctOptions = (evaluation['correctOptions'] as List?)?.cast<int>() ?? [];
+                  explanation = evaluation['explanation'] as String?;
+                }
+              }
+
               return Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -246,9 +268,33 @@ class _MasteryQuizPageState extends State<MasteryQuizPage> {
                     ...List.generate(options.length, (i) {
                       final isMultipleChoice = q['isMultipleChoice'] == true;
                       final isSelected = selected?.contains(i) ?? false;
+                      
+                      Color bgColor = isSelected ? const Color(0xFFE6F7F4) : (_dark ? const Color(0xFF0D1117) : const Color(0xFFF8FAFC));
+                      Color borderColor = isSelected ? const Color(0xFF28B79B) : Colors.transparent;
+                      Color iconColor = isSelected ? const Color(0xFF28B79B) : textSub;
+                      IconData iconData = isMultipleChoice 
+                          ? (isSelected ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded)
+                          : (isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded);
+
+                      if (_isReviewMode) {
+                        final isCorrectOption = correctOptions.contains(i);
+                        if (isCorrectOption) {
+                          bgColor = const Color(0xFFECFDF5); // very light green
+                          borderColor = const Color(0xFF10B981);
+                          iconColor = const Color(0xFF10B981);
+                          iconData = Icons.check_circle_rounded;
+                        } else if (isSelected) {
+                          // user selected it, but it's wrong
+                          bgColor = const Color(0xFFFEF2F2); // very light red
+                          borderColor = const Color(0xFFEF4444);
+                          iconColor = const Color(0xFFEF4444);
+                          iconData = Icons.cancel_rounded;
+                        }
+                      }
+
                       return InkWell(
                         borderRadius: BorderRadius.circular(8),
-                        onTap: () => setState(() {
+                        onTap: _isReviewMode ? null : () => setState(() {
                           if (isMultipleChoice) {
                             _answers.putIfAbsent(qId, () => {});
                             if (isSelected) {
@@ -264,23 +310,19 @@ class _MasteryQuizPageState extends State<MasteryQuizPage> {
                           margin: const EdgeInsets.only(bottom: 8),
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
-                            color: isSelected
-                                ? const Color(0xFFE6F7F4)
-                                : (_dark ? const Color(0xFF0D1117) : const Color(0xFFF8FAFC)),
+                            color: bgColor,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: isSelected ? const Color(0xFF28B79B) : Colors.transparent,
+                              color: borderColor,
                               width: 1.4,
                             ),
                           ),
                           child: Row(
                             children: [
                               Icon(
-                                isMultipleChoice 
-                                    ? (isSelected ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded)
-                                    : (isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded),
+                                iconData,
                                 size: 18,
-                                color: isSelected ? const Color(0xFF28B79B) : textSub,
+                                color: iconColor,
                               ),
                               const SizedBox(width: 10),
                               Expanded(
@@ -297,6 +339,26 @@ class _MasteryQuizPageState extends State<MasteryQuizPage> {
                         ),
                       );
                     }),
+                    if (_isReviewMode && explanation != null && explanation.trim().isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0F9FF),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFBAE6FD)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Lời giải / Explanation:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0369A1))),
+                            const SizedBox(height: 4),
+                            Text(explanation, style: const TextStyle(fontSize: 13, color: Color(0xFF0C4A6E), height: 1.4)),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               );
@@ -308,23 +370,32 @@ class _MasteryQuizPageState extends State<MasteryQuizPage> {
             padding: const EdgeInsets.all(16),
             child: SizedBox(
               width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: allAnswered && !_isSubmitting ? _submit : null,
-                icon: _isSubmitting
-                    ? const SizedBox(
-                        width: 18, height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.send_rounded, size: 18),
-                label: Text(allAnswered
-                    ? 'Submit (${_answers.length}/${_questions.length} questions)'
-                    : 'Answered ${_answers.length}/${_questions.length} questions'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF28B79B),
-                  disabledBackgroundColor:
-                      (_dark ? Colors.white12 : const Color(0xFFCBD5E1)),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-              ),
+              child: _isReviewMode
+                  ? FilledButton(
+                      onPressed: () => setState(() => _isReviewMode = false),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF28B79B),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: const Text('Close Review'),
+                    )
+                  : FilledButton.icon(
+                      onPressed: allAnswered && !_isSubmitting ? _submit : null,
+                      icon: _isSubmitting
+                          ? const SizedBox(
+                              width: 18, height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.send_rounded, size: 18),
+                      label: Text(allAnswered
+                          ? 'Submit (${_answers.length}/${_questions.length} questions)'
+                          : 'Answered ${_answers.length}/${_questions.length} questions'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF28B79B),
+                        disabledBackgroundColor:
+                            (_dark ? Colors.white12 : const Color(0xFFCBD5E1)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
             ),
           ),
         ),
@@ -379,6 +450,21 @@ class _MasteryQuizPageState extends State<MasteryQuizPage> {
                 style: TextStyle(fontSize: 13.5, color: textSub, height: 1.5),
               ),
               const SizedBox(height: 24),
+              if (_evaluations.isNotEmpty) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () => setState(() => _isReviewMode = true),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF28B79B),
+                      side: const BorderSide(color: Color(0xFF28B79B)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text('Review Answers'),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(

@@ -59,12 +59,19 @@ public class PathwayMutationService {
 
     @Transactional
     public void applyDetourInsertion(LearningPathway pathway, Long targetNodeId, Course remedialCourse, String reason) {
+        // P0 phanh detour: toi da 3 detour/pathway, 1 detour/parent
+        long detourCount = pathway.getNodes().stream().filter(n -> "DETOUR_REMEDIAL".equals(n.getNodeType())).count();
+        if (detourCount >= 3) throw new IllegalStateException("Pathway already has maximum 3 remedial courses. Please seek tutor support.");
+        if (remedialCourse == null) throw new IllegalArgumentException("No remedial course available");
         // Detour: chen 1 node remedial ngay sau node that bai, cac node phia sau
         // bi day xuong (stepOrder +1) va khoa lai
         PathwayNode failedNode = pathway.getNodes().stream()
                 .filter(n -> n.getId().equals(targetNodeId))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Node not found in pathway"));
+
+        boolean alreadyDetoured = pathway.getNodes().stream().anyMatch(n -> targetNodeId.equals(n.getParentNodeId()));
+        if (alreadyDetoured) throw new IllegalStateException("A remedial course already exists for this node.");
 
         String beforeJson = toJson(pathway.getNodes());
 

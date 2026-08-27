@@ -16,6 +16,8 @@ import com.hango.hango_backend.repository.LessonQuizAttemptRepository;
 import com.hango.hango_backend.repository.UserRepository;
 import com.hango.hango_backend.repository.LessonProgressRepository;
 import com.hango.hango_backend.repository.EnrollmentRepository;
+import com.hango.hango_backend.repository.LearningPathwayRepository;
+import com.hango.hango_backend.repository.PathwayNodeRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -43,6 +45,8 @@ public class LessonServiceImpl implements LessonService {
     private final UserRepository userRepository;
     private final LessonProgressRepository lessonProgressRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final LearningPathwayRepository learningPathwayRepository;
+    private final PathwayNodeRepository pathwayNodeRepository;
     private final CertificateService certificateService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -62,13 +66,19 @@ public class LessonServiceImpl implements LessonService {
         boolean hasPriorAttempt = userId != null
                 && quizAttemptRepository.countByLessonIdAndStudentId(lessonId, userId) > 0;
 
+        boolean isFinalQuiz = Lesson.DISPLAY_TYPE_FINAL_QUIZ.equalsIgnoreCase(lesson.getLessonType());
+        String sql = "SELECT q.id AS question_id, q.question_text, q.explanation, qg.context_text AS passage " +
+                "FROM lesson_quizzes lq " +
+                "JOIN questions q ON lq.question_id = q.id " +
+                "LEFT JOIN question_groups qg ON q.group_id = qg.id " +
+                "WHERE lq.lesson_id = ? ";
+        if (isFinalQuiz) {
+            sql += "AND q.group_id IS NULL ";
+        }
+        sql += "ORDER BY lq.display_order ASC";
+
         List<QuizQuestionDTO> questions = jdbcTemplate.query(
-                "SELECT q.id AS question_id, q.question_text, q.explanation, qg.context_text AS passage " +
-                        "FROM lesson_quizzes lq " +
-                        "JOIN questions q ON lq.question_id = q.id " +
-                        "LEFT JOIN question_groups qg ON q.group_id = qg.id " +
-                        "WHERE lq.lesson_id = ? " +
-                        "ORDER BY lq.display_order ASC",
+                sql,
                 (rs, rowNum) -> {
                     Long qId = rs.getLong("question_id");
                     String questionText = rs.getString("question_text");
@@ -216,7 +226,7 @@ public class LessonServiceImpl implements LessonService {
             answersJson = "{}";
         }
 
-        double finalScore = computeServerSideScore(lessonId, request);
+        double finalScore = computeServerSideScore(lesson, request);
 
         LessonQuizAttempt attempt = LessonQuizAttempt.builder()
                 .lesson(lesson)
@@ -229,6 +239,11 @@ public class LessonServiceImpl implements LessonService {
                 .build();
 
         LessonQuizAttempt saved = quizAttemptRepository.save(attempt);
+
+        // P0: Hook FINAL_QUIZ -> dong bo mastery cho pathway node (single source of truth)
+        if (Lesson.DISPLAY_TYPE_FINAL_QUIZ.equalsIgnoreCase(lesson.getLessonType())) {
+            try { syncPathwayMasteryFromFinalQuiz(lesson, student, finalScore); } catch (Exception e) { org.slf4j.LoggerFactory.getLogger(LessonServiceImpl.class).warn("syncPathwayMastery failed: {}", e.getMessage()); }
+        }
 
         // Auto mark the lesson as completed upon quiz attempt submission
         // Du diem cao hay thap van danh dau bai hoc la "da hoan thanh" (khong bat
@@ -256,15 +271,21 @@ public class LessonServiceImpl implements LessonService {
     // lesson_detail_page.dart _submitQuiz va getLessonDetail() o tren) - khong
     // phai question_id that trong DB, nen phai lay dap an dung THEO DUNG THU TU
     // hien thi (ORDER BY lq.display_order ASC) de khop dung vi tri.
-    private double computeServerSideScore(Long lessonId, LessonQuizAttemptRequestDTO request) {
-        List<Long> questionIds = jdbcTemplate.query(
-                "SELECT q.id AS question_id " +
+    private double computeServerSideScore(Lesson lesson, LessonQuizAttemptRequestDTO request) {
+        boolean isFinalQuiz = Lesson.DISPLAY_TYPE_FINAL_QUIZ.equalsIgnoreCase(lesson.getLessonType());
+        String sql = "SELECT q.id AS question_id " +
                 "FROM lesson_quizzes lq " +
                 "JOIN questions q ON lq.question_id = q.id " +
-                "WHERE lq.lesson_id = ? " +
-                "ORDER BY lq.display_order ASC",
+                "WHERE lq.lesson_id = ? ";
+        if (isFinalQuiz) {
+            sql += "AND q.group_id IS NULL ";
+        }
+        sql += "ORDER BY lq.display_order ASC";
+
+        List<Long> questionIds = jdbcTemplate.query(
+                sql,
                 (rs, rowNum) -> rs.getLong("question_id"),
-                lessonId
+                lesson.getId()
         );
 
         // Khong tim thay cau hoi quiz nao cho bai hoc nay trong DB (vd du lieu
@@ -313,6 +334,30 @@ public class LessonServiceImpl implements LessonService {
         }
 
         return ((double) correctCount / questionIds.size()) * 10.0;
+    }
+
+    private void syncPathwayMasteryFromFinalQuiz(Lesson lesson, User student, double score10) {
+        Long courseId = lesson.getSection() != null && lesson.getSection().getCourse() != null
+                ? lesson.getSection().getCourse().getId() : null;
+        if (courseId == null) return;
+        int score100 = (int) Math.round(score10 * 10);
+        learningPathwayRepository.findByStudentIdAndStatus(student.getId(), "ACTIVE").ifPresent(pathway -> {
+            pathway.getNodes().stream()
+                    .filter(n -> n.getCourse() != null && n.getCourse().getId().equals(courseId))
+                    .findFirst().ifPresent(node -> {
+                        node.setMasteryScore(score100);
+                        if (score100 >= 80) {
+                            node.setIsMastered(true);
+                            int cur = node.getReviewIntervalDays() == null ? 0 : node.getReviewIntervalDays();
+                            int next = cur == 0 ? 1 : cur == 1 ? 3 : cur == 3 ? 7 : cur == 7 ? 14 : 30;
+                            node.setReviewIntervalDays(next);
+                            node.setNextReviewDate(java.time.LocalDateTime.now().plusDays(next));
+                        } else {
+                            node.setIsMastered(false);
+                        }
+                        pathwayNodeRepository.save(node);
+                    });
+        });
     }
 
     // Trai tim cua tinh nang "Progress Tracking": cap nhat trang thai hoan
