@@ -27,6 +27,8 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
   // --- Tab 1: Statements State ---
   bool _isLoading = true;
   List<dynamic> _statements = [];
+  int _statementCurrentPage = 1;
+  final int _statementItemsPerPage = 10;
   String _periodMonthFilter = '';
   String _statusFilter = '';
   final Set<String> _knownPeriods = {
@@ -49,6 +51,7 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() => setState(() {}));
     _fetchStatements();
     _fetchPayments();
   }
@@ -62,7 +65,10 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
   }
 
   Future<void> _fetchStatements() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _statementCurrentPage = 1;
+    });
     final data = await _revenueService.getCourseManagerStatements(
       periodMonth: _periodMonthFilter,
       status: _statusFilter,
@@ -1124,13 +1130,9 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                 const SizedBox(height: 20),
                 _buildTabBar(isVi),
                 const SizedBox(height: 20),
-                IndexedStack(
-                  index: _tabController.index,
-                  children: [
-                    _buildStatementsTab(isVi),
-                    _buildPaymentsTab(isVi),
-                  ],
-                ),
+                _tabController.index == 0
+                    ? _buildStatementsTab(isVi)
+                    : _buildPaymentsTab(isVi),
               ],
             ),
           ),
@@ -1524,117 +1526,142 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                           isVi ? 'Không tìm thấy Báo cáo Quyết toán nào phù hợp.' : 'No matching settlement statements found.',
                           style: const TextStyle(fontSize: 14, color: Color(0xFF64748B), fontFamily: 'Outfit'),
                         ),
-                      ],
-                    ),
                   );
                 }
 
-                return SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
-                    columns: [
-                      DataColumn(label: Text(isVi ? 'Mã Báo cáo' : 'Statement Code', style: _headerStyle)),
-                      DataColumn(label: Text(isVi ? 'Giáo viên' : 'Trainer Name', style: _headerStyle)),
-                      DataColumn(label: Text(isVi ? 'Loại' : 'Type', style: _headerStyle)),
-                      DataColumn(label: Text(isVi ? 'Kỳ Tháng' : 'Period', style: _headerStyle)),
-                      DataColumn(label: Text(isVi ? 'Tổng Gross' : 'Gross', style: _headerStyle)),
-                      DataColumn(label: Text(isVi ? 'Thuế 10%' : 'Tax 10%', style: _headerStyle)),
-                      DataColumn(label: Text(isVi ? 'Thực nhận (Net)' : 'Net Payout', style: _headerStyle)),
-                      DataColumn(label: Text(isVi ? 'Tài khoản Ngân hàng' : 'Bank Account', style: _headerStyle)),
-                      DataColumn(label: Text(isVi ? 'Trạng thái' : 'Status', style: _headerStyle)),
-                      DataColumn(label: Text(isVi ? 'Thao tác' : 'Action', style: _headerStyle)),
-                    ],
-                    rows: displayList.map((s) {
-                  final status = s['status']?.toString() ?? 'PENDING_TRAINER_CONFIRM';
-                  final net = s['netPayoutAmount'] ?? 0;
-                  final gross = s['totalGrossAmount'] ?? 0;
-                  final tax = s['pitTaxAmount'] ?? 0;
-                  final trainerName = s['trainerName'] ?? 'N/A';
-                  final trainerType = s['trainerType'] ?? 'PROFESSIONAL';
-                  final bankName = s['bankName'] ?? '';
-                  final bankAcc = s['bankAccount'] ?? '';
-                  final bankAccName = s['bankAccountName'] ?? '';
+                final totalItems = displayList.length;
+                final totalPages = (totalItems / _statementItemsPerPage).ceil().clamp(1, 999999);
+                final safeCurrentPage = _statementCurrentPage.clamp(1, totalPages);
+                final startIndex = (safeCurrentPage - 1) * _statementItemsPerPage;
+                final endIndex = (startIndex + _statementItemsPerPage > totalItems)
+                    ? totalItems
+                    : startIndex + _statementItemsPerPage;
+                final paginatedList = displayList.sublist(
+                  startIndex < totalItems ? startIndex : 0,
+                  endIndex <= totalItems ? endIndex : totalItems,
+                );
 
-                  return DataRow(
-                    cells: [
-                      DataCell(
-                        InkWell(
-                          onTap: () => _showStatementDetailDialog(s as Map<String, dynamic>),
-                          child: Text(
-                            s['statementCode']?.toString() ?? 'N/A',
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2563EB), decoration: TextDecoration.underline),
-                          ),
-                        ),
-                      ),
-                      DataCell(
-                        InkWell(
-                          onTap: () => _showStatementDetailDialog(s as Map<String, dynamic>),
-                          child: Text(
-                            trainerName,
-                            style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-                          ),
-                        ),
-                      ),
-                      DataCell(Text(trainerType == 'PEER_TUTOR' ? 'Tutor' : 'Teacher')),
-
-                      DataCell(Text(s['periodMonth']?.toString() ?? 'N/A')),
-                      DataCell(Text(_formatVND(gross))),
-                      DataCell(Text(_formatVND(tax), style: const TextStyle(color: Colors.redAccent))),
-                      DataCell(Text(_formatVND(net), style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF28B79B)))),
-                      DataCell(Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('$bankName - $bankAcc', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                          Text(bankAccName, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: DataTable(
+                        headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
+                        columns: [
+                          DataColumn(label: Text(isVi ? 'Mã Báo cáo' : 'Statement Code', style: _headerStyle)),
+                          DataColumn(label: Text(isVi ? 'Giáo viên' : 'Trainer Name', style: _headerStyle)),
+                          DataColumn(label: Text(isVi ? 'Loại' : 'Type', style: _headerStyle)),
+                          DataColumn(label: Text(isVi ? 'Kỳ Tháng' : 'Period', style: _headerStyle)),
+                          DataColumn(label: Text(isVi ? 'Tổng Gross' : 'Gross', style: _headerStyle)),
+                          DataColumn(label: Text(isVi ? 'Thuế 10%' : 'Tax 10%', style: _headerStyle)),
+                          DataColumn(label: Text(isVi ? 'Thực nhận (Net)' : 'Net Payout', style: _headerStyle)),
+                          DataColumn(label: Text(isVi ? 'Tài khoản Ngân hàng' : 'Bank Account', style: _headerStyle)),
+                          DataColumn(label: Text(isVi ? 'Trạng thái' : 'Status', style: _headerStyle)),
+                          DataColumn(label: Text(isVi ? 'Thao tác' : 'Action', style: _headerStyle)),
                         ],
-                      )),
-                      DataCell(_buildStatusBadge(status, isVi)),
-                      DataCell(
-                        status == 'PAID'
-                            ? OutlinedButton.icon(
-                                onPressed: () => _showSettleDialog(s as Map<String, dynamic>, isReadOnly: true),
-                                icon: const Icon(Icons.receipt_long_outlined, size: 14),
-                                label: Text(isVi ? 'Xem Chứng từ' : 'View Transfer Record', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: const Color(0xFF28B79B),
-                                  side: const BorderSide(color: Color(0xFF28B79B)),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                ),
-                              )
-                            : (status == 'REJECTED' || status == 'CANCELLED')
-                                ? ElevatedButton.icon(
-                                    onPressed: () => _showRegenerateDialog(s as Map<String, dynamic>),
-                                    icon: const Icon(Icons.sync, size: 14),
-                                    label: Text(isVi ? 'Tính toán & Chốt lại' : 'Recalculate & Resubmit', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFFD97706),
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    ),
-                                  )
-                                : ElevatedButton.icon(
-                                    onPressed: () => _showSettleDialog(s as Map<String, dynamic>, isReadOnly: false),
-                                    icon: const Icon(Icons.check_circle_outline, size: 14),
-                                    label: Text(isVi ? 'Xác nhận Đã trả' : 'Mark Paid', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF28B79B),
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    ),
+                        rows: paginatedList.map((s) {
+                          final status = s['status']?.toString() ?? 'PENDING_TRAINER_CONFIRM';
+                          final net = s['netPayoutAmount'] ?? 0;
+                          final gross = s['totalGrossAmount'] ?? 0;
+                          final tax = s['pitTaxAmount'] ?? 0;
+                          final trainerName = s['trainerName'] ?? 'N/A';
+                          final trainerType = s['trainerType'] ?? 'PROFESSIONAL';
+                          final bankName = s['bankName'] ?? '';
+                          final bankAcc = s['bankAccount'] ?? '';
+                          final bankAccName = s['bankAccountName'] ?? '';
+
+                          return DataRow(
+                            cells: [
+                              DataCell(
+                                InkWell(
+                                  onTap: () => _showStatementDetailDialog(s as Map<String, dynamic>),
+                                  child: Text(
+                                    s['statementCode']?.toString() ?? 'N/A',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2563EB), decoration: TextDecoration.underline),
                                   ),
+                                ),
+                              ),
+                              DataCell(
+                                InkWell(
+                                  onTap: () => _showStatementDetailDialog(s as Map<String, dynamic>),
+                                  child: Text(
+                                    trainerName,
+                                    style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                                  ),
+                                ),
+                              ),
+                              DataCell(Text(trainerType == 'PEER_TUTOR' ? 'Tutor' : 'Teacher')),
+
+                              DataCell(Text(s['periodMonth']?.toString() ?? 'N/A')),
+                              DataCell(Text(_formatVND(gross))),
+                              DataCell(Text(_formatVND(tax), style: const TextStyle(color: Colors.redAccent))),
+                              DataCell(Text(_formatVND(net), style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF28B79B)))),
+                              DataCell(Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('$bankName - $bankAcc', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  Text(bankAccName, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                                ],
+                              )),
+                              DataCell(_buildStatusBadge(status, isVi)),
+                              DataCell(
+                                status == 'PAID'
+                                    ? OutlinedButton.icon(
+                                        onPressed: () => _showSettleDialog(s as Map<String, dynamic>, isReadOnly: true),
+                                        icon: const Icon(Icons.receipt_long_outlined, size: 14),
+                                        label: Text(isVi ? 'Xem Chứng từ' : 'View Transfer Record', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: const Color(0xFF28B79B),
+                                          side: const BorderSide(color: Color(0xFF28B79B)),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                        ),
+                                      )
+                                    : (status == 'REJECTED' || status == 'CANCELLED')
+                                        ? ElevatedButton.icon(
+                                            onPressed: () => _showRegenerateDialog(s as Map<String, dynamic>),
+                                            icon: const Icon(Icons.sync, size: 14),
+                                            label: Text(isVi ? 'Tính toán & Chốt lại' : 'Recalculate & Resubmit', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFFD97706),
+                                              foregroundColor: Colors.white,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                            ),
+                                          )
+                                        : ElevatedButton.icon(
+                                            onPressed: () => _showSettleDialog(s as Map<String, dynamic>, isReadOnly: false),
+                                            icon: const Icon(Icons.check_circle_outline, size: 14),
+                                            label: Text(isVi ? 'Xác nhận Đã trả' : 'Mark Paid', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFF28B79B),
+                                              foregroundColor: Colors.white,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                            ),
+                                          ),
+                              ),
+                            ],
+                          );
+                        }).toList(),
                       ),
-                    ],
-                  );
-                 }).toList(),
-               ),
-             );
-           },
-         ),
+                    ),
+                    if (totalItems > 0)
+                      _buildPaginationFooter(
+                        totalItems: totalItems,
+                        startIndex: startIndex,
+                        endIndex: endIndex,
+                        currentPage: safeCurrentPage,
+                        totalPages: totalPages,
+                        onPageChanged: (page) => setState(() => _statementCurrentPage = page),
+                        isVi: isVi,
+                      ),
+                  ],
+                );
+              },
+            ),
         ],
       ),
     );
@@ -1941,46 +1968,162 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                   ),
                 ),
                 const SizedBox(height: 16),
-                // Pagination controls
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      isVi
-                          ? 'Hiển thị ${_payments.length} / $_paymentsTotalElements giao dịch (Trang ${_paymentsPage + 1}/$_paymentsTotalPages)'
-                          : 'Showing ${_payments.length} of $_paymentsTotalElements transactions (Page ${_paymentsPage + 1}/$_paymentsTotalPages)',
-                      style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontFamily: 'Outfit'),
-                    ),
-                    Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.chevron_left),
-                          onPressed: _paymentsPage > 0
-                              ? () {
-                                  setState(() => _paymentsPage--);
-                                  _fetchPayments();
-                                }
-                              : null,
-                        ),
-                        Text('${_paymentsPage + 1}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        IconButton(
-                          icon: const Icon(Icons.chevron_right),
-                          onPressed: (_paymentsPage + 1) < _paymentsTotalPages
-                              ? () {
-                                  setState(() => _paymentsPage++);
-                                  _fetchPayments();
-                                }
-                              : null,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                if (_paymentsTotalElements > 0)
+                  _buildPaginationFooter(
+                    totalItems: _paymentsTotalElements,
+                    startIndex: _paymentsPage * _paymentsPageSize,
+                    endIndex: (_paymentsPage * _paymentsPageSize + _payments.length),
+                    currentPage: _paymentsPage + 1,
+                    totalPages: _paymentsTotalPages == 0 ? 1 : _paymentsTotalPages,
+                    onPageChanged: (page) {
+                      setState(() => _paymentsPage = page - 1);
+                      _fetchPayments();
+                    },
+                    isVi: isVi,
+                  ),
               ],
             ),
         ],
       ),
     );
+  }
+
+  Widget _buildPaginationFooter({
+    required int totalItems,
+    required int startIndex,
+    required int endIndex,
+    required int currentPage,
+    required int totalPages,
+    required Function(int) onPageChanged,
+    required bool isVi,
+  }) {
+    if (totalItems == 0) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 12,
+        runSpacing: 12,
+        children: [
+          Text(
+            isVi
+                ? 'Hiển thị ${totalItems == 0 ? 0 : startIndex + 1} đến $endIndex của $totalItems mục'
+                : 'Showing ${totalItems == 0 ? 0 : startIndex + 1} to $endIndex of $totalItems entries',
+            style: const TextStyle(
+              color: Color(0xFF64748B),
+              fontSize: 14,
+              fontFamily: 'Outfit',
+            ),
+          ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildPaginationButton(
+                  Icons.chevron_left,
+                  onPressed: currentPage > 1
+                      ? () => onPageChanged(currentPage - 1)
+                      : null,
+                ),
+                const SizedBox(width: 8),
+                ..._getPageNumbers(currentPage, totalPages).map((p) {
+                  if (p == null) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4),
+                      child: Text('...', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+                    );
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: _buildPaginationNumber(
+                      p.toString(),
+                      isActive: p == currentPage,
+                      onPressed: () => onPageChanged(p),
+                    ),
+                  );
+                }),
+                _buildPaginationButton(
+                  Icons.chevron_right,
+                  onPressed: currentPage < totalPages
+                      ? () => onPageChanged(currentPage + 1)
+                      : null,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaginationButton(IconData icon, {VoidCallback? onPressed}) {
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: onPressed == null ? const Color(0xFFF8FAFC) : Colors.white,
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Icon(
+          icon,
+          size: 18,
+          color: onPressed == null
+              ? const Color(0xFFCBD5E1)
+              : const Color(0xFF64748B),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaginationNumber(
+    String text, {
+    bool isActive = false,
+    VoidCallback? onPressed,
+  }) {
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFF28B79B) : Colors.white,
+          border: Border.all(
+            color: isActive ? const Color(0xFF28B79B) : const Color(0xFFE2E8F0),
+          ),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          text,
+          style: TextStyle(
+            color: isActive ? Colors.white : const Color(0xFF64748B),
+            fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+            fontSize: 14,
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<int?> _getPageNumbers(int currentPage, int totalPages) {
+    if (totalPages <= 7) {
+      return List.generate(totalPages, (index) => index + 1);
+    }
+    if (currentPage <= 4) {
+      return [1, 2, 3, 4, 5, null, totalPages];
+    }
+    if (currentPage >= totalPages - 3) {
+      return [1, null, totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    }
+    return [1, null, currentPage - 1, currentPage, currentPage + 1, null, totalPages];
   }
 
   TextStyle get _headerStyle => const TextStyle(
