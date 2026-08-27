@@ -789,7 +789,12 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
           CircleAvatar(
             radius: 16,
             backgroundColor: const Color(0xFFE2F9F3),
-            backgroundImage: _trainerAvatarUrl.isNotEmpty ? NetworkImage(_trainerAvatarUrl) : null,
+            backgroundImage: _trainerAvatarUrl.isNotEmpty
+                ? NetworkImage(_trainerAvatarUrl.contains('dicebear.com') && _trainerAvatarUrl.contains('/svg')
+                    ? _trainerAvatarUrl.replaceAll('/svg', '/png')
+                    : _trainerAvatarUrl)
+                : null,
+            onBackgroundImageError: _trainerAvatarUrl.isNotEmpty ? (exception, stackTrace) {} : null,
             child: _trainerAvatarUrl.isEmpty
                 ? Text(_trainerInitials, style: const TextStyle(color: Color(0xFF28B79B), fontWeight: FontWeight.bold, fontSize: 14))
                 : null,

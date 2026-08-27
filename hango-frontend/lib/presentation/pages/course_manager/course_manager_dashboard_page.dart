@@ -556,7 +556,14 @@ class _CourseManagerDashboardPageState extends State<CourseManagerDashboardPage>
                   CircleAvatar(
                     radius: 18,
                     backgroundColor: const Color(0xFFF0FDFA),
-                    backgroundImage: t.avatarUrl != null && t.avatarUrl!.isNotEmpty ? NetworkImage(t.avatarUrl!) : null,
+                    backgroundImage: t.avatarUrl != null && t.avatarUrl!.isNotEmpty
+                        ? NetworkImage(t.avatarUrl!.contains('dicebear.com') && t.avatarUrl!.contains('/svg')
+                            ? t.avatarUrl!.replaceAll('/svg', '/png')
+                            : t.avatarUrl!)
+                        : null,
+                    onBackgroundImageError: t.avatarUrl != null && t.avatarUrl!.isNotEmpty
+                        ? (exception, stackTrace) {}
+                        : null,
                     child: t.avatarUrl == null || t.avatarUrl!.isEmpty
                         ? Text(t.fullName.isNotEmpty ? t.fullName[0].toUpperCase() : '?',
                             style: const TextStyle(color: Color(0xFF0D9488), fontWeight: FontWeight.w700))
@@ -716,23 +723,26 @@ class _CourseManagerDashboardPageState extends State<CourseManagerDashboardPage>
             }
             return Padding(
               padding: const EdgeInsets.only(bottom: 4),
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                leading: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    width: 40, height: 40,
-                    color: const Color(0xFFF0FDFA),
-                    child: course.thumbnailUrl.isNotEmpty
-                        ? Image.network(course.thumbnailUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.school_outlined, color: Color(0xFF0D9488), size: 20))
-                        : const Icon(Icons.school_outlined, color: Color(0xFF0D9488), size: 20),
+              child: Material(
+                color: Colors.transparent,
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  leading: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      width: 40, height: 40,
+                      color: const Color(0xFFF0FDFA),
+                      child: course.thumbnailUrl.isNotEmpty
+                          ? Image.network(course.thumbnailUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.school_outlined, color: Color(0xFF0D9488), size: 20))
+                          : const Icon(Icons.school_outlined, color: Color(0xFF0D9488), size: 20),
+                    ),
                   ),
+                  title: Text(course.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E293B), fontFamily: 'Fira Sans'), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  subtitle: Text('by ${course.creatorName}', style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontFamily: 'Fira Sans')),
+                  trailing: Text(timeAgo, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontFamily: 'Fira Sans')),
+                  onTap: () => Navigator.pushNamed(context, '/course-manager/courses/review/${course.id}'),
                 ),
-                title: Text(course.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E293B), fontFamily: 'Fira Sans'), maxLines: 1, overflow: TextOverflow.ellipsis),
-                subtitle: Text('by ${course.creatorName}', style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontFamily: 'Fira Sans')),
-                trailing: Text(timeAgo, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontFamily: 'Fira Sans')),
-                onTap: () => Navigator.pushNamed(context, '/course-manager/courses/review/${course.id}'),
               ),
             );
           }),
