@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../../utils/config.dart';
@@ -29,14 +30,19 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
   String _errorMessage = '';
 
   int _coursesCount = 0;
-  int _examsCount = 0;
+  int _salesCount = 0;
   int _learnersCount = 0;
   double _totalRevenue = 0.0;
-  double _averageRating = 0.0;
   List<dynamic> _coursesList = [];
   List<dynamic> _recentActivities = [];
-  List<dynamic> _monthlyRevenues = [];
-  String _selectedChartPeriod = '1Y';
+  
+  List<dynamic> _weeklyRevenues = [];
+  int _selectedWeekOffset = 0;
+  bool _isWeeklyLoading = false;
+
+  List<dynamic> _monthlyRevenuesByYear = [];
+  int _selectedYear = DateTime.now().year;
+  bool _isMonthlyLoading = false;
 
   String get apiBaseUrl => EnvConfig.v1BaseUrl;
 
@@ -45,6 +51,8 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
     super.initState();
     _loadTrainerInfo();
     _fetchDashboardData();
+    _fetchWeeklyRevenue();
+    _fetchMonthlyRevenue();
   }
 
   Future<void> _loadTrainerInfo() async {
@@ -91,12 +99,10 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
         setState(() {
           _coursesCount = (data['coursesCount'] ?? 0) as int;
           _learnersCount = (data['learnersCount'] ?? 0) as int;
-          _examsCount = (data['examsCount'] ?? 0) as int;
+          _salesCount = (data['salesCount'] ?? 0) as int;
           _totalRevenue = (data['totalRevenue'] ?? 0.0).toDouble();
-          _averageRating = (data['averageRating'] ?? 0.0).toDouble();
           _coursesList = data['courses'] ?? [];
           _recentActivities = data['recentActivities'] ?? [];
-          _monthlyRevenues = data['monthlyRevenues'] ?? [];
           _isLoading = false;
         });
       } else {
@@ -113,13 +119,71 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
     }
   }
 
+  Future<void> _fetchWeeklyRevenue() async {
+    setState(() => _isWeeklyLoading = true);
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return;
+      final response = await http.get(
+        Uri.parse('$apiBaseUrl/trainer/revenue/weekly?weekOffset=$_selectedWeekOffset'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        setState(() {
+          _weeklyRevenues = jsonDecode(utf8.decode(response.bodyBytes));
+          _isWeeklyLoading = false;
+        });
+      } else {
+        setState(() => _isWeeklyLoading = false);
+      }
+    } catch (e) {
+      debugPrint('Error loading weekly revenue: $e');
+      if (mounted) setState(() => _isWeeklyLoading = false);
+    }
+  }
+
+  String _getWeekRangeText(int offset) {
+    if (offset == 0) return 'This Week';
+    if (offset == -1) return 'Last Week';
+    final now = DateTime.now();
+    final currentMonday = now.subtract(Duration(days: now.weekday - 1));
+    final targetMonday = currentMonday.add(Duration(days: offset * 7));
+    final targetSunday = targetMonday.add(const Duration(days: 6));
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${months[targetMonday.month - 1]} ${targetMonday.day} - ${months[targetSunday.month - 1]} ${targetSunday.day}';
+  }
+
+  Future<void> _fetchMonthlyRevenue() async {
+    setState(() => _isMonthlyLoading = true);
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return;
+      final response = await http.get(
+        Uri.parse('$apiBaseUrl/trainer/revenue/monthly?year=$_selectedYear'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        setState(() {
+          _monthlyRevenuesByYear = jsonDecode(utf8.decode(response.bodyBytes));
+          _isMonthlyLoading = false;
+        });
+      } else {
+        setState(() => _isMonthlyLoading = false);
+      }
+    } catch (e) {
+      debugPrint('Error loading monthly revenue: $e');
+      if (mounted) setState(() => _isMonthlyLoading = false);
+    }
+  }
+
   void _loadMockFallback() {
     setState(() {
       _coursesCount = 12;
       _learnersCount = 428;
-      _examsCount = 5;
+      _salesCount = 50;
       _totalRevenue = 15000000.0;
-      _averageRating = 4.8;
       _coursesList = [
         {'id': 1, 'title': 'IELTS Intensive 7.0+', 'learnersCount': 120, 'lessonsCount': 24, 'thumbnailUrl': null},
         {'id': 2, 'title': 'Business English Advanced', 'learnersCount': 85, 'lessonsCount': 16, 'thumbnailUrl': null},
@@ -129,7 +193,8 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
         {'type': 'RATING', 'action': 'New 5-star review on', 'target': 'Business English', 'time': '5 hours ago'},
         {'type': 'PAYMENT', 'action': 'Sold course', 'target': 'Grammar Masterclass', 'time': '1 day ago'},
       ];
-      _monthlyRevenues = List.generate(12, (index) => {'month': index + 1, 'revenue': index * 1.5});
+      _weeklyRevenues = List.generate(7, (index) => {'date': '2026-08-0${index+1}', 'dayOfWeek': 'Day ${index+1}', 'revenue': index * 500000.0});
+      _monthlyRevenuesByYear = List.generate(12, (index) => {'month': index + 1, 'revenue': index * 1.5 * 1000000.0});
     });
   }
 
@@ -198,12 +263,32 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(flex: 2, child: _buildChartSection()),
+              Expanded(
+                flex: 2,
+                child: Column(
+                  children: [
+                    _buildWeeklyRevenueChart(),
+                    const SizedBox(height: 24),
+                    _buildMonthlyRevenueChart(),
+                  ],
+                ),
+              ),
               if (isDesktop) const SizedBox(width: 24),
-              if (isDesktop) Expanded(flex: 1, child: _buildRecentActivitySection()),
+              if (isDesktop) Expanded(flex: 1, child: Column(
+                children: [
+                  _buildRecentActivitySection(),
+                  const SizedBox(height: 24),
+                  _buildRevenueInsightsCard(),
+                ],
+              )),
             ],
           ),
-          if (!isDesktop) ...[const SizedBox(height: 32), _buildRecentActivitySection()],
+          if (!isDesktop) ...[
+            const SizedBox(height: 32), 
+            _buildRecentActivitySection(),
+            const SizedBox(height: 32),
+            _buildRevenueInsightsCard(),
+          ],
           const SizedBox(height: 32),
           _buildCoursesSection(),
         ],
@@ -325,7 +410,7 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
                       children: [
                         _buildWelcomeStatBadge('Courses', '$_coursesCount', const Color(0xFF34D399)),
                         const SizedBox(width: 8),
-                        _buildWelcomeStatBadge('Exams', '$_examsCount', const Color(0xFF60A5FA)),
+                        _buildWelcomeStatBadge('Sales', '$_salesCount', const Color(0xFF60A5FA)),
                         const SizedBox(width: 8),
                         _buildWelcomeStatBadge('Learners', '$_learnersCount', const Color(0xFFA78BFA)),
                       ],
@@ -382,7 +467,7 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
         _buildPremiumCard(title: 'Total Revenue', value: _formatCurrency(_totalRevenue), trend: '', accentColor: const Color(0xFF20B486), subtitle: 'All time earnings'),
         _buildPremiumCard(title: 'Total Learners', value: '$_learnersCount', trend: '', accentColor: const Color(0xFF3B82F6), subtitle: 'Unique enrolled students'),
         _buildPremiumCard(title: 'Active Courses', value: '$_coursesCount', trend: '', accentColor: const Color(0xFF8B5CF6), subtitle: 'Published course families'),
-        _buildPremiumCard(title: 'Avg Rating', value: _averageRating.toStringAsFixed(1), trend: '', accentColor: const Color(0xFFF59E0B), subtitle: 'Out of 5.0 stars'),
+        _buildPremiumCard(title: 'Total Sales', value: '$_salesCount', trend: '', accentColor: const Color(0xFFF59E0B), subtitle: 'Successful orders'),
       ],
     );
   }
@@ -424,39 +509,19 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
     );
   }
 
-  Widget _buildChartSection() {
-    int currentMonth = DateTime.now().month;
+  Widget _buildWeeklyRevenueChart() {
     double minX = 0;
-    double maxX = 11;
-
-    if (_selectedChartPeriod == '1M') {
-      minX = (currentMonth - 2).toDouble();
-      maxX = (currentMonth - 1).toDouble();
-    } else if (_selectedChartPeriod == '3M') {
-      minX = (currentMonth - 3).toDouble();
-      maxX = (currentMonth - 1).toDouble();
-    } else if (_selectedChartPeriod == '6M') {
-      minX = (currentMonth - 6).toDouble();
-      maxX = (currentMonth - 1).toDouble();
-    } else {
-      minX = 0;
-      maxX = 11;
-    }
-    
-    if (minX < 0) minX = 0;
-    if (maxX <= minX) maxX = minX + 1;
-
+    double maxX = 6;
     List<FlSpot> spots = [];
-    if (_monthlyRevenues.isNotEmpty) {
-      for (var e in _monthlyRevenues) {
-        int m = e['month'] as int;
+    List<String> days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+    if (_weeklyRevenues.isNotEmpty) {
+      for (int i = 0; i < _weeklyRevenues.length; i++) {
+        var e = _weeklyRevenues[i];
         double val = ((e['revenue'] as num) / 1000000).toDouble();
-        if ((m - 1) >= minX && (m - 1) <= maxX) {
-          spots.add(FlSpot((m - 1).toDouble(), val));
-        }
+        spots.add(FlSpot(i.toDouble(), val));
       }
-    }
-    if (spots.isEmpty) {
+    } else {
       spots = [FlSpot(minX, 0), FlSpot(maxX, 0)];
     }
 
@@ -474,35 +539,57 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Revenue Analytics', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), fontFamily: 'Outfit')), SizedBox(height: 4), Text('Monthly earning progression', style: TextStyle(fontSize: 13, color: Color(0xFF64748B), fontFamily: 'Outfit'))]),
+                const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Weekly Revenue', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), fontFamily: 'Outfit')), SizedBox(height: 4), Text('7-day progression', style: TextStyle(fontSize: 13, color: Color(0xFF64748B), fontFamily: 'Outfit'))]),
                 Container(
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(12)),
                   child: Row(
-                    children: ['1M', '3M', '6M', '1Y'].map((period) {
-                      final isSelected = _selectedChartPeriod == period;
-                      return InkWell(
-                        onTap: () => setState(() => _selectedChartPeriod = period),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: isSelected ? Colors.white : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                            boxShadow: isSelected ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))] : null,
-                          ),
-                          child: Text(period, style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500, color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF64748B), fontFamily: 'Outfit')),
-                        ),
-                      );
-                    }).toList(),
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left, color: Color(0xFF64748B), size: 20),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: () {
+                          setState(() => _selectedWeekOffset--);
+                          _fetchWeeklyRevenue();
+                        },
+                      ),
+                      const SizedBox(width: 12),
+                      Text(_getWeekRangeText(_selectedWeekOffset), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A), fontFamily: 'Outfit')),
+                      const SizedBox(width: 12),
+                      IconButton(
+                        icon: Icon(Icons.chevron_right, color: _selectedWeekOffset < 0 ? const Color(0xFF64748B) : const Color(0xFFCBD5E1), size: 20),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: _selectedWeekOffset < 0 ? () {
+                          setState(() => _selectedWeekOffset++);
+                          _fetchWeeklyRevenue();
+                        } : null,
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 32),
             Expanded(
-              child: LineChart(
+              child: _isWeeklyLoading ? const Center(child: CircularProgressIndicator(color: Color(0xFF20B486))) : LineChart(
                 LineChartData(
+                  lineTouchData: LineTouchData(
+                    touchTooltipData: LineTouchTooltipData(
+                      getTooltipColor: (touchedSpot) => const Color(0xFF475569),
+                      getTooltipItems: (List<LineBarSpot> touchedBarSpots) {
+                        return touchedBarSpots.map((barSpot) {
+                          double actualValue = barSpot.y * 1000000;
+                          final formattedValue = NumberFormat.currency(locale: 'vi_VN', symbol: '₫').format(actualValue);
+                          return LineTooltipItem(
+                            formattedValue,
+                            const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Outfit', fontSize: 14),
+                          );
+                        }).toList();
+                      },
+                    ),
+                  ),
                   gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: maxY / 5, getDrawingHorizontalLine: (value) => FlLine(color: const Color(0xFFF1F5F9), strokeWidth: 1)),
                   titlesData: FlTitlesData(
                     show: true,
@@ -517,10 +604,12 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
                           const style = TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.w600, fontSize: 12, fontFamily: 'Outfit');
                           int val = value.toInt();
                           if (val != value) return const SizedBox.shrink();
-                          List<String> months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                          if (val < 0 || val > 11) return const SizedBox.shrink();
-                          
-                          return SideTitleWidget(meta: meta, child: Text(months[val], style: style));
+                          if (val < 0 || val >= days.length) return const SizedBox.shrink();
+                          String label = days[val];
+                          if (_weeklyRevenues.isNotEmpty && val < _weeklyRevenues.length) {
+                             label = _weeklyRevenues[val]['dayOfWeek'] ?? days[val];
+                          }
+                          return SideTitleWidget(meta: meta, child: Text(label, style: style));
                         },
                       ),
                     ),
@@ -552,6 +641,120 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
                       belowBarData: BarAreaData(show: true, gradient: LinearGradient(colors: [const Color(0xFF20B486).withValues(alpha: 0.25), const Color(0xFF20B486).withValues(alpha: 0.0)], begin: Alignment.topCenter, end: Alignment.bottomCenter)),
                     ),
                   ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMonthlyRevenueChart() {
+    double maxY = 10;
+    if (_monthlyRevenuesByYear.isNotEmpty) {
+      double maxVal = _monthlyRevenuesByYear.map((e) => ((e['revenue'] as num) / 1000000).toDouble()).reduce((a, b) => a > b ? a : b);
+      maxY = maxVal == 0 ? 10 : ((maxVal / 10).ceil() * 10).toDouble();
+      if (maxY == maxVal) maxY += 10;
+    }
+
+    return _HoverCard(
+      padding: const EdgeInsets.all(24),
+      child: SizedBox(
+        height: 380,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Monthly Revenue', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), fontFamily: 'Outfit')), SizedBox(height: 4), Text('12-month earning progression', style: TextStyle(fontSize: 13, color: Color(0xFF64748B), fontFamily: 'Outfit'))]),
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left, color: Color(0xFF64748B)),
+                      onPressed: () {
+                        setState(() => _selectedYear--);
+                        _fetchMonthlyRevenue();
+                      },
+                    ),
+                    Text('$_selectedYear', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A), fontFamily: 'Outfit')),
+                    IconButton(
+                      icon: Icon(Icons.chevron_right, color: _selectedYear < DateTime.now().year ? const Color(0xFF64748B) : const Color(0xFFCBD5E1)),
+                      onPressed: _selectedYear < DateTime.now().year ? () {
+                        setState(() => _selectedYear++);
+                        _fetchMonthlyRevenue();
+                      } : null,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 32),
+            Expanded(
+              child: _isMonthlyLoading ? const Center(child: CircularProgressIndicator(color: Color(0xFF20B486))) : BarChart(
+                BarChartData(
+                  barTouchData: BarTouchData(
+                    touchTooltipData: BarTouchTooltipData(
+                      getTooltipColor: (group) => const Color(0xFF475569),
+                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                        double actualValue = rod.toY * 1000000;
+                        final formattedValue = NumberFormat.currency(locale: 'vi_VN', symbol: '₫').format(actualValue);
+                        return BarTooltipItem(
+                          formattedValue,
+                          const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Outfit', fontSize: 14),
+                        );
+                      },
+                    ),
+                  ),
+                  gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: maxY / 5, getDrawingHorizontalLine: (value) => FlLine(color: const Color(0xFFF1F5F9), strokeWidth: 1)),
+                  titlesData: FlTitlesData(
+                    show: true,
+                    rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 30,
+                        getTitlesWidget: (value, meta) {
+                          const style = TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.w600, fontSize: 12, fontFamily: 'Outfit');
+                          List<String> months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                          if (value.toInt() < 1 || value.toInt() > 12) return const SizedBox.shrink();
+                          return SideTitleWidget(meta: meta, child: Text(months[value.toInt() - 1], style: style));
+                        },
+                      ),
+                    ),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true, 
+                        reservedSize: 42,
+                        interval: maxY / 5,
+                        getTitlesWidget: (value, meta) {
+                          if (value == meta.max && value != meta.min && value % (maxY / 5) != 0) return const SizedBox.shrink();
+                          return Text('${value.toInt()}M', style: const TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.w600, fontSize: 12, fontFamily: 'Outfit'));
+                        }
+                      )
+                    ),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  maxY: maxY,
+                  barGroups: List.generate(12, (index) {
+                    double val = 0;
+                    if (_monthlyRevenuesByYear.isNotEmpty && index < _monthlyRevenuesByYear.length) {
+                      val = ((_monthlyRevenuesByYear[index]['revenue'] as num) / 1000000).toDouble();
+                    }
+                    return BarChartGroupData(
+                      x: index + 1,
+                      barRods: [
+                        BarChartRodData(
+                          toY: val,
+                          gradient: const LinearGradient(colors: [Color(0xFF20B486), Color(0xFF10B981)]),
+                          width: 16,
+                          borderRadius: const BorderRadius.only(topLeft: Radius.circular(4), topRight: Radius.circular(4)),
+                        )
+                      ],
+                    );
+                  }),
                 ),
               ),
             ),
@@ -632,6 +835,187 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildRevenueInsightsCard() {
+    // Calculate insights from existing data
+    final int currentMonth = DateTime.now().month;
+    double thisMonthRevenue = 0;
+    double yearTotal = 0;
+    if (_monthlyRevenuesByYear.isNotEmpty) {
+      for (var m in _monthlyRevenuesByYear) {
+        double rev = ((m['revenue'] as num?) ?? 0).toDouble();
+        yearTotal += rev;
+        int month = (m['month'] as int?) ?? 0;
+        if (month == currentMonth) {
+          thisMonthRevenue = rev;
+        }
+      }
+    }
+
+    return _HoverCard(
+      padding: const EdgeInsets.all(24),
+      child: SizedBox(
+        height: 380,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Color(0xFF20B486), Color(0xFF10B981)]),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(Icons.insights_rounded, color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 14),
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Revenue Insights', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), fontFamily: 'Outfit')),
+                  SizedBox(height: 2),
+                  Text('Financial summary', style: TextStyle(fontSize: 13, color: Color(0xFF64748B), fontFamily: 'Outfit')),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          // This Month Revenue
+          _buildInsightRow(
+            icon: Icons.calendar_today_rounded,
+            iconBg: const Color(0xFFEFF6FF),
+            iconColor: const Color(0xFF3B82F6),
+            label: 'This Month',
+            value: _formatCurrency(thisMonthRevenue),
+            valueColor: const Color(0xFF3B82F6),
+          ),
+          const SizedBox(height: 16),
+          // Year Total
+          _buildInsightRow(
+            icon: Icons.trending_up_rounded,
+            iconBg: const Color(0xFFF0FDF4),
+            iconColor: const Color(0xFF20B486),
+            label: 'Year $_selectedYear Total',
+            value: _formatCurrency(yearTotal),
+            valueColor: const Color(0xFF20B486),
+          ),
+          const SizedBox(height: 20),
+          // Revenue Split Visual
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.pie_chart_outline_rounded, size: 16, color: Color(0xFF64748B)),
+                    SizedBox(width: 8),
+                    Text('Revenue Split', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF475569), fontFamily: 'Outfit')),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Progress bar showing 70/30 split
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 7,
+                        child: Container(height: 10, color: const Color(0xFF20B486)),
+                      ),
+                      Expanded(
+                        flex: 3,
+                        child: Container(height: 10, color: const Color(0xFF94A3B8)),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(children: [
+                      Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF20B486), shape: BoxShape.circle)),
+                      const SizedBox(width: 6),
+                      const Text('You: 70%', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569), fontFamily: 'Outfit')),
+                    ]),
+                    Row(children: [
+                      Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF94A3B8), shape: BoxShape.circle)),
+                      const SizedBox(width: 6),
+                      const Text('Platform: 30%', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF94A3B8), fontFamily: 'Outfit')),
+                    ]),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Settlement Status
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [const Color(0xFF20B486).withValues(alpha: 0.08), const Color(0xFF20B486).withValues(alpha: 0.02)],
+              ),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFF20B486).withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(color: const Color(0xFF20B486).withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
+                  child: const Icon(Icons.account_balance_wallet_rounded, size: 18, color: Color(0xFF20B486)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('All-time Earnings', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF64748B), fontFamily: 'Outfit')),
+                      const SizedBox(height: 2),
+                      Text(_formatCurrency(_totalRevenue), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF20B486), fontFamily: 'Outfit')),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      ),
+    );
+  }
+
+  Widget _buildInsightRow({
+    required IconData icon,
+    required Color iconBg,
+    required Color iconColor,
+    required String label,
+    required String value,
+    required Color valueColor,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(10)),
+          child: Icon(icon, size: 18, color: iconColor),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF64748B), fontFamily: 'Outfit')),
+        ),
+        Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: valueColor, fontFamily: 'Outfit')),
+      ],
     );
   }
 

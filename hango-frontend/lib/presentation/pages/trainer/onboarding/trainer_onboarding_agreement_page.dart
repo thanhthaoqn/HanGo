@@ -5,6 +5,8 @@ import '../../../../data/services/auth_service.dart';
 import '../../../../data/services/trainer_onboarding_service.dart';
 import '../../../../utils/toast_helper.dart';
 import '../../../../utils/language_manager.dart';
+import '../../../../utils/trainer_onboarding_payload_utils.dart';
+import '../../../../utils/trainer_onboarding_stage.dart';
 import '../../../widgets/shared_header.dart';
 import '../../../widgets/shared_footer.dart';
 import 'trainer_onboarding_status_page.dart';
@@ -27,10 +29,12 @@ class TrainerOnboardingAgreementPage extends StatefulWidget {
   });
 
   @override
-  State<TrainerOnboardingAgreementPage> createState() => _TrainerOnboardingAgreementPageState();
+  State<TrainerOnboardingAgreementPage> createState() =>
+      _TrainerOnboardingAgreementPageState();
 }
 
-class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreementPage> {
+class _TrainerOnboardingAgreementPageState
+    extends State<TrainerOnboardingAgreementPage> {
   final _onboardingService = TrainerOnboardingService();
   final ScrollController _termsScrollController = ScrollController();
   bool _hasScrolledToBottom = false;
@@ -40,6 +44,11 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
   @override
   void initState() {
     super.initState();
+    final alreadyAccepted =
+        widget.profilePayload['agreementSigned'] == true &&
+        widget.profilePayload['agreementVersion'] == trainerAgreementVersion;
+    _agreementSigned = alreadyAccepted;
+    _hasScrolledToBottom = alreadyAccepted;
     _loadTrainerHeaderInfo();
     _termsScrollController.addListener(_onTermsScroll);
   }
@@ -66,40 +75,55 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
   }
 
   void _handleSubmit() async {
+    if (!_hasScrolledToBottom || !_agreementSigned || _isSubmitting) return;
     setState(() {
       _isSubmitting = true;
     });
 
-    final finalPayload = Map<String, dynamic>.from(widget.profilePayload);
-    finalPayload['agreementSigned'] = true;
+    final result = await _onboardingService.saveProfileDraft(
+      buildTrainerAgreementDraftPayload(),
+    );
 
-    final result = await _onboardingService.saveProfileDraft(finalPayload);
-
+    if (!mounted) return;
     setState(() {
       _isSubmitting = false;
     });
 
-    if (mounted) {
-      if (result['success'] == true) {
-        final nextPage = TrainerOnboardingDetailsPage(
-          initialProfile: result['data'] ?? finalPayload,
+    if (result['success'] == true) {
+      final savedProfile = Map<String, dynamic>.from(
+        result['data'] ?? widget.profilePayload,
+      );
+      final nextStage = resolveTrainerOnboardingStage(savedProfile);
+      final Widget nextPage = switch (nextStage) {
+        TrainerOnboardingStage.payout => TrainerPayoutDetailsPage(
+          initialProfile: savedProfile,
           isEmbedded: true,
-        );
+        ),
+        TrainerOnboardingStage.complete ||
+        TrainerOnboardingStage.status => TrainerOnboardingStatusPage(
+          initialProfile: savedProfile,
+          isEmbedded: true,
+        ),
+        _ => TrainerOnboardingDetailsPage(
+          initialProfile: savedProfile,
+          isEmbedded: true,
+        ),
+      };
 
-        final shellState = TrainerOnboardingShellPage.of(context);
-        if (shellState != null) {
-          shellState.updateBody(nextPage);
-        } else {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => TrainerOnboardingShellPage(initialBody: nextPage),
-            ),
-          );
-        }
+      final shellState = TrainerOnboardingShellPage.of(context);
+      if (shellState != null) {
+        shellState.updateBody(nextPage);
       } else {
-        ToastHelper.showError(context, result['message'] ?? 'Error proceeding.');
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                TrainerOnboardingShellPage(initialBody: nextPage),
+          ),
+        );
       }
+    } else {
+      ToastHelper.showError(context, result['message'] ?? 'Error proceeding.');
     }
   }
 
@@ -119,6 +143,7 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
         initials = parts.last[0].toUpperCase();
       }
     }
+    if (!mounted) return;
     setState(() {
       _trainerName = fullName;
       _trainerInitials = initials;
@@ -155,8 +180,12 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
     final roleNameLower = isPro ? 'teacher' : 'tutor';
 
     final splitText = isVi
-        ? (isPro ? '70% doanh thu dành cho Giáo viên (30% phí nền tảng HanGo)' : '60% doanh thu dành cho Gia sư (40% phí nền tảng HanGo)')
-        : (isPro ? '70% revenue share for Teacher (30% HanGo platform fee)' : '60% revenue share for Tutor (40% HanGo platform fee)');
+        ? (isPro
+              ? '70% doanh thu dành cho Giáo viên (30% phí nền tảng HanGo)'
+              : '60% doanh thu dành cho Gia sư (40% phí nền tảng HanGo)')
+        : (isPro
+              ? '70% revenue share for Teacher (30% HanGo platform fee)'
+              : '60% revenue share for Tutor (40% HanGo platform fee)');
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
@@ -178,7 +207,11 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
               const SizedBox(height: 12),
               Text(
                 'Please review the platform rules regarding revenue share, introductory course requirements, and content policies for $roleName Applications.',
-                style: const TextStyle(fontSize: 14, color: Color(0xFF64748B), fontFamily: 'Outfit'),
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF64748B),
+                  fontFamily: 'Outfit',
+                ),
               ),
               const SizedBox(height: 32),
               // Agreement Terms Box
@@ -200,17 +233,27 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildTermTitle('ARTICLE 1: REVENUE SHARE & SETTLEMENT'),
+                          _buildTermTitle(
+                            isVi
+                                ? 'ĐIỀU 1: TỶ LỆ CHIA SẺ DOANH THU & QUYẾT TOÁN THUẾ'
+                                : 'ARTICLE 1: REVENUE SHARE & SETTLEMENT',
+                          ),
                           _buildTermText(
-                            'Based on selected profile: ${isPro ? "Professional Teacher (70/30 split)" : "Peer Tutor (60/40 split)"}.\n- Contracted Revenue Split Ratio: $splitText.\n- Consolidated payouts are processed monthly to the configured bank account after deducting a mandatory 10% Personal Income Tax as per tax regulations.',
+                            isVi
+                                ? 'Loại tài khoản lựa chọn: ${isPro ? "Giáo viên chính thức (tỷ lệ 70/30)" : "Gia sư / Sinh viên (tỷ lệ 60/40)"}.\n- Tỷ lệ phân chia doanh thu: $splitText.\n- Thu nhập được quyết toán định kỳ hàng tháng. Khoản chi trả từ 2.000.000 VND trở lên trong kỳ có thể bị khấu trừ 10% Thuế Thu nhập cá nhân tại nguồn theo quy định áp dụng.'
+                                : 'Based on selected profile: ${isPro ? "Professional Teacher (70/30 split)" : "Peer Tutor (60/40 split)"}.\n- Contracted Revenue Split Ratio: $splitText.\n- Payouts are processed monthly. A 10% Personal Income Tax withholding may apply when gross payout in a period is 2,000,000 VND or higher under the applicable regulations.',
                           ),
                           const SizedBox(height: 16),
-                          _buildTermTitle('ARTICLE 2: FIRST COURSE FREE POLICY'),
+                          _buildTermTitle(
+                            'ARTICLE 2: FIRST COURSE FREE POLICY',
+                          ),
                           _buildTermText(
                             'To establish initial teaching credentials and contribute to the HanGo community ecosystem, all newly onboarded ${roleName}s agree to publish their very first course for free (0 VND).',
                           ),
                           const SizedBox(height: 16),
-                          _buildTermTitle('ARTICLE 3: CONTENT COPYRIGHTS & COMPLIANCE'),
+                          _buildTermTitle(
+                            'ARTICLE 3: CONTENT COPYRIGHTS & COMPLIANCE',
+                          ),
                           _buildTermText(
                             '${roleName}s guarantee original ownership of syllabus, exams, and quizzes. No unlicensed duplication of third-party assets is permitted. The $roleNameLower assumes full legal responsibility for any copyrights violations.',
                           ),
@@ -223,7 +266,10 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
               const SizedBox(height: 16),
               if (!_hasScrolledToBottom)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFEF3C7),
                     borderRadius: BorderRadius.circular(8),
@@ -231,17 +277,51 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 18),
+                      const Icon(
+                        Icons.info_outline_rounded,
+                        color: Color(0xFFD97706),
+                        size: 18,
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           isVi
                               ? 'Vui lòng cuộn xuống dưới cùng của khung điều khoản để xác nhận đã đọc xong.'
                               : 'Please scroll all the way to the bottom of the terms container to unlock the button.',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF92400E), fontFamily: 'Outfit'),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF92400E),
+                            fontFamily: 'Outfit',
+                          ),
                         ),
                       ),
                     ],
+                  ),
+                ),
+              if (_hasScrolledToBottom)
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _agreementSigned,
+                  activeColor: const Color(0xFF28B79B),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  onChanged: _isSubmitting
+                      ? null
+                      : (value) {
+                          setState(() {
+                            _agreementSigned = value ?? false;
+                          });
+                        },
+                  title: Text(
+                    isVi
+                        ? 'Tôi đã đọc, hiểu và đồng ý với các điều khoản trên.'
+                        : 'I have read, understood, and agree to the terms above.',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF334155),
+                      fontFamily: 'Outfit',
+                    ),
                   ),
                 ),
               const SizedBox(height: 24),
@@ -250,21 +330,38 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   ElevatedButton.icon(
-                    onPressed: (_hasScrolledToBottom && !_isSubmitting) ? _handleSubmit : null,
+                    onPressed:
+                        (_hasScrolledToBottom &&
+                            _agreementSigned &&
+                            !_isSubmitting)
+                        ? _handleSubmit
+                        : null,
                     icon: _isSubmitting
                         ? const SizedBox(
                             width: 16,
                             height: 16,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
                           )
                         : const Icon(Icons.arrow_forward_rounded, size: 16),
-                    label: Text(isVi ? 'Tiếp tục hoàn thiện hồ sơ' : 'Continue to Profile'),
+                    label: Text(
+                      isVi ? 'Đồng ý và tiếp tục' : 'Accept and Continue',
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF28B79B),
                       foregroundColor: Colors.white,
-                      disabledBackgroundColor: const Color(0xFF28B79B).withOpacity(0.5),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+                      disabledBackgroundColor: const Color(
+                        0xFF28B79B,
+                      ).withOpacity(0.5),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 28,
+                        vertical: 16,
+                      ),
                       elevation: 4,
                     ),
                   ),
@@ -289,9 +386,7 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
             padding: const EdgeInsets.symmetric(horizontal: 12.0),
             child: Row(
               children: [
-
                 Image.network(
-
                   'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
 
                   height: 36,
@@ -299,45 +394,34 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
                   fit: BoxFit.contain,
 
                   errorBuilder: (context, error, stackTrace) {
-
                     return Row(
-
                       children: [
-
                         Container(
-
                           width: 32,
 
                           height: 32,
 
                           decoration: const BoxDecoration(
-
                             color: Color(0xFFE6FFFA),
 
                             shape: BoxShape.circle,
-
                           ),
 
                           child: const Icon(
-
                             Icons.school,
 
                             size: 18,
 
                             color: Color(0xFF20B486),
-
                           ),
-
                         ),
 
                         const SizedBox(width: 8),
 
                         const Text(
-
                           'HanGo',
 
                           style: TextStyle(
-
                             fontSize: 20,
 
                             fontWeight: FontWeight.bold,
@@ -345,45 +429,78 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
                             color: Color(0xFF1F2937),
 
                             fontFamily: 'Outfit',
-
                           ),
-
                         ),
-
                       ],
-
                     );
-
                   },
-
                 ),
-
               ],
             ),
           ),
           const SizedBox(height: 40),
-          _buildSidebarItem(Icons.dashboard_outlined, isVi ? 'Bảng điều khiển' : 'Dashboard', isActive: true),
-          _buildSidebarItem(Icons.book_outlined, isVi ? 'Khóa học' : 'Courses', isEnabled: false),
-          _buildSidebarItem(Icons.assignment_outlined, isVi ? 'Đề thi' : 'Exam', isEnabled: false),
-          _buildSidebarItem(Icons.people_outline, isVi ? 'Học sinh' : 'Learner', isEnabled: false),
-          _buildSidebarItem(Icons.question_answer_outlined, isVi ? 'Ngân hàng câu hỏi' : 'Question Bank', isEnabled: false),
+          _buildSidebarItem(
+            Icons.dashboard_outlined,
+            isVi ? 'Bảng điều khiển' : 'Dashboard',
+            isActive: true,
+          ),
+          _buildSidebarItem(
+            Icons.book_outlined,
+            isVi ? 'Khóa học' : 'Courses',
+            isEnabled: false,
+          ),
+          _buildSidebarItem(
+            Icons.assignment_outlined,
+            isVi ? 'Đề thi' : 'Exam',
+            isEnabled: false,
+          ),
+          _buildSidebarItem(
+            Icons.people_outline,
+            isVi ? 'Học sinh' : 'Learner',
+            isEnabled: false,
+          ),
+          _buildSidebarItem(
+            Icons.question_answer_outlined,
+            isVi ? 'Ngân hàng câu hỏi' : 'Question Bank',
+            isEnabled: false,
+          ),
           const Spacer(),
           const Divider(color: Color(0xFFE2E8F0)),
           const SizedBox(height: 12),
-          _buildSidebarItem(Icons.logout, isVi ? 'Đăng xuất' : 'Logout', color: Colors.redAccent, isEnabled: true, onTap: _handleLogout),
+          _buildSidebarItem(
+            Icons.logout,
+            isVi ? 'Đăng xuất' : 'Logout',
+            color: Colors.redAccent,
+            isEnabled: true,
+            onTap: _handleLogout,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildSidebarItem(IconData icon, String title, {bool isActive = false, bool isEnabled = true, Color? color, VoidCallback? onTap}) {
+  Widget _buildSidebarItem(
+    IconData icon,
+    String title, {
+    bool isActive = false,
+    bool isEnabled = true,
+    Color? color,
+    VoidCallback? onTap,
+  }) {
     final activeColor = const Color(0xFF20B486);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
       child: InkWell(
-        onTap: isEnabled ? (onTap ?? () {}) : () {
-          ToastHelper.show(context, LanguageManager.isVi ? 'Tài khoản của bạn đang chờ phê duyệt' : 'Your account is awaiting approval');
-        },
+        onTap: isEnabled
+            ? (onTap ?? () {})
+            : () {
+                ToastHelper.show(
+                  context,
+                  LanguageManager.isVi
+                      ? 'Tài khoản của bạn đang chờ phê duyệt'
+                      : 'Your account is awaiting approval',
+                );
+              },
         borderRadius: BorderRadius.circular(8),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -395,14 +512,22 @@ class _TrainerOnboardingAgreementPageState extends State<TrainerOnboardingAgreem
             children: [
               Icon(
                 icon,
-                color: isActive ? Colors.white : (isEnabled ? (color ?? const Color(0xFF4B5563)) : Colors.grey.shade400),
+                color: isActive
+                    ? Colors.white
+                    : (isEnabled
+                          ? (color ?? const Color(0xFF4B5563))
+                          : Colors.grey.shade400),
                 size: 20,
               ),
               const SizedBox(width: 12),
               Text(
                 title,
                 style: TextStyle(
-                  color: isActive ? Colors.white : (isEnabled ? (color ?? const Color(0xFF1F2937)) : Colors.grey.shade400),
+                  color: isActive
+                      ? Colors.white
+                      : (isEnabled
+                            ? (color ?? const Color(0xFF1F2937))
+                            : Colors.grey.shade400),
                   fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
                   fontSize: 14,
                   fontFamily: 'Outfit',

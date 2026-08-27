@@ -75,8 +75,9 @@ public class CourseManagerExamMatrixController {
             Integer durationMinutes = request.get("durationMinutes") != null ? Integer.parseInt(request.get("durationMinutes").toString()) : null;
             Integer expectedQuestionCount = request.get("expectedQuestionCount") != null ? Integer.parseInt(request.get("expectedQuestionCount").toString()) : null;
             Double passingScore = request.get("passingScore") != null ? Double.parseDouble(request.get("passingScore").toString()) : null;
+            Integer questionSourceType = request.get("questionSourceType") != null ? Integer.parseInt(request.get("questionSourceType").toString()) : null;
 
-            Long generatedExamId = matrixService.generateExamFromMatrix(id, title, description, expectedQuestionCount, passingScore, durationMinutes, userDetails.getUsername());
+            Long generatedExamId = matrixService.generateExamFromMatrix(id, title, description, expectedQuestionCount, passingScore, durationMinutes, questionSourceType, userDetails.getUsername());
             return ResponseEntity
                     .ok("{\"examId\": " + generatedExamId + ", \"message\": \"Exam generated successfully\"}");
         } catch (Exception e) {
@@ -91,14 +92,15 @@ public class CourseManagerExamMatrixController {
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestParam Long skillId,
             @RequestParam Long diffId,
-            @RequestParam Long catId) {
+            @RequestParam Long catId,
+            @RequestParam(required = false) Integer questionSourceType) {
         try {
             if (userDetails == null) {
                 return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
             }
             User user = userRepository.findByEmail(userDetails.getUsername())
                     .orElseThrow(() -> new RuntimeException("User not found: " + userDetails.getUsername()));
-            long count = questionRepository.countQuestionsByCriteria(skillId, diffId, catId, user.getId());
+            long count = questionRepository.countQuestionsByCriteria(skillId, diffId, catId, user.getId(), questionSourceType);
             return ResponseEntity.ok("{\"count\": " + count + "}");
         } catch (Exception e) {
             e.printStackTrace();

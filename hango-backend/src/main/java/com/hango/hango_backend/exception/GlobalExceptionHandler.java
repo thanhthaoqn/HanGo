@@ -124,9 +124,9 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorDTO);
     }
 
-    @ExceptionHandler(Exception.class)
+    @ExceptionHandler(Exception.class) // Bat TAT CA nhung loi ngoai y muon (NullPointer, Loi ket noi DB...) ma lap trinh vien chua kip xu ly
     public ResponseEntity<ApiErrorDTO> handleGlobalException(Exception ex, HttpServletRequest request) {
-        // Log the exception securely on the server side
+        // Ghi log vao server de dev biet duong sua, khong in ra man hinh cua user
         ex.printStackTrace();
         
         ApiErrorDTO errorDTO = ApiErrorDTO.builder()

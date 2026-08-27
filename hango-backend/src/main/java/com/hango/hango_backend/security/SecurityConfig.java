@@ -61,6 +61,7 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
 
                         // Các endpoint công khai của hệ thống
+                        .requestMatchers("/api/health").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/v1/exams", "/api/v1/exams/**").permitAll()
                         .requestMatchers("/api/v1/courses", "/api/v1/courses/**").permitAll()
@@ -80,7 +81,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/payment/payos-webhook", "/api/v1/payment/vnpay-return").permitAll()
                         .requestMatchers("/api/v1/course-manager/**").permitAll()
                         .requestMatchers("/api/v1/payment/**").permitAll()
-                        .requestMatchers("/api/v1/trainer/statements/**", "/api/v1/trainer/revenue-summary").permitAll()
+                        .requestMatchers("/api/v1/trainer/statements/**", "/api/v1/trainer/revenue-summary", "/api/v1/trainer/dashboard/seed").permitAll()
 
                         .anyRequest().authenticated());
 

@@ -218,6 +218,7 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
     _scrollToBottom();
 
     try {
+      // POST /pathways/{id}/chat: gui cau hoi + id node dang chon de AI co context
       final response = await _repository.sendChatMessage(
         pathwayId: widget.pathway.pathwayId,
         message: userMsg,
@@ -227,6 +228,7 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
 
       if (!mounted) return;
 
+      // Luu conversationId de duy tri cung 1 cuoc hoi thoai o cac lan gui sau
       setState(() {
         _conversationId = response['conversation_id'] as int?;
         _messages.add({

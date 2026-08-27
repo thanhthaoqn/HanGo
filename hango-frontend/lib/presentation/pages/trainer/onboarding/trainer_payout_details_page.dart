@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../data/services/trainer_onboarding_service.dart';
 import '../../../../utils/toast_helper.dart';
 import '../../../../utils/language_manager.dart';
+import '../../../../utils/trainer_onboarding_validation_utils.dart';
 import 'trainer_onboarding_shell_page.dart';
-import '../trainer_dashboard_page.dart';
+import '../trainer_shell_page.dart';
 
 class TrainerPayoutDetailsPage extends StatefulWidget {
   final Map<String, dynamic> initialProfile;
@@ -28,11 +30,13 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
   final _bankAccountController = TextEditingController();
   final _bankAccountNameController = TextEditingController();
   final _taxCodeController = TextEditingController();
+  final _citizenIdController = TextEditingController();
 
   String? _bankNameErrorText;
   String? _bankAccountErrorText;
   String? _bankAccountNameErrorText;
   String? _taxCodeErrorText;
+  String? _citizenIdErrorText;
 
   static const List<String> _bankSuggestions = [
     'Vietcombank (VCB)',
@@ -50,31 +54,14 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
   void initState() {
     super.initState();
     _populateFields(widget.initialProfile);
-    _bankAccountController.addListener(_onBankAccountChanged);
   }
 
   void _populateFields(Map<String, dynamic> p) {
     _bankNameController.text = p['bankName'] ?? '';
     _bankAccountController.text = p['bankAccount'] ?? '';
     _bankAccountNameController.text = p['bankAccountName'] ?? '';
-    _taxCodeController.text = p['taxCode']?.toString().isNotEmpty == true
-        ? p['taxCode']
-        : (p['citizenId'] ?? '');
-  }
-
-  void _onBankAccountChanged() {
-    // Keep empty until user types
-  }
-
-  bool _isDummyNumber(String input) {
-    if (input.isEmpty) return true;
-    final allSame = RegExp(r'^(\d)\1+$').hasMatch(input);
-    final dummySeq =
-        input == '1234567890' ||
-        input == '123456789012' ||
-        input == '1234567890123' ||
-        input == '0123456789';
-    return allSame || dummySeq;
+    _taxCodeController.text = p['taxCode'] ?? '';
+    _citizenIdController.text = p['citizenId'] ?? '';
   }
 
   String? _validateBankName(String bankName, bool isVi) {
@@ -87,71 +74,19 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
   }
 
   String? _validateBankAccount(String bankAccount, bool isVi) {
-    final numRegex = RegExp(r'^\d+$');
-
-    if (bankAccount.isEmpty) {
-      return isVi
-          ? 'Vui lòng nhập số tài khoản ngân hàng.'
-          : 'Please enter the bank account number.';
-    }
-    if (!numRegex.hasMatch(bankAccount)) {
-      return isVi
-          ? 'Số tài khoản ngân hàng chỉ được chứa chữ số.'
-          : 'Bank account number must contain digits only.';
-    }
-    if (bankAccount.length < 6 || bankAccount.length > 20) {
-      return isVi
-          ? 'Số tài khoản ngân hàng phải có độ dài từ 6 đến 20 chữ số.'
-          : 'Bank account number must be between 6 and 20 digits.';
-    }
-    if (_isDummyNumber(bankAccount)) {
-      return isVi
-          ? 'Số tài khoản không được là dãy số giả như 0000000000.'
-          : 'Bank account cannot be a dummy sequence like 0000000000.';
-    }
-    return null;
+    return validateTrainerBankAccount(bankAccount, isVi: isVi);
   }
 
   String? _validateBankAccountName(String bankAccountName, bool isVi) {
-    final nameRegex = RegExp(r'^[A-Z ]+$');
-
-    if (bankAccountName.isEmpty) {
-      return isVi
-          ? 'Vui lòng nhập tên chủ tài khoản.'
-          : 'Please enter the account owner name.';
-    }
-    if (!nameRegex.hasMatch(bankAccountName)) {
-      return isVi
-          ? 'Tên chủ tài khoản phải viết HOA, không dấu và chỉ gồm chữ cái, ví dụ: NGUYEN VAN A.'
-          : 'Account owner name must be UPPERCASE, unaccented, and letters only, for example: NGUYEN VAN A.';
-    }
-    return null;
+    return validateTrainerBankAccountName(bankAccountName, isVi: isVi);
   }
 
   String? _validateTaxCode(String taxCode, bool isVi) {
-    final numRegex = RegExp(r'^\d+$');
+    return validateTrainerTaxCode(taxCode, isVi: isVi);
+  }
 
-    if (taxCode.isEmpty) {
-      return isVi
-          ? 'Vui lòng nhập mã số thuế hoặc số CCCD.'
-          : 'Please enter the Tax ID or Citizen ID number.';
-    }
-    if (!numRegex.hasMatch(taxCode)) {
-      return isVi
-          ? 'Mã số thuế hoặc CCCD chỉ được chứa chữ số.'
-          : 'Tax ID or Citizen ID must contain digits only.';
-    }
-    if (taxCode.length != 12) {
-      return isVi
-          ? 'Mã số thuế hoặc CCCD phải có đúng 12 chữ số.'
-          : 'Tax ID or Citizen ID must be exactly 12 digits.';
-    }
-    if (_isDummyNumber(taxCode)) {
-      return isVi
-          ? 'Mã số thuế hoặc CCCD không được là dãy số giả như 000000000000.'
-          : 'Tax ID or Citizen ID cannot be a dummy sequence like 000000000000.';
-    }
-    return null;
+  String? _validateCitizenId(String citizenId, bool isVi) {
+    return validateTrainerCitizenId(citizenId, isVi: isVi);
   }
 
   bool _validateFields() {
@@ -160,6 +95,7 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
     final bankAccount = _bankAccountController.text.trim();
     final bankAccountName = _bankAccountNameController.text.trim();
     final taxCode = _taxCodeController.text.trim();
+    final citizenId = _citizenIdController.text.trim();
 
     setState(() {
       _bankNameErrorText = _validateBankName(bankName, isVi);
@@ -169,12 +105,14 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
         isVi,
       );
       _taxCodeErrorText = _validateTaxCode(taxCode, isVi);
+      _citizenIdErrorText = _validateCitizenId(citizenId, isVi);
     });
 
     return _bankNameErrorText == null &&
         _bankAccountErrorText == null &&
         _bankAccountNameErrorText == null &&
-        _taxCodeErrorText == null;
+        _taxCodeErrorText == null &&
+        _citizenIdErrorText == null;
   }
 
   void _handleComplete() async {
@@ -191,33 +129,32 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
         .trim()
         .toUpperCase();
     payload['taxCode'] = _taxCodeController.text.trim();
-    payload['citizenId'] = _taxCodeController.text.trim();
+    payload['citizenId'] = _citizenIdController.text.trim();
     payload['agreementSigned'] = true;
 
     final result = await _onboardingService.saveProfileDraft(payload);
 
+    if (!mounted) return;
     setState(() {
       _isSubmitting = false;
     });
 
-    if (mounted) {
-      if (result['success'] == true) {
-        ToastHelper.showSuccess(
-          context,
-          'Payout details saved successfully! Welcome to your Trainer Dashboard.',
-        );
+    if (result['success'] == true) {
+      ToastHelper.showSuccess(
+        context,
+        'Payout details saved successfully! Welcome to your Trainer Dashboard.',
+      );
 
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const TrainerDashboardPage()),
-          (route) => false,
-        );
-      } else {
-        ToastHelper.showError(
-          context,
-          result['message'] ?? 'Failed to save payout details.',
-        );
-      }
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const TrainerShellPage()),
+        (route) => false,
+      );
+    } else {
+      ToastHelper.showError(
+        context,
+        result['message'] ?? 'Failed to save payout details.',
+      );
     }
   }
 
@@ -227,6 +164,7 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
     _bankAccountController.dispose();
     _bankAccountNameController.dispose();
     _taxCodeController.dispose();
+    _citizenIdController.dispose();
     super.dispose();
   }
 
@@ -258,7 +196,7 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
                   border: Border.all(color: const Color(0xFFE2E8F0)),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.02),
+                      color: Colors.black.withValues(alpha: 0.02),
                       blurRadius: 12,
                       offset: const Offset(0, 6),
                     ),
@@ -331,7 +269,8 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
                     ),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
-                      value: _bankSuggestions.contains(_bankNameController.text)
+                      initialValue:
+                          _bankSuggestions.contains(_bankNameController.text)
                           ? _bankNameController.text
                           : null,
                       dropdownColor: Colors.white,
@@ -402,6 +341,8 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
                     TextField(
                       controller: _bankAccountController,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      maxLength: 20,
                       onChanged: (value) {
                         setState(() {
                           _bankAccountErrorText = _validateBankAccount(
@@ -418,6 +359,7 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
                         fillColor: Colors.white,
                         filled: true,
                         errorText: _bankAccountErrorText,
+                        counterText: '',
                         hintText: isVi
                             ? 'Chỉ nhập số, ví dụ: 1023928129'
                             : 'Digits only, example: 1023928129',
@@ -502,11 +444,11 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
                     ),
                     const SizedBox(height: 24),
 
-                    // Tax Identification Number (Tax ID / Citizen ID)
+                    // Personal Tax ID
                     Text(
                       isVi
-                          ? 'Mã số thuế / Số CCCD (Tax ID / Citizen ID) *'
-                          : 'Tax Identification / Citizen ID Number *',
+                          ? 'Mã số thuế cá nhân (nếu có)'
+                          : 'Personal Tax ID (optional)',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
@@ -518,7 +460,8 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
                     TextField(
                       controller: _taxCodeController,
                       keyboardType: TextInputType.number,
-                      maxLength: 12,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      maxLength: 13,
                       onChanged: (value) {
                         setState(() {
                           _taxCodeErrorText = _validateTaxCode(
@@ -535,11 +478,66 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
                         errorText: _taxCodeErrorText,
                         counterText: '',
                         hintText: isVi
-                            ? 'Nhập 12 số CCCD / Mã số thuế'
-                            : 'Enter 12-digit Citizen ID / Tax ID',
+                            ? 'Nhập mã số thuế 10 hoặc 13 chữ số'
+                            : 'Enter a 10 or 13-digit Tax ID',
                         helperText: isVi
-                            ? 'Mã số thuế cá nhân hoặc số CCCD gắn chip (đúng 12 chữ số).'
-                            : 'Personal Tax ID or Citizen ID number (exactly 12 digits).',
+                            ? 'Có thể để trống nếu chưa được cấp mã số thuế.'
+                            : 'Leave blank if you do not have a Tax ID yet.',
+                        fillColor: Colors.white,
+                        filled: true,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF28B79B),
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    Text(
+                      isVi ? 'Số CCCD *' : 'Citizen ID Number *',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: Color(0xFF334155),
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _citizenIdController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      maxLength: 12,
+                      onChanged: (value) {
+                        setState(() {
+                          _citizenIdErrorText = _validateCitizenId(
+                            value.trim(),
+                            isVi,
+                          );
+                        });
+                      },
+                      decoration: InputDecoration(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        errorText: _citizenIdErrorText,
+                        counterText: '',
+                        hintText: isVi
+                            ? 'Nhập đúng 12 chữ số trên CCCD'
+                            : 'Enter the 12 digits on your Citizen ID',
                         fillColor: Colors.white,
                         filled: true,
                         border: OutlineInputBorder(

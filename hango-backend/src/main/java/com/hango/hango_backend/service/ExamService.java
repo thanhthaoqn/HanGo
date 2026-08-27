@@ -147,9 +147,12 @@ public class ExamService {
         BigDecimal calculatedScore = BigDecimal.ZERO;
         try {
             if (request.getAnswers() != null) {
+                // Lam giau tung cau tra loi voi isCorrect/skill/topic (so khop voi DB)
+                // -> answersJson nay la NGUON DU LIEU cho Weakness Analysis ve sau
                 List<Map<String, Object>> enrichedAnswers = enrichAnswers(request.getAnswers(), examQuestions);
                 answersJson = objectMapper.writeValueAsString(enrichedAnswers);
-                
+
+                // Diem thi = 10 * so cau dung / tong so cau
                 long correctCount = enrichedAnswers.stream()
                         .filter(a -> Boolean.TRUE.equals(a.get("isCorrect")))
                         .count();

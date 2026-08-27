@@ -44,7 +44,10 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
 
     @Override
     public List<QuestionDTO> getTrainerQuestions(String email, String type, String search, String sortBy, Long skillId,
-            Long categoryId, Long difficultyId, Integer usageType) {
+            Long categoryId, Long difficultyId, Integer usageType, Long groupTypeId, Boolean isGroup) {
+        boolean includeGroupQuery = isGroup == null || isGroup;
+        boolean includeSingleQuery = isGroup == null || !isGroup;
+
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
 
@@ -60,14 +63,16 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
         String skillCondition = (skillId != null) ? "AND q.skill_param_id = ? " : "";
         String categoryCondition = (categoryId != null) ? "AND q.category_id = ? " : "";
         String difficultyCondition = (difficultyId != null) ? "AND q.difficulty_param_id = ? " : "";
+        String groupTypeConditionGroup = (groupTypeId != null) ? "AND qg.group_type_param_id = ? " : "";
+        String groupTypeConditionSingle = (groupTypeId != null) ? "AND 1=0 " : "";
         String usageTypeCondition = "";
         if (usageType != null) {
             if (usageType == 1) {
-                usageTypeCondition = "AND (q.usage_type = '1' OR q.usage_type = 'QUIZ_ONLY' OR q.usage_type IS NULL) ";
+                usageTypeCondition = " AND (q.usage_type = '1' OR q.usage_type = 'QUIZ_ONLY' OR q.usage_type = '3' OR q.usage_type = 'BOTH') ";
             } else if (usageType == 2) {
-                usageTypeCondition = "AND (q.usage_type = '2' OR q.usage_type = 'EXAM_ONLY') ";
+                usageTypeCondition = " AND (q.usage_type = '2' OR q.usage_type = 'EXAM_ONLY' OR q.usage_type = '3' OR q.usage_type = 'BOTH') ";
             } else if (usageType == 3) {
-                usageTypeCondition = "AND (q.usage_type = '3' OR q.usage_type = 'BOTH') ";
+                usageTypeCondition = " AND (q.usage_type = '3' OR q.usage_type = 'BOTH') ";
             }
         }
 
@@ -83,6 +88,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
 
         sql.append("SELECT * FROM ( ");
 
+        if (includeGroupQuery) {
         // Group query
         sql.append("SELECT ")
                 .append("  TRUE as is_group, ")
@@ -91,16 +97,18 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
                 .append("  MAX(qc.name) as category_name, ")
                 .append("  NULL as skill_name, ")
                 .append("  MAX(sp_group.param_value) as group_type_name, ")
-                .append("  NULL as difficulty_name, ")
+                .append("  MAX(sp_diff.param_value) as difficulty_name, ")
                 .append("  MAX(q.status) as status, ")
                 .append("  MAX(u.full_name) as creator_name, ")
                 .append("  MAX(q.created_at) as created_at, ")
                 .append("  MAX(q.updated_at) as updated_at, ")
-                .append("  MAX(q.usage_type) as usage_type ")
+                .append("  MAX(q.usage_type) as usage_type, ")
+                .append("  0 as options_count ")
                 .append("FROM question_groups qg ")
                 .append("JOIN questions q ON q.group_id = qg.id ")
                 .append("LEFT JOIN question_categories qc ON q.category_id = qc.id ")
                 .append("LEFT JOIN system_parameters sp_group ON qg.group_type_param_id = sp_group.id ")
+                .append("LEFT JOIN system_parameters sp_diff ON q.difficulty_param_id = sp_diff.id ")
                 .append("JOIN users u ON q.created_by = u.id ")
                 .append("WHERE q.created_by = ? ")
                 .append(statusConditionGroup)
@@ -108,6 +116,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
                 .append(skillCondition)
                 .append(categoryCondition)
                 .append(difficultyCondition)
+                .append(groupTypeConditionGroup)
                 .append(usageTypeCondition)
                 .append("GROUP BY qg.id, qg.context_text ");
 
@@ -125,9 +134,15 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
             params.add(categoryId);
         if (difficultyId != null)
             params.add(difficultyId);
+        if (groupTypeId != null)
+            params.add(groupTypeId);
+        }
 
-        sql.append(" UNION ALL ");
+        if (includeGroupQuery && includeSingleQuery) {
+            sql.append(" UNION ALL ");
+        }
 
+        if (includeSingleQuery) {
         // Single query
         sql.append("SELECT ")
                 .append("  FALSE as is_group, ")
@@ -141,7 +156,8 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
                 .append("  u.full_name as creator_name, ")
                 .append("  q.created_at, ")
                 .append("  q.updated_at, ")
-                .append("  q.usage_type ")
+                .append("  q.usage_type, ")
+                .append("  (SELECT COUNT(*) FROM question_options qo WHERE qo.question_id = q.id) as options_count ")
                 .append("FROM questions q ")
                 .append("LEFT JOIN question_categories qc ON q.category_id = qc.id ")
                 .append("LEFT JOIN system_parameters sp_skill ON q.skill_param_id = sp_skill.id ")
@@ -153,6 +169,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
                 .append(skillCondition)
                 .append(categoryCondition)
                 .append(difficultyCondition)
+                .append(groupTypeConditionSingle)
                 .append(usageTypeCondition);
 
         params.add(user.getId());
@@ -169,6 +186,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
             params.add(categoryId);
         if (difficultyId != null)
             params.add(difficultyId);
+        }
 
         sql.append(") AS combined_results ");
 
@@ -221,6 +239,7 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
                     .updatedAt(updatedAt)
                     .usageType(parsedUsageType)
                     .usageTypeLabel(QuestionUsageType.fromValue(parsedUsageType).getDescription())
+                    .optionsCount(rs.getInt("options_count"))
                     .build();
         }, params.toArray());
     }

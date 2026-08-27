@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -86,6 +87,8 @@ class AuthServiceTest {
     private RefreshTokenRepository refreshTokenRepository;
     @Mock
     private AuditLogService auditLogService;
+    @Mock
+    private UserLockoutService userLockoutService;
     @Mock
     private Authentication authentication;
 
@@ -203,79 +206,46 @@ class AuthServiceTest {
     }
 
     @Test
-    void authenticateUserShouldIncrementFailedAttemptsButStillReturn401BelowLockThreshold() {
-        // Regression test for the login brute-force lockout fix: below the
-        // threshold, behavior must be unchanged (still 401, account not locked).
+    void authenticateUserShouldLockAccountAfter5FailedAttempts() {
         User user = activeVerifiedUser("active@example.com", "ACTIVE");
-        user.setFailedLoginAttempts(3);
+        user.setId(10L);
         when(userRepository.findByEmail("active@example.com")).thenReturn(Optional.of(user));
         when(authenticationManager.authenticate(any())).thenThrow(new BadCredentialsException("Bad credentials"));
-        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        assertApiException(HttpStatus.UNAUTHORIZED,
-                () -> authService.authenticateUser(loginRequest("active@example.com", "wrong-password")));
-
-        ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
-        verify(userRepository).save(savedUser.capture());
-        assertEquals(4, savedUser.getValue().getFailedLoginAttempts());
-        assertNull(savedUser.getValue().getLockedUntil());
-    }
-
-    @Test
-    void authenticateUserShouldLockAccountAfterMaxFailedAttempts() {
-        // The 5th consecutive bad-credentials failure must lock the account
-        // (lockedUntil set in the future) and respond 403, not the usual 401.
-        User user = activeVerifiedUser("active@example.com", "ACTIVE");
-        user.setFailedLoginAttempts(4);
-        when(userRepository.findByEmail("active@example.com")).thenReturn(Optional.of(user));
-        when(authenticationManager.authenticate(any())).thenThrow(new BadCredentialsException("Bad credentials"));
-        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(userLockoutService.recordFailedAttempt(10L)).thenReturn(true);
 
         ApiException ex = assertApiException(HttpStatus.FORBIDDEN,
                 () -> authService.authenticateUser(loginRequest("active@example.com", "wrong-password")));
-        assertTrue(ex.getMessage().toLowerCase().contains("locked"));
 
-        ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
-        verify(userRepository).save(savedUser.capture());
-        assertEquals(5, savedUser.getValue().getFailedLoginAttempts());
-        assertNotNull(savedUser.getValue().getLockedUntil());
-        assertTrue(savedUser.getValue().getLockedUntil().isAfter(LocalDateTime.now()));
+        assertEquals("Account is locked due to 5 consecutive failed login attempts. Please try again after 15 minutes.", ex.getMessage());
+        verify(userLockoutService).recordFailedAttempt(10L);
     }
 
     @Test
-    void authenticateUserShouldRejectLoginWhileAccountIsLockedWithoutCheckingPassword() {
-        // While locked, must fail fast with 403 and never even call the
-        // authenticationManager (avoids continued brute-force during lockout).
-        User user = activeVerifiedUser("active@example.com", "ACTIVE");
-        user.setLockedUntil(LocalDateTime.now().plusMinutes(10));
-        when(userRepository.findByEmail("active@example.com")).thenReturn(Optional.of(user));
+    void authenticateUserShouldRejectLoginWhenAccountIsCurrentlyLocked() {
+        User user = activeVerifiedUser("locked@example.com", "ACTIVE");
+        user.setId(11L);
+        user.setLockedUntil(java.time.LocalDateTime.now().plusMinutes(10));
+        when(userRepository.findByEmail("locked@example.com")).thenReturn(Optional.of(user));
 
-        assertApiException(HttpStatus.FORBIDDEN,
-                () -> authService.authenticateUser(loginRequest("active@example.com", "correct-password")));
+        ApiException ex = assertApiException(HttpStatus.FORBIDDEN,
+                () -> authService.authenticateUser(loginRequest("locked@example.com", "any-password")));
 
+        assertEquals("Account is locked due to multiple failed login attempts. Please try again after 15 minutes.", ex.getMessage());
         verify(authenticationManager, never()).authenticate(any());
     }
 
     @Test
-    void authenticateUserShouldAllowLoginAgainAfterLockWindowExpires() {
-        // A lockedUntil timestamp in the PAST must no longer block login.
-        User user = activeVerifiedUser("active@example.com", "ACTIVE");
-        user.setLockedUntil(LocalDateTime.now().minusMinutes(1));
-        when(userRepository.findByEmail("active@example.com")).thenReturn(Optional.of(user));
+    void authenticateUserShouldUnlockAccountWhenLockoutPeriodExpires() {
+        User user = activeVerifiedUser("unlocked@example.com", "ACTIVE");
+        user.setId(12L);
+        user.setLockedUntil(java.time.LocalDateTime.now().minusMinutes(1));
+        when(userRepository.findByEmail("unlocked@example.com")).thenReturn(Optional.of(user));
         when(authenticationManager.authenticate(any())).thenReturn(authentication);
-        when(jwtUtils.generateJwtTokenFromUsername(anyString())).thenReturn("mock-jwt-token");
-        when(jwtUtils.generateOpaqueRefreshToken()).thenReturn("raw-refresh-token");
-        when(jwtUtils.hashToken(anyString())).thenReturn("hashed");
-        when(jwtUtils.getRefreshExpirationMs()).thenReturn(2_592_000_000L);
-        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        LoginResponse response = authService.authenticateUser(loginRequest("active@example.com", "correct-password"));
+        LoginResponse response = authService.authenticateUser(loginRequest("unlocked@example.com", "correct-password"));
 
-        assertEquals("mock-jwt-token", response.getToken());
-        ArgumentCaptor<User> savedUser = ArgumentCaptor.forClass(User.class);
-        verify(userRepository).save(savedUser.capture());
-        assertNull(savedUser.getValue().getLockedUntil());
-        assertEquals(0, savedUser.getValue().getFailedLoginAttempts());
+        assertNotNull(response);
+        verify(userLockoutService, atLeastOnce()).resetLockout(12L);
     }
 
     @Test

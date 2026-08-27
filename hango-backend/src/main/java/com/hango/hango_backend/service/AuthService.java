@@ -51,7 +51,6 @@ import com.hango.hango_backend.util.JwtUtils;
 @Service
 public class AuthService {
 
-
     private static final int MAX_OTP_ATTEMPTS = 5;
     private static final long OTP_RESEND_COOLDOWN_SECONDS = 60;
     private static final long VERIFICATION_TOKEN_VALIDITY_HOURS = 12;
@@ -59,8 +58,9 @@ public class AuthService {
     // (failedLoginAttempts, lockedUntil) - truoc day 2 cot nay chi bi RESET ve
     // 0/null (trong resetPassword/changePassword) chu KHONG he bi TANG len o
     // dau, nghia la co che khoa tai khoan chua bao gio thuc su hoat dong.
-    private static final int MAX_LOGIN_ATTEMPTS = 5;
-    private static final long LOGIN_LOCKOUT_MINUTES = 15;
+    // Nguong/thoi luong khoa thuc te nam trong UserLockoutService.
+    private static final int MAX_FAILED_LOGIN_ATTEMPTS = 5;
+    private static final long LOCKOUT_DURATION_MINUTES = 15;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     @Autowired
@@ -95,6 +95,9 @@ public class AuthService {
 
     @Autowired
     private AuditLogService auditLogService;
+
+    @Autowired
+    private UserLockoutService userLockoutService;
 
     private static String normalizeEmail(String email) {
         return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
@@ -153,12 +156,15 @@ public class AuthService {
         // Tai khoan dang bi khoa tam thoi do dang nhap sai qua nhieu lan
         // (xem nhanh catch AuthenticationException ben duoi) - chan luon tu day,
         // KHONG goi authenticationManager.authenticate() nua du mat khau co dung
-        // hay khong, tranh brute-force tiep tuc do trong luc bi khoa.
-        if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(LocalDateTime.now())) {
-            logAudit(user, "LOGIN_FAILURE", user.getId(), "Account temporarily locked until " + user.getLockedUntil());
-            throw new ApiException(
-                    "Too many failed login attempts. Please try again in a few minutes.",
-                    HttpStatus.FORBIDDEN);
+        // hay khong, tranh brute-force tiep tuc do trong luc bi khoa. Neu thoi
+        // gian khoa da het han thi reset bo dem truoc khi cho thu lai.
+        if (user.getLockedUntil() != null) {
+            if (user.getLockedUntil().isAfter(LocalDateTime.now())) {
+                logAudit(user, "LOGIN_FAILURE", user.getId(), "Account is locked until " + user.getLockedUntil());
+                throw new ApiException("Account is locked due to multiple failed login attempts. Please try again after 15 minutes.", HttpStatus.FORBIDDEN);
+            } else {
+                userLockoutService.resetLockout(user.getId());
+            }
         }
 
         // Uy quyen viec so sanh mat khau cho Spring Security: authenticationManager
@@ -170,30 +176,20 @@ public class AuthService {
                     new UsernamePasswordAuthenticationToken(email, loginRequest.getPassword()));
             SecurityContextHolder.getContext().setAuthentication(authentication);
         } catch (AuthenticationException ex) {
-            // Chong brute-force: dem so lan sai lien tiep, khoa tam thoi
-            // LOGIN_LOCKOUT_MINUTES phut sau khi vuot qua MAX_LOGIN_ATTEMPTS lan.
-            // Bo dem duoc RESET VE 0 ngay khi dang nhap dung (xem ben duoi) hoac
-            // khi doi mat khau (xem resetPassword/changePassword).
-            int attempts = (user.getFailedLoginAttempts() == null ? 0 : user.getFailedLoginAttempts()) + 1;
-            user.setFailedLoginAttempts(attempts);
-            boolean justLocked = attempts >= MAX_LOGIN_ATTEMPTS;
-            if (justLocked) {
-                user.setLockedUntil(LocalDateTime.now().plusMinutes(LOGIN_LOCKOUT_MINUTES));
+            // Chong brute-force: ghi nhan lan sai trong 1 transaction RIENG
+            // (UserLockoutService dung REQUIRES_NEW) de chac chan duoc luu xuong
+            // DB ngay ca khi transaction cua authenticateUser() nay bi rollback
+            // do ApiException duoc nem ra ngay sau day.
+            boolean isLocked = userLockoutService.recordFailedAttempt(user.getId());
+            if (isLocked) {
+                logAudit(user, "LOGIN_FAILURE", user.getId(), "Account locked for 15 minutes after failed attempts");
+                throw new ApiException("Account is locked due to 5 consecutive failed login attempts. Please try again after 15 minutes.", HttpStatus.FORBIDDEN);
             }
-            userRepository.save(user);
-
-            logAudit(user, "LOGIN_FAILURE", user.getId(),
-                    "Bad credentials (attempt " + attempts + "/" + MAX_LOGIN_ATTEMPTS + ")"
-                            + (justLocked ? " - account locked" : ""));
-
-            if (justLocked) {
-                throw new ApiException(
-                        "Too many failed login attempts. Your account has been temporarily locked for "
-                                + LOGIN_LOCKOUT_MINUTES + " minutes.",
-                        HttpStatus.FORBIDDEN);
-            }
+            logAudit(user, "LOGIN_FAILURE", user.getId(), "Bad credentials");
             throw new ApiException("Invalid email or password.", HttpStatus.UNAUTHORIZED);
         }
+
+        userLockoutService.resetLockout(user.getId());
 
         // Checked before the generic "not active" status: a freshly registered
         // account is INACTIVE until its email is verified, so this gives the
@@ -230,8 +226,6 @@ public class AuthService {
         return new LoginResponse(jwt, refreshToken, user.getId(), user.getEmail(), user.getFullName(), roles,
                 user.getAvatarUrl());
     }
-
-
 
     // =================================================================
     // registerUser

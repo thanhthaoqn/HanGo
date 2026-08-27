@@ -239,13 +239,15 @@ class CourseManagerApi {
       String? description,
       int? durationMinutes,
       int? expectedQuestionCount,
-      double? passingScore) async {
+      double? passingScore,
+      {int? questionSourceType}) async {
     final payload = {};
     if (title != null && title.isNotEmpty) payload['title'] = title;
     if (description != null && description.isNotEmpty) payload['description'] = description;
     if (durationMinutes != null) payload['durationMinutes'] = durationMinutes;
     if (expectedQuestionCount != null) payload['expectedQuestionCount'] = expectedQuestionCount;
     if (passingScore != null) payload['passingScore'] = passingScore;
+    if (questionSourceType != null) payload['questionSourceType'] = questionSourceType;
 
     final response = await _post('/matrices/$matrixId/generate', body: jsonEncode(payload));
     if (response.statusCode == 200 || response.statusCode == 201) {

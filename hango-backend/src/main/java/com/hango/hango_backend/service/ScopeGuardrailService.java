@@ -68,9 +68,11 @@ public class ScopeGuardrailService {
                 }
             }
 
+            // Buoc 1+2: lay embedding bai hoc (da cache trong DB) va embedding cau hoi moi
             List<Double> scopeVector = geminiClientService.generateEmbedding(scopeText.toString());
             List<Double> messageVector = geminiClientService.generateEmbedding(userMessage);
 
+            // Buoc 3+4: tinh cosine similarity va so sanh voi nguong cau hinh
             double similarity = VectorUtil.cosineSimilarity(scopeVector, messageVector);
             boolean inScope = similarity >= aiAssistantProperties.getScopeSimilarityThreshold();
 

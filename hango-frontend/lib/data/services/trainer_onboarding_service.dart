@@ -1,246 +1,288 @@
+import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
+
 import 'package:http/http.dart' as http;
-import 'auth_service.dart';
 
 import '../../utils/config.dart';
+import '../../utils/trainer_onboarding_validation_utils.dart';
+import 'auth_service.dart';
 
 class TrainerOnboardingService {
   final _authService = AuthService();
 
+  static const _requestTimeout = Duration(seconds: 20);
+  static const _uploadTimeout = Duration(seconds: 60);
   static String get baseUrl => EnvConfig.v1BaseUrl;
 
-  Future<Map<String, String>> _getHeaders() async {
+  Future<String?> _getToken() async {
     final token = await _authService.getToken();
+    return token != null && token.trim().isNotEmpty ? token.trim() : null;
+  }
+
+  Future<Map<String, String>?> _getJsonHeaders() async {
+    final token = await _getToken();
+    if (token == null) return null;
     return {
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer ${token ?? ""}',
+      'Authorization': 'Bearer $token',
     };
   }
 
-  // 1. Upgrade student to trainer
+  Map<String, dynamic>? _decodeObject(http.Response response) {
+    try {
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      return decoded is Map<String, dynamic> ? decoded : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Map<String, dynamic> _failure(
+    http.Response response,
+    String fallbackMessage,
+  ) {
+    final body = _decodeObject(response);
+    return {
+      'success': false,
+      'statusCode': response.statusCode,
+      'message': body?['error']?.toString() ?? fallbackMessage,
+    };
+  }
+
+  Map<String, dynamic> _networkFailure(Object error) {
+    if (error is TimeoutException) {
+      return {
+        'success': false,
+        'message':
+            'Request timed out. Please check your connection and try again.',
+      };
+    }
+    return {
+      'success': false,
+      'message': 'Unable to connect to HanGo. Please try again.',
+    };
+  }
+
+  Map<String, dynamic> _missingSession() => {
+    'success': false,
+    'statusCode': 401,
+    'message': 'Your session has expired. Please sign in again.',
+  };
+
   Future<Map<String, dynamic>> becomeTrainer(String trainerType) async {
     try {
-      final headers = await _getHeaders();
-      final uri = Uri.parse('$baseUrl/trainers/become-trainer?trainerType=$trainerType');
-      
-      final response = await http.post(uri, headers: headers);
-      
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        
-        // Save the new session credentials immediately (updates user roles & token)
-        await _authService.saveSession(data);
-        
-        // Notify application state about token upgrade
-        if (AuthService.onLoginSuccess != null) {
-          AuthService.onLoginSuccess!(data);
-        }
-        
-        return {'success': true, 'data': data};
-      } else {
-        final err = jsonDecode(response.body);
-        return {'success': false, 'message': err['error'] ?? 'Nâng cấp tài khoản thất bại'};
+      final headers = await _getJsonHeaders();
+      if (headers == null) return _missingSession();
+      final uri = Uri.parse(
+        '$baseUrl/trainers/become-trainer',
+      ).replace(queryParameters: {'trainerType': trainerType});
+      final response = await http
+          .post(uri, headers: headers)
+          .timeout(_requestTimeout);
+
+      if (response.statusCode != 200) {
+        return _failure(response, 'Account upgrade failed.');
       }
-    } catch (e) {
-      return {'success': false, 'message': e.toString()};
+
+      final data = _decodeObject(response);
+      if (data == null) {
+        return {
+          'success': false,
+          'message': 'The server returned an invalid response.',
+        };
+      }
+      await _authService.saveSession(data);
+      AuthService.onLoginSuccess?.call(data);
+      return {'success': true, 'data': data};
+    } catch (error) {
+      return _networkFailure(error);
     }
   }
 
-  // 2. Get Trainer's profile details
   Future<Map<String, dynamic>> getTrainerProfile() async {
     try {
-      final headers = await _getHeaders();
-      final uri = Uri.parse('$baseUrl/trainers/profile');
-      final response = await http.get(uri, headers: headers);
-
+      final headers = await _getJsonHeaders();
+      if (headers == null) return _missingSession();
+      final response = await http
+          .get(Uri.parse('$baseUrl/trainers/profile'), headers: headers)
+          .timeout(_requestTimeout);
       if (response.statusCode == 200) {
-        return {'success': true, 'data': jsonDecode(utf8.decode(response.bodyBytes))};
-      } else {
-        final err = jsonDecode(response.body);
-        return {'success': false, 'message': err['error'] ?? 'Không thể tải hồ sơ'};
+        return {'success': true, 'data': _decodeObject(response) ?? {}};
       }
-    } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return _failure(response, 'Unable to load the trainer profile.');
+    } catch (error) {
+      return _networkFailure(error);
     }
   }
 
-  // 3. Save profile draft (Auto-Save)
-  Future<Map<String, dynamic>> saveProfileDraft(Map<String, dynamic> profileData) async {
-    try {
-      final headers = await _getHeaders();
-      final uri = Uri.parse('$baseUrl/trainers/profile');
-      final response = await http.put(
-        uri,
-        headers: headers,
-        body: jsonEncode(profileData),
-      );
-
-      if (response.statusCode == 200) {
-        return {'success': true, 'data': jsonDecode(utf8.decode(response.bodyBytes))};
-      } else {
-        final err = jsonDecode(response.body);
-        return {'success': false, 'message': err['error'] ?? 'Lưu bản nháp thất bại'};
-      }
-    } catch (e) {
-      return {'success': false, 'message': e.toString()};
-    }
+  Future<Map<String, dynamic>> saveProfileDraft(
+    Map<String, dynamic> profileData,
+  ) {
+    return _sendProfileJson(
+      method: 'PUT',
+      path: '/trainers/profile',
+      profileData: profileData,
+      fallbackMessage: 'Unable to save the trainer profile.',
+    );
   }
 
-  // 4. Submit profile for review
-  Future<Map<String, dynamic>> submitProfile(Map<String, dynamic> profileData) async {
-    try {
-      final headers = await _getHeaders();
-      final uri = Uri.parse('$baseUrl/trainers/profile/submit');
-      final response = await http.post(
-        uri,
-        headers: headers,
-        body: jsonEncode(profileData),
-      );
-
-      if (response.statusCode == 200) {
-        return {'success': true, 'data': jsonDecode(utf8.decode(response.bodyBytes))};
-      } else {
-        final err = jsonDecode(response.body);
-        return {'success': false, 'message': err['error'] ?? 'Gửi duyệt hồ sơ thất bại'};
-      }
-    } catch (e) {
-      return {'success': false, 'message': e.toString()};
-    }
+  Future<Map<String, dynamic>> submitProfile(Map<String, dynamic> profileData) {
+    return _sendProfileJson(
+      method: 'POST',
+      path: '/trainers/profile/submit',
+      profileData: profileData,
+      fallbackMessage: 'Unable to submit the trainer application.',
+    );
   }
 
-  Future<Map<String, dynamic>> submitProfileForReview(Map<String, dynamic> profileData) async {
+  Future<Map<String, dynamic>> submitProfileForReview(
+    Map<String, dynamic> profileData,
+  ) {
     return submitProfile(profileData);
   }
 
-  // 5. Get Trainer profiles for Admin review
-  Future<Map<String, dynamic>> getTrainerProfilesForAdmin({String? search, String status = 'ALL'}) async {
-    try {
-      final headers = await _getHeaders();
-      String url = '$baseUrl/admin/trainer-profiles?status=$status';
-      if (search != null && search.isNotEmpty) {
-        url += '&search=${Uri.encodeComponent(search)}';
-      }
-      final response = await http.get(Uri.parse(url), headers: headers);
+  Future<Map<String, dynamic>> submitCredentialUpdate(
+    Map<String, dynamic> profileData,
+  ) {
+    return _sendProfileJson(
+      method: 'POST',
+      path: '/trainers/profile/credentials/submit',
+      profileData: profileData,
+      fallbackMessage: 'Unable to submit the credential update.',
+    );
+  }
 
+  Future<Map<String, dynamic>> _sendProfileJson({
+    required String method,
+    required String path,
+    required Map<String, dynamic> profileData,
+    required String fallbackMessage,
+  }) async {
+    try {
+      final headers = await _getJsonHeaders();
+      if (headers == null) return _missingSession();
+      final uri = Uri.parse('$baseUrl$path');
+      final body = jsonEncode(profileData);
+      final response = method == 'POST'
+          ? await http
+                .post(uri, headers: headers, body: body)
+                .timeout(_requestTimeout)
+          : await http
+                .put(uri, headers: headers, body: body)
+                .timeout(_requestTimeout);
       if (response.statusCode == 200) {
-        return {'success': true, 'data': jsonDecode(utf8.decode(response.bodyBytes))};
-      } else {
-        final err = jsonDecode(response.body);
-        return {'success': false, 'message': err['error'] ?? 'Lỗi tải danh sách phê duyệt'};
+        return {'success': true, 'data': _decodeObject(response) ?? {}};
       }
-    } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return _failure(response, fallbackMessage);
+    } catch (error) {
+      return _networkFailure(error);
     }
   }
 
-  // 6. Review Trainer Profile (Admin action)
+  Future<Map<String, dynamic>> uploadTrainerDocument({
+    required List<int> bytes,
+    required String fileName,
+  }) {
+    return _uploadTrainerFile(
+      path: '/trainers/documents/upload',
+      bytes: bytes,
+      fileName: fileName,
+      fallbackMessage: 'Unable to upload the trainer document.',
+    );
+  }
+
+  Future<Map<String, dynamic>> uploadTrainerAvatar({
+    required List<int> bytes,
+    required String fileName,
+  }) {
+    return _uploadTrainerFile(
+      path: '/trainers/avatar/upload',
+      bytes: bytes,
+      fileName: fileName,
+      fallbackMessage: 'Unable to upload the trainer avatar.',
+    );
+  }
+
+  Future<Map<String, dynamic>> _uploadTrainerFile({
+    required String path,
+    required List<int> bytes,
+    required String fileName,
+    required String fallbackMessage,
+  }) async {
+    try {
+      final token = await _getToken();
+      if (token == null) return _missingSession();
+      final request = http.MultipartRequest('POST', Uri.parse('$baseUrl$path'))
+        ..headers['Authorization'] = 'Bearer $token'
+        ..files.add(
+          http.MultipartFile.fromBytes('file', bytes, filename: fileName),
+        );
+      final streamedResponse = await request.send().timeout(_uploadTimeout);
+      final response = await http.Response.fromStream(streamedResponse);
+      if (response.statusCode == 200) {
+        final data = _decodeObject(response);
+        final url = data?['url']?.toString();
+        if (url != null && url.isNotEmpty) {
+          return {
+            'success': true,
+            'data': {'url': url},
+          };
+        }
+      }
+      return _failure(
+        response,
+        trainerUploadFailureMessage(
+          statusCode: response.statusCode,
+          fallbackMessage: fallbackMessage,
+        ),
+      );
+    } catch (error) {
+      return _networkFailure(error);
+    }
+  }
+
+  Future<Map<String, dynamic>> getTrainerProfilesForAdmin({
+    String? search,
+    String status = 'ALL',
+  }) async {
+    try {
+      final headers = await _getJsonHeaders();
+      if (headers == null) return _missingSession();
+      final query = <String, String>{'status': status};
+      if (search != null && search.trim().isNotEmpty) {
+        query['search'] = search.trim();
+      }
+      final uri = Uri.parse(
+        '$baseUrl/admin/trainer-profiles',
+      ).replace(queryParameters: query);
+      final response = await http
+          .get(uri, headers: headers)
+          .timeout(_requestTimeout);
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        return {'success': true, 'data': decoded is List ? decoded : []};
+      }
+      return _failure(response, 'Unable to load trainer applications.');
+    } catch (error) {
+      return _networkFailure(error);
+    }
+  }
+
   Future<Map<String, dynamic>> reviewTrainerProfile(
     int userId, {
     required String status,
     String? adminNotes,
     double? revenueShare,
-  }) async {
-    try {
-      final headers = await _getHeaders();
-      final uri = Uri.parse('$baseUrl/admin/trainer-profiles/$userId/review');
-      final response = await http.put(
-        uri,
-        headers: headers,
-        body: jsonEncode({
-          'status': status,
-          'adminNotes': adminNotes ?? '',
-          'revenueShare': revenueShare,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        return {'success': true, 'data': jsonDecode(utf8.decode(response.bodyBytes))};
-      } else {
-        final err = jsonDecode(response.body);
-        return {'success': false, 'message': err['error'] ?? 'Xét duyệt hồ sơ thất bại'};
-      }
-    } catch (e) {
-      return {'success': false, 'message': e.toString()};
-    }
-  }
-
-  // 7. Analyze Document Image using Gemini Vision AI
-  Future<Map<String, dynamic>> analyzeDocumentUrl(String imageUrl) async {
-    try {
-      final headers = await _getHeaders();
-      final uri = Uri.parse('$baseUrl/trainers/analyze-document-url');
-      final response = await http.post(
-        uri,
-        headers: headers,
-        body: jsonEncode({'imageUrl': imageUrl}),
-      );
-
-      if (response.statusCode == 200) {
-        var rawStr = utf8.decode(response.bodyBytes).trim();
-        if (rawStr.startsWith('```json')) {
-          rawStr = rawStr.substring(7);
-        } else if (rawStr.startsWith('```')) {
-          rawStr = rawStr.substring(3);
-        }
-        if (rawStr.endsWith('```')) {
-          rawStr = rawStr.substring(0, rawStr.length - 3);
-        }
-        rawStr = rawStr.trim();
-
-        final decoded = jsonDecode(rawStr);
-        if (decoded is Map<String, dynamic>) {
-          return {'success': true, 'data': decoded};
-        } else if (decoded is String) {
-          final innerDecoded = jsonDecode(decoded);
-          if (innerDecoded is Map<String, dynamic>) {
-            return {'success': true, 'data': innerDecoded};
-          }
-        }
-      }
-      return {'success': false, 'message': 'AI Vision analysis failed'};
-    } catch (e) {
-      return {'success': false, 'message': e.toString()};
-    }
-  }
-
-  // 8. Analyze Document Bytes using Gemini Vision AI (Multipart upload)
-  Future<Map<String, dynamic>> analyzeDocumentFileBytes(Uint8List bytes, String filename) async {
-    try {
-      final token = await _authService.getToken();
-      final uri = Uri.parse('$baseUrl/trainers/analyze-document');
-      final request = http.MultipartRequest('POST', uri)
-        ..headers['Authorization'] = 'Bearer ${token ?? ""}'
-        ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
-
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-
-      if (response.statusCode == 200) {
-        var rawStr = responseBody.trim();
-        if (rawStr.startsWith('```json')) {
-          rawStr = rawStr.substring(7);
-        } else if (rawStr.startsWith('```')) {
-          rawStr = rawStr.substring(3);
-        }
-        if (rawStr.endsWith('```')) {
-          rawStr = rawStr.substring(0, rawStr.length - 3);
-        }
-        rawStr = rawStr.trim();
-
-        final decoded = jsonDecode(rawStr);
-        if (decoded is Map<String, dynamic>) {
-          return {'success': true, 'data': decoded};
-        } else if (decoded is String) {
-          final innerDecoded = jsonDecode(decoded);
-          if (innerDecoded is Map<String, dynamic>) {
-            return {'success': true, 'data': innerDecoded};
-          }
-        }
-      }
-      return {'success': false, 'message': 'AI Vision analysis failed'};
-    } catch (e) {
-      return {'success': false, 'message': e.toString()};
-    }
+  }) {
+    return _sendProfileJson(
+      method: 'PUT',
+      path: '/admin/trainer-profiles/$userId/review',
+      profileData: {
+        'status': status,
+        'adminNotes': adminNotes ?? '',
+        'revenueShare': revenueShare,
+      },
+      fallbackMessage: 'Unable to review the trainer application.',
+    );
   }
 }

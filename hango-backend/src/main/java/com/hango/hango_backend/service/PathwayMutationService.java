@@ -27,6 +27,7 @@ public class PathwayMutationService {
 
     @Transactional
     public void applyFastTrackSkip(LearningPathway pathway, Long targetNodeId, String reason) {
+        // Skip node: danh dau COMPLETED + luu ly do, dong thoi mo khoa node ke tiep
         PathwayNode nodeToSkip = pathway.getNodes().stream()
                 .filter(n -> n.getId().equals(targetNodeId))
                 .findFirst()
@@ -58,6 +59,8 @@ public class PathwayMutationService {
 
     @Transactional
     public void applyDetourInsertion(LearningPathway pathway, Long targetNodeId, Course remedialCourse, String reason) {
+        // Detour: chen 1 node remedial ngay sau node that bai, cac node phia sau
+        // bi day xuong (stepOrder +1) va khoa lai
         PathwayNode failedNode = pathway.getNodes().stream()
                 .filter(n -> n.getId().equals(targetNodeId))
                 .findFirst()

@@ -59,6 +59,8 @@ class CourseManagerDashboardServiceTest {
     private ExamHistoryService examHistoryService;
     @Mock
     private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+    @Mock
+    private CourseQuizValidationService courseQuizValidationService;
 
     @InjectMocks
     private CourseManagerDashboardServiceImpl service;
@@ -111,6 +113,7 @@ class CourseManagerDashboardServiceTest {
         User creator = user(2L);
         Course c = course(1L, "PENDING_APPROVAL", creator);
         when(courseRepository.findById(1L)).thenReturn(Optional.of(c));
+        when(courseQuizValidationService.hasAtLeastOneQuiz(1L)).thenReturn(true);
 
         service.publishCourse(1L);
 
@@ -132,6 +135,7 @@ class CourseManagerDashboardServiceTest {
         User learner = user(5L);
         Enrollment enrollment = Enrollment.builder().user(learner).course(v1).build();
         when(enrollmentRepository.findByCourseIdIn(List.of(10L))).thenReturn(List.of(enrollment));
+        when(courseQuizValidationService.hasAtLeastOneQuiz(11L)).thenReturn(true);
 
         service.publishCourse(11L);
 
@@ -147,6 +151,7 @@ class CourseManagerDashboardServiceTest {
         c.setSuggestedPrice(java.math.BigDecimal.valueOf(120));
         when(courseRepository.findById(1L)).thenReturn(Optional.of(c));
         when(courseRepository.isEligibleForFirstCoursePromotion(2L, "ENG-101")).thenReturn(true);
+        when(courseQuizValidationService.hasAtLeastOneQuiz(1L)).thenReturn(true);
 
         service.publishCourse(1L);
 
