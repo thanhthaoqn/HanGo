@@ -97,61 +97,73 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
     }
   }
 
+  double _getBaseScale() {
+    if (_decodedImage == null) return 1.0;
+    final w = _decodedImage!.width.toDouble();
+    final h = _decodedImage!.height.toDouble();
+    final rotW = (_rotationQuarterTurns % 2 == 0) ? w : h;
+    final rotH = (_rotationQuarterTurns % 2 == 0) ? h : w;
+    return math.max(
+      widget.cropDiameter / rotW,
+      widget.cropDiameter / rotH,
+    );
+  }
+
   void _resetTransform() {
     if (_decodedImage == null) return;
-    _rotationQuarterTurns = 0;
     _currentZoom = 1.0;
 
-    final imgW = _decodedImage!.width.toDouble();
-    final imgH = _decodedImage!.height.toDouble();
+    final w = _decodedImage!.width.toDouble();
+    final h = _decodedImage!.height.toDouble();
+    final rotW = (_rotationQuarterTurns % 2 == 0) ? w : h;
+    final rotH = (_rotationQuarterTurns % 2 == 0) ? h : w;
 
-    // Scale image so that its smallest dimension fits the crop diameter
-    final scale = math.max(
-      widget.cropDiameter / imgW,
-      widget.cropDiameter / imgH,
-    );
+    final baseScale = _getBaseScale();
+    final renderedW = rotW * baseScale;
+    final renderedH = rotH * baseScale;
 
-    // Center image in the viewport
-    final renderedW = imgW * scale;
-    final renderedH = imgH * scale;
     final dx = (_viewportSize - renderedW) / 2.0;
     final dy = (_viewportSize - renderedH) / 2.0;
 
     _transformController.value = Matrix4.identity()
-      ..translate(dx, dy)
-      ..scale(scale, scale);
+      ..setTranslationRaw(dx, dy, 0.0)
+      ..scale(baseScale, baseScale, 1.0);
 
     setState(() {});
   }
 
   void _onZoomSliderChanged(double newZoom) {
     if (_decodedImage == null) return;
-    final oldZoom = _currentZoom;
-    final zoomRatio = newZoom / oldZoom;
+    final baseScale = _getBaseScale();
+    final targetScale = baseScale * newZoom;
+
+    final currentMatrix = _transformController.value;
+    final currentScale = currentMatrix.getMaxScaleOnAxis();
+    if (currentScale <= 0) return;
+
+    final ratio = targetScale / currentScale;
     _currentZoom = newZoom;
 
-    // Zoom from center of viewport
-    final center = const Offset(_viewportSize / 2.0, _viewportSize / 2.0);
-    final currentMatrix = _transformController.value;
-
+    // Zoom relative to center of the crop circle
+    const center = Offset(_viewportSize / 2.0, _viewportSize / 2.0);
     final translation = currentMatrix.getTranslation();
-    final currentScale = currentMatrix.getMaxScaleOnAxis();
 
-    final newScale = currentScale * zoomRatio;
-    final dx = center.dx - (center.dx - translation.x) * zoomRatio;
-    final dy = center.dy - (center.dy - translation.y) * zoomRatio;
+    final newDx = center.dx - (center.dx - translation.x) * ratio;
+    final newDy = center.dy - (center.dy - translation.y) * ratio;
 
     _transformController.value = Matrix4.identity()
-      ..translate(dx, dy)
-      ..scale(newScale, newScale);
+      ..setTranslationRaw(newDx, newDy, 0.0)
+      ..scale(targetScale, targetScale, 1.0);
 
     setState(() {});
   }
 
   void _rotateQuarterTurn() {
+    if (_decodedImage == null) return;
     setState(() {
       _rotationQuarterTurns = (_rotationQuarterTurns + 1) % 4;
     });
+    _resetTransform();
   }
 
   Future<void> _applyCropAndConfirm() async {
@@ -198,21 +210,23 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
     canvas.scale(scaleToOutput, scaleToOutput);
     // 2. Translate crop center to origin
     canvas.translate(-cropLeft, -cropTop);
-    // 3. Apply interactive pan & zoom matrix
+    // 3. Apply exact InteractiveViewer transform matrix
     canvas.transform(matrix.storage);
 
-    // 4. Apply rotation around image center if rotated
-    if (_rotationQuarterTurns != 0) {
-      final imgW = uiImage.width.toDouble();
-      final imgH = uiImage.height.toDouble();
-      canvas.translate(imgW / 2.0, imgH / 2.0);
-      canvas.rotate(_rotationQuarterTurns * (math.pi / 2.0));
-      canvas.translate(-imgW / 2.0, -imgH / 2.0);
-    }
+    // 4. Draw image with same rotation
+    final w = uiImage.width.toDouble();
+    final h = uiImage.height.toDouble();
+    final rotW = (_rotationQuarterTurns % 2 == 0) ? w : h;
+    final rotH = (_rotationQuarterTurns % 2 == 0) ? h : w;
 
-    // 5. Draw image
-    final paint = Paint()..filterQuality = FilterQuality.high;
-    canvas.drawImage(uiImage, Offset.zero, paint);
+    _drawImageWithRotation(
+      canvas: canvas,
+      image: uiImage,
+      rotW: rotW,
+      rotH: rotH,
+      quarterTurns: _rotationQuarterTurns,
+    );
+
     canvas.restore();
 
     final picture = recorder.endRecording();
@@ -228,11 +242,46 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
     return byteData.buffer.asUint8List();
   }
 
+  static void _drawImageWithRotation({
+    required Canvas canvas,
+    required ui.Image image,
+    required double rotW,
+    required double rotH,
+    required int quarterTurns,
+  }) {
+    canvas.save();
+    if (quarterTurns == 1) {
+      canvas.translate(rotW, 0);
+      canvas.rotate(math.pi / 2.0);
+    } else if (quarterTurns == 2) {
+      canvas.translate(rotW, rotH);
+      canvas.rotate(math.pi);
+    } else if (quarterTurns == 3) {
+      canvas.translate(0, rotH);
+      canvas.rotate(3.0 * math.pi / 2.0);
+    }
+    final paint = Paint()
+      ..filterQuality = FilterQuality.high
+      ..isAntiAlias = true;
+    canvas.drawImage(image, Offset.zero, paint);
+    canvas.restore();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isVi = LanguageManager.isVi;
     final dialogTitle = widget.title ??
         (isVi ? 'Chỉnh sửa ảnh đại diện' : 'Adjust Avatar Photo');
+
+    double rotW = 100.0;
+    double rotH = 100.0;
+    if (_decodedImage != null) {
+      final w = _decodedImage!.width.toDouble();
+      final h = _decodedImage!.height.toDouble();
+      rotW = (_rotationQuarterTurns % 2 == 0) ? w : h;
+      rotH = (_rotationQuarterTurns % 2 == 0) ? h : w;
+    }
+    final baseScale = _getBaseScale();
 
     return Dialog(
       backgroundColor: Colors.white,
@@ -359,21 +408,30 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
                                     transformationController:
                                         _transformController,
                                     boundaryMargin: const EdgeInsets.all(
-                                        _viewportSize * 1.5),
-                                    minScale: 0.3,
-                                    maxScale: 6.0,
+                                      _viewportSize * 2.0,
+                                    ),
+                                    minScale: baseScale * 0.4,
+                                    maxScale: baseScale * 6.0,
                                     onInteractionEnd: (_) {
-                                      final scale = _transformController.value
-                                          .getMaxScaleOnAxis();
+                                      if (_decodedImage == null) return;
+                                      final currentScale =
+                                          _transformController.value
+                                              .getMaxScaleOnAxis();
+                                      final zoom = (currentScale / baseScale)
+                                          .clamp(1.0, 4.0);
                                       setState(() {
-                                        _currentZoom = scale.clamp(1.0, 4.0);
+                                        _currentZoom = zoom;
                                       });
                                     },
-                                    child: RotatedBox(
-                                      quarterTurns: _rotationQuarterTurns,
-                                      child: Image.memory(
-                                        widget.imageBytes,
-                                        fit: BoxFit.contain,
+                                    child: SizedBox(
+                                      width: rotW,
+                                      height: rotH,
+                                      child: CustomPaint(
+                                        size: Size(rotW, rotH),
+                                        painter: _ImageCanvasPainter(
+                                          image: _decodedImage!,
+                                          quarterTurns: _rotationQuarterTurns,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -413,7 +471,7 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
                         ),
                       ),
                       child: Slider(
-                        value: _currentZoom,
+                        value: _currentZoom.clamp(1.0, 4.0),
                         min: 1.0,
                         max: 4.0,
                         onChanged: _decodedImage != null
@@ -542,6 +600,34 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
         ),
       ),
     );
+  }
+}
+
+/// Draws the decoded ui.Image on the CustomPaint canvas according to the rotation.
+class _ImageCanvasPainter extends CustomPainter {
+  final ui.Image image;
+  final int quarterTurns;
+
+  _ImageCanvasPainter({
+    required this.image,
+    required this.quarterTurns,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    _ImageCropperDialogState._drawImageWithRotation(
+      canvas: canvas,
+      image: image,
+      rotW: size.width,
+      rotH: size.height,
+      quarterTurns: quarterTurns,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ImageCanvasPainter oldDelegate) {
+    return oldDelegate.image != image ||
+        oldDelegate.quarterTurns != quarterTurns;
   }
 }
 
