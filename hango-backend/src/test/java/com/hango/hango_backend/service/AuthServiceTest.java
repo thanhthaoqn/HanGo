@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -86,6 +87,8 @@ class AuthServiceTest {
     private RefreshTokenRepository refreshTokenRepository;
     @Mock
     private AuditLogService auditLogService;
+    @Mock
+    private UserLockoutService userLockoutService;
     @Mock
     private Authentication authentication;
 
@@ -205,22 +208,22 @@ class AuthServiceTest {
     @Test
     void authenticateUserShouldLockAccountAfter5FailedAttempts() {
         User user = activeVerifiedUser("active@example.com", "ACTIVE");
-        user.setFailedLoginAttempts(4);
+        user.setId(10L);
         when(userRepository.findByEmail("active@example.com")).thenReturn(Optional.of(user));
         when(authenticationManager.authenticate(any())).thenThrow(new BadCredentialsException("Bad credentials"));
+        when(userLockoutService.recordFailedAttempt(10L)).thenReturn(true);
 
         ApiException ex = assertApiException(HttpStatus.FORBIDDEN,
                 () -> authService.authenticateUser(loginRequest("active@example.com", "wrong-password")));
 
         assertEquals("Account is locked due to 5 consecutive failed login attempts. Please try again after 15 minutes.", ex.getMessage());
-        assertEquals(5, user.getFailedLoginAttempts());
-        assertNotNull(user.getLockedUntil());
-        assertTrue(user.getLockedUntil().isAfter(java.time.LocalDateTime.now()));
+        verify(userLockoutService).recordFailedAttempt(10L);
     }
 
     @Test
     void authenticateUserShouldRejectLoginWhenAccountIsCurrentlyLocked() {
         User user = activeVerifiedUser("locked@example.com", "ACTIVE");
+        user.setId(11L);
         user.setLockedUntil(java.time.LocalDateTime.now().plusMinutes(10));
         when(userRepository.findByEmail("locked@example.com")).thenReturn(Optional.of(user));
 
@@ -234,7 +237,7 @@ class AuthServiceTest {
     @Test
     void authenticateUserShouldUnlockAccountWhenLockoutPeriodExpires() {
         User user = activeVerifiedUser("unlocked@example.com", "ACTIVE");
-        user.setFailedLoginAttempts(5);
+        user.setId(12L);
         user.setLockedUntil(java.time.LocalDateTime.now().minusMinutes(1));
         when(userRepository.findByEmail("unlocked@example.com")).thenReturn(Optional.of(user));
         when(authenticationManager.authenticate(any())).thenReturn(authentication);
@@ -242,8 +245,7 @@ class AuthServiceTest {
         LoginResponse response = authService.authenticateUser(loginRequest("unlocked@example.com", "correct-password"));
 
         assertNotNull(response);
-        assertEquals(0, user.getFailedLoginAttempts());
-        assertNull(user.getLockedUntil());
+        verify(userLockoutService, atLeastOnce()).resetLockout(12L);
     }
 
     @Test

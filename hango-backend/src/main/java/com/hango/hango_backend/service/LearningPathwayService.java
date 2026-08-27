@@ -745,11 +745,24 @@ public class LearningPathwayService {
                 .findFirst()
                 .orElseThrow(() -> new ApiException("Node not found in pathway", HttpStatus.NOT_FOUND));
 
-        if ("LOCKED".equalsIgnoreCase(node.getStatus())) {
+        int realProgress = calculateCourseProgressPercent(studentId, node.getCourse().getId());
+        long totalLessons = lessonRepository.countByCourseId(node.getCourse().getId());
+        String resolvedStatus = node.getStatus();
+        boolean manuallyCompleted = node.getNodeType() != null && !node.getNodeType().isBlank();
+        
+        if (totalLessons > 0 && realProgress >= 100) {
+            resolvedStatus = "COMPLETED";
+        } else if ("COMPLETED".equalsIgnoreCase(resolvedStatus) && realProgress < 100 && !manuallyCompleted) {
+            resolvedStatus = "IN_PROGRESS";
+        } else if (realProgress > 0 && "LOCKED".equalsIgnoreCase(node.getStatus())) {
+            resolvedStatus = "IN_PROGRESS";
+        }
+
+        if (!"COMPLETED".equalsIgnoreCase(resolvedStatus)) {
             throw new ApiException("Finish the course before taking its mastery quiz", HttpStatus.BAD_REQUEST);
         }
 
-        // Defensive: course/category cÃ³ thá»ƒ null
+        // Defensive: course/category có thể null
         Course course = node.getCourse();
         if (course == null) {
             throw new ApiException("Node has no associated course", HttpStatus.INTERNAL_SERVER_ERROR);
@@ -900,7 +913,10 @@ public class LearningPathwayService {
         List<Long> questionIds = jdbcTemplate.queryForList(
                 "SELECT DISTINCT q.id FROM questions q " +
                         "JOIN lesson_quizzes lq ON q.id = lq.question_id " +
-                        "WHERE lq.lesson_id IN (" + inClause + ") ORDER BY RAND() LIMIT ?",
+                        "WHERE lq.lesson_id IN (" + inClause + ") " +
+                        "AND (q.usage_type = '1' OR q.usage_type = 'QUIZ_ONLY' OR q.usage_type = '3' OR q.usage_type = 'BOTH') " +
+                        "AND q.group_id IS NULL " +
+                        "ORDER BY RAND() LIMIT ?",
                 Long.class, limit);
         return buildQuestionDtos(questionIds);
     }
@@ -914,7 +930,7 @@ public class LearningPathwayService {
                             "WHERE UPPER(sk.param_value) IN (" +
                             "  SELECT UPPER(sp.param_key) FROM system_parameters sp " +
                             "  WHERE sp.param_type = 'SKILL_CATEGORY_MAP' AND UPPER(sp.param_value) = UPPER(?)" +
-                            ") ORDER BY RAND() LIMIT ?",
+                            ") AND (q.usage_type = '1' OR q.usage_type = 'QUIZ_ONLY' OR q.usage_type = '3' OR q.usage_type = 'BOTH') AND q.group_id IS NULL ORDER BY RAND() LIMIT ?",
                     Long.class, category.trim(), limit);
             if (!questionIds.isEmpty()) {
                 return buildQuestionDtos(questionIds);
@@ -923,11 +939,11 @@ public class LearningPathwayService {
         // Cuoi cung: bat ky cau APPROVED nao
         try {
             questionIds = jdbcTemplate.queryForList(
-                    "SELECT id FROM questions WHERE status = 'APPROVED' ORDER BY RAND() LIMIT ?",
+                    "SELECT id FROM questions WHERE status = 'APPROVED' AND (usage_type = '1' OR usage_type = 'QUIZ_ONLY' OR usage_type = '3' OR usage_type = 'BOTH') AND group_id IS NULL ORDER BY RAND() LIMIT ?",
                     Long.class, limit);
         } catch (Exception e) {
             questionIds = jdbcTemplate.queryForList(
-                    "SELECT id FROM questions ORDER BY RAND() LIMIT ?", Long.class, limit);
+                    "SELECT id FROM questions WHERE (usage_type = '1' OR usage_type = 'QUIZ_ONLY' OR usage_type = '3' OR usage_type = 'BOTH') AND group_id IS NULL ORDER BY RAND() LIMIT ?", Long.class, limit);
         }
         return buildQuestionDtos(questionIds);
     }
@@ -956,10 +972,15 @@ public class LearningPathwayService {
                 if (isCorrect != null && isCorrect) correctCount++;
             }
 
+            Object passageObj = rows.get(0).get("passage");
+            if (passageObj == null) {
+                passageObj = rows.get(0).get("context_text");
+            }
+            
             result.add(com.hango.hango_backend.dto.MasteryQuestionDTO.builder()
                     .questionId(qId)
                     .questionText((String) rows.get(0).get("question_text"))
-                    .passage((String) rows.get(0).get("passage"))
+                    .passage((String) passageObj)
                     .options(options)
                     .isMultipleChoice(correctCount > 1)
                     .build());
