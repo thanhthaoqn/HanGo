@@ -68,8 +68,17 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
             }
 
             String settlementStatus = row[2] != null ? row[2].toString() : null;
-            java.sql.Timestamp createdAtTs = row[3] != null ? (java.sql.Timestamp) row[3] : null;
-            LocalDateTime createdAt = createdAtTs != null ? createdAtTs.toLocalDateTime() : null;
+            Object rawCreatedAt = row[3];
+            LocalDateTime createdAt = null;
+            if (rawCreatedAt instanceof java.sql.Timestamp) {
+                createdAt = ((java.sql.Timestamp) rawCreatedAt).toLocalDateTime();
+            } else if (rawCreatedAt instanceof LocalDateTime) {
+                createdAt = (LocalDateTime) rawCreatedAt;
+            } else if (rawCreatedAt != null) {
+                try {
+                    createdAt = LocalDateTime.parse(rawCreatedAt.toString().replace(" ", "T"));
+                } catch (Exception ignored) {}
+            }
 
             if ("PENDING".equalsIgnoreCase(settlementStatus) || settlementStatus == null) {
                 if (createdAt != null && createdAt.isAfter(holdThreshold)) {
@@ -254,6 +263,9 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
 
             if (statement.getStatus() == null || "DRAFT".equalsIgnoreCase(statement.getStatus())) {
                 statement.setStatus("PENDING_TRAINER_CONFIRM");
+            }
+            if (statement.getCreatedAt() == null) {
+                statement.setCreatedAt(LocalDateTime.now());
             }
 
             MonthlyStatement savedStatement = statementRepository.save(statement);
@@ -573,6 +585,19 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
 
         String tType = profile != null && profile.getTrainerType() != null ? profile.getTrainerType() : "PROFESSIONAL";
 
+        LocalDateTime statementCreatedAt = s.getCreatedAt();
+        if (statementCreatedAt == null) {
+            if (s.getPaidAt() != null) {
+                statementCreatedAt = s.getPaidAt();
+            } else if (s.getTrainerConfirmedAt() != null) {
+                statementCreatedAt = s.getTrainerConfirmedAt();
+            } else if (s.getPeriodMonth() != null && s.getPeriodMonth().length() == 7) {
+                try {
+                    statementCreatedAt = java.time.YearMonth.parse(s.getPeriodMonth()).atDay(1).atStartOfDay();
+                } catch (Exception ignored) {}
+            }
+        }
+
         return MonthlyStatementDTO.builder()
                 .id(s.getId())
                 .statementCode(s.getStatementCode())
@@ -596,7 +621,7 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
                 .bankTxnRef(s.getBankTxnRef())
                 .adminNotes(s.getAdminNotes())
                 .payoutReceiptUrl(s.getPayoutReceiptUrl())
-                .createdAt(s.getCreatedAt())
+                .createdAt(statementCreatedAt)
                 .build();
     }
 }

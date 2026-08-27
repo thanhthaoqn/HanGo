@@ -1613,7 +1613,7 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                                   ),
                                 ),
                               ),
-                              DataCell(Text(_formatDateTime(s['createdAt']), style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)))),
+                              DataCell(Text(_formatDateTime(s['createdAt'] ?? s['paidAt'] ?? s['trainerConfirmedAt']), style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)))),
                               DataCell(
                                 InkWell(
                                   onTap: () => _showStatementDetailDialog(s as Map<String, dynamic>),
