@@ -110,7 +110,7 @@ class _MasteryQuizPageState extends State<MasteryQuizPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              _score != null ? 'Kết quả Mastery' : 'Mastery Quiz',
+              _score != null ? 'Mastery Result' : 'Mastery Quiz',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textMain),
             ),
             Text(
@@ -140,7 +140,7 @@ class _MasteryQuizPageState extends State<MasteryQuizPage> {
             const Icon(Icons.error_outline_rounded, size: 48, color: Color(0xFFEF4444)),
             const SizedBox(height: 12),
             Text(
-              'Không tải được bộ câu hỏi mastery.',
+              'Failed to load mastery questions.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: textMain),
             ),
@@ -151,7 +151,7 @@ class _MasteryQuizPageState extends State<MasteryQuizPage> {
             FilledButton.icon(
               onPressed: _loadQuestions,
               icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text('Thử lại'),
+              label: const Text('Try again'),
               style: FilledButton.styleFrom(backgroundColor: const Color(0xFF28B79B)),
             ),
           ],
@@ -166,7 +166,7 @@ class _MasteryQuizPageState extends State<MasteryQuizPage> {
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Text(
-            'Khóa học này chưa có câu hỏi mastery. Vui lòng liên hệ Trainer bổ sung quiz.',
+            'This course does not have mastery questions yet. Please contact your Trainer to add a quiz.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 14, color: textSub),
           ),
@@ -316,8 +316,8 @@ class _MasteryQuizPageState extends State<MasteryQuizPage> {
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Icon(Icons.send_rounded, size: 18),
                 label: Text(allAnswered
-                    ? 'Nộp bài (${_answers.length}/${_questions.length} câu)'
-                    : 'Đã trả lời ${_answers.length}/${_questions.length} câu'),
+                    ? 'Submit (${_answers.length}/${_questions.length} questions)'
+                    : 'Answered ${_answers.length}/${_questions.length} questions'),
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF28B79B),
                   disabledBackgroundColor:
@@ -367,14 +367,14 @@ class _MasteryQuizPageState extends State<MasteryQuizPage> {
               ),
               const SizedBox(height: 16),
               Text(
-                passed ? 'Mastered! 🎉' : 'Chưa đạt Mastery',
+                passed ? 'Mastered! 🎉' : 'Not Mastered',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textMain),
               ),
               const SizedBox(height: 8),
               Text(
                 passed
-                    ? 'Xuất sắc! Khóa "${node.courseTitle}" đã được đánh dấu mastered và sẽ được lên lịch ôn tập lại (spaced repetition).'
-                    : 'Bạn cần đạt tối thiểu 80 điểm để mastered khóa "${node.courseTitle}". Hãy học thêm rồi thử lại nhé!',
+                    ? 'Excellent! Course "${node.courseTitle}" is now marked as mastered and will be scheduled for spaced repetition.'
+                    : 'You need at least 80 points to master "${node.courseTitle}". Keep learning and try again later!',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 13.5, color: textSub, height: 1.5),
               ),
@@ -387,7 +387,7 @@ class _MasteryQuizPageState extends State<MasteryQuizPage> {
                     backgroundColor: const Color(0xFF28B79B),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  child: const Text('Quay lại lộ trình'),
+                  child: const Text('Back to Pathway'),
                 ),
               ),
             ],
