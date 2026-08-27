@@ -71,6 +71,10 @@ class PathwayMentorChatServiceTest {
     @InjectMocks
     private PathwayMentorChatService chatService;
 
+    // =================================================================
+    // chat
+    // =================================================================
+
     @Test
     void chatShouldUsePathwayContextAndPersistMessages() {
         LearningPathway pathway = pathway();
@@ -152,6 +156,223 @@ class PathwayMentorChatServiceTest {
 
         assertEquals(HttpStatus.FORBIDDEN, exception.getStatus());
         verify(geminiClientService, never()).generateChatResponse(anyString(), any());
+    }
+
+    @Test
+    void chatShouldThrowWhenLearnerIdIsNull() {
+        PathwayChatRequestDTO request = new PathwayChatRequestDTO();
+        request.setMessage("What should I study next?");
+
+        ApiException exception = assertThrows(ApiException.class, () -> chatService.chat(10L, null, request));
+
+        assertEquals(HttpStatus.UNAUTHORIZED, exception.getStatus());
+        verify(pathwayRepository, never()).findById(any());
+    }
+
+    @Test
+    void chatShouldThrowWhenPathwayNotFound() {
+        when(pathwayRepository.findById(10L)).thenReturn(Optional.empty());
+
+        PathwayChatRequestDTO request = new PathwayChatRequestDTO();
+        request.setMessage("What should I study next?");
+
+        ApiException exception = assertThrows(ApiException.class, () -> chatService.chat(10L, 1L, request));
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
+    }
+
+    @Test
+    void chatShouldThrowWhenUserNotFound() {
+        LearningPathway pathway = pathway();
+        when(pathwayRepository.findById(10L)).thenReturn(Optional.of(pathway));
+        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+
+        PathwayChatRequestDTO request = new PathwayChatRequestDTO();
+        request.setMessage("What should I study next?");
+
+        ApiException exception = assertThrows(ApiException.class, () -> chatService.chat(10L, 1L, request));
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
+        assertEquals("User not found", exception.getMessage());
+    }
+
+    @Test
+    void chatShouldFallBackToApologyMessageWhenGeminiThrows() {
+        LearningPathway pathway = pathway();
+        when(pathwayRepository.findById(10L)).thenReturn(Optional.of(pathway));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(pathway.getStudent()));
+        when(conversationRepository.findFirstByLearnerIdAndPathwayIdOrderByStartedAtDesc(1L, 10L))
+                .thenReturn(Optional.empty());
+        when(conversationRepository.save(any(PathwayConversation.class))).thenAnswer(invocation -> {
+            PathwayConversation conversation = invocation.getArgument(0);
+            if (conversation.getId() == null) {
+                conversation.setId(99L);
+            }
+            return conversation;
+        });
+        when(examAttemptRepository.findTop10ByStudent_IdOrderBySubmittedAtDesc(1L)).thenReturn(List.of());
+        when(lessonRepository.countByCourseId(7L)).thenReturn(4L);
+        when(lessonProgressRepository.countCompletedLessonsByUserIdAndCourseId(1L, 7L)).thenReturn(1L);
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenThrow(new RuntimeException("Gemini down"));
+
+        PathwayChatRequestDTO request = new PathwayChatRequestDTO();
+        request.setMessage("Why should I learn grammar first?");
+
+        PathwayChatResponseDTO response = chatService.chat(10L, 1L, request);
+
+        assertEquals("Xin lỗi, tôi đang gặp sự cố kỹ thuật. Vui lòng thử lại sau giây lát.", response.getReply());
+        assertFalse(response.isWasOutOfScope());
+    }
+
+    @Test
+    void chatShouldReuseConversationWhenConversationIdProvided() {
+        LearningPathway pathway = pathway();
+        PathwayConversation existingConversation = PathwayConversation.builder()
+                .id(55L)
+                .learner(pathway.getStudent())
+                .pathway(pathway)
+                .messages(new java.util.ArrayList<>())
+                .build();
+        when(pathwayRepository.findById(10L)).thenReturn(Optional.of(pathway));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(pathway.getStudent()));
+        when(conversationRepository.findByIdAndLearnerIdWithMessages(55L, 1L)).thenReturn(Optional.of(existingConversation));
+        when(conversationRepository.save(any(PathwayConversation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(examAttemptRepository.findTop10ByStudent_IdOrderBySubmittedAtDesc(1L)).thenReturn(List.of());
+        when(lessonRepository.countByCourseId(7L)).thenReturn(4L);
+        when(lessonProgressRepository.countCompletedLessonsByUserIdAndCourseId(1L, 7L)).thenReturn(1L);
+        when(geminiClientService.generateChatResponse(anyString(), any()))
+                .thenReturn("Keep going with Grammar.")
+                .thenReturn("{\"suggestedQuestions\":[]}");
+
+        PathwayChatRequestDTO request = new PathwayChatRequestDTO();
+        request.setMessage("How am I doing?");
+        request.setConversationId(55L);
+
+        PathwayChatResponseDTO response = chatService.chat(10L, 1L, request);
+
+        assertEquals(55L, response.getConversationId());
+        verify(conversationRepository, times(1)).save(any(PathwayConversation.class));
+        verify(conversationRepository, never()).findFirstByLearnerIdAndPathwayIdOrderByStartedAtDesc(any(), any());
+        assertEquals(2, existingConversation.getMessages().size());
+    }
+
+    @Test
+    void chatShouldMarkOutOfScopeWhenAiReplyMentionsOutOfScopePhrase() {
+        LearningPathway pathway = pathway();
+        when(pathwayRepository.findById(10L)).thenReturn(Optional.of(pathway));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(pathway.getStudent()));
+        when(conversationRepository.findFirstByLearnerIdAndPathwayIdOrderByStartedAtDesc(1L, 10L))
+                .thenReturn(Optional.empty());
+        when(conversationRepository.save(any(PathwayConversation.class))).thenAnswer(invocation -> {
+            PathwayConversation conversation = invocation.getArgument(0);
+            if (conversation.getId() == null) {
+                conversation.setId(99L);
+            }
+            return conversation;
+        });
+        when(examAttemptRepository.findTop10ByStudent_IdOrderBySubmittedAtDesc(1L)).thenReturn(List.of());
+        when(lessonRepository.countByCourseId(7L)).thenReturn(4L);
+        when(lessonProgressRepository.countCompletedLessonsByUserIdAndCourseId(1L, 7L)).thenReturn(1L);
+        when(geminiClientService.generateChatResponse(anyString(), any()))
+                .thenReturn("That request is out of scope for a pathway mentor.");
+
+        PathwayChatRequestDTO request = new PathwayChatRequestDTO();
+        request.setMessage("Can you help me plan my study schedule?");
+
+        PathwayChatResponseDTO response = chatService.chat(10L, 1L, request);
+
+        assertTrue(response.isWasOutOfScope());
+        assertTrue(response.getSuggestedQuestions().isEmpty());
+    }
+
+    // =================================================================
+    // getChatHistory
+    // =================================================================
+
+    @Test
+    void getChatHistoryShouldThrowWhenPathwayNotFound() {
+        when(pathwayRepository.findById(10L)).thenReturn(Optional.empty());
+
+        ApiException exception = assertThrows(ApiException.class, () -> chatService.getChatHistory(10L, 1L));
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
+    }
+
+    @Test
+    void getChatHistoryShouldRejectOtherLearnersPathway() {
+        LearningPathway pathway = pathway();
+        pathway.setStudent(User.builder().id(2L).build());
+        when(pathwayRepository.findById(10L)).thenReturn(Optional.of(pathway));
+
+        ApiException exception = assertThrows(ApiException.class, () -> chatService.getChatHistory(10L, 1L));
+
+        assertEquals(HttpStatus.FORBIDDEN, exception.getStatus());
+    }
+
+    @Test
+    void getChatHistoryShouldMapConversationsAndMessages() {
+        LearningPathway pathway = pathway();
+        PathwayMessage userMessage = PathwayMessage.builder()
+                .role(PathwayMessage.MessageRole.USER)
+                .content("Why grammar first?")
+                .wasOutOfScope(false)
+                .build();
+        PathwayMessage assistantMessage = PathwayMessage.builder()
+                .role(PathwayMessage.MessageRole.ASSISTANT)
+                .content("Because your grammar accuracy is low.")
+                .wasOutOfScope(false)
+                .build();
+        PathwayConversation conversation = PathwayConversation.builder()
+                .id(55L)
+                .messages(List.of(userMessage, assistantMessage))
+                .build();
+        when(pathwayRepository.findById(10L)).thenReturn(Optional.of(pathway));
+        when(conversationRepository.findByLearnerIdAndPathwayIdOrderByStartedAtDesc(1L, 10L))
+                .thenReturn(List.of(conversation));
+
+        List<PathwayChatResponseDTO> history = chatService.getChatHistory(10L, 1L);
+
+        assertEquals(2, history.size());
+        assertEquals("USER", history.get(0).getRole());
+        assertEquals("Why grammar first?", history.get(0).getReply());
+        assertEquals("ASSISTANT", history.get(1).getRole());
+    }
+
+    // =================================================================
+    // clearChatHistory
+    // =================================================================
+
+    @Test
+    void clearChatHistoryShouldThrowWhenPathwayNotFound() {
+        when(pathwayRepository.findById(10L)).thenReturn(Optional.empty());
+
+        ApiException exception = assertThrows(ApiException.class, () -> chatService.clearChatHistory(10L, 1L));
+
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
+    }
+
+    @Test
+    void clearChatHistoryShouldRejectOtherLearnersPathway() {
+        LearningPathway pathway = pathway();
+        pathway.setStudent(User.builder().id(2L).build());
+        when(pathwayRepository.findById(10L)).thenReturn(Optional.of(pathway));
+
+        ApiException exception = assertThrows(ApiException.class, () -> chatService.clearChatHistory(10L, 1L));
+
+        assertEquals(HttpStatus.FORBIDDEN, exception.getStatus());
+    }
+
+    @Test
+    void clearChatHistoryShouldDeleteAllConversations() {
+        LearningPathway pathway = pathway();
+        PathwayConversation conversation = PathwayConversation.builder().id(55L).build();
+        when(pathwayRepository.findById(10L)).thenReturn(Optional.of(pathway));
+        when(conversationRepository.findByLearnerIdAndPathwayIdOrderByStartedAtDesc(1L, 10L))
+                .thenReturn(List.of(conversation));
+
+        chatService.clearChatHistory(10L, 1L);
+
+        verify(conversationRepository).deleteAll(List.of(conversation));
     }
 
     private LearningPathway pathway() {

@@ -6,6 +6,7 @@ import com.hango.hango_backend.dto.CourseLessonDTO;
 import com.hango.hango_backend.dto.CourseSessionDTO;
 import com.hango.hango_backend.entity.Course;
 import com.hango.hango_backend.entity.Lesson;
+import com.hango.hango_backend.exception.ApiException;
 import com.hango.hango_backend.repository.CourseRepository;
 import com.hango.hango_backend.repository.ExamRepository;
 import com.hango.hango_backend.service.CourseQuizValidationService;
@@ -17,6 +18,7 @@ import com.hango.hango_backend.service.CourseManagerDashboardService;
 import com.hango.hango_backend.service.ExamHistoryService;
 import com.hango.hango_backend.service.NotificationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -306,13 +308,16 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
 
     @Override
     @Transactional
+    // Buoc 4 (buoc cuoi) cua flow "Content Building & Publishing": Course Manager
+    // duyet 1 khoa hoc dang cho duyet -> khoa hoc chinh thuc hien thi cho hoc vien.
+    // Chi khoa hoc dang PENDING_APPROVAL moi duoc publish (chan double-publish).
     public void publishCourse(Long courseId) {
         Course course = courseRepository.findById(courseId)
                 .filter(c -> c.getDeletedAt() == null)
-                .orElseThrow(() -> new RuntimeException("Course not found with ID: " + courseId));
+                .orElseThrow(() -> new ApiException("Course not found with ID: " + courseId, HttpStatus.NOT_FOUND));
 
         if (!"PENDING_APPROVAL".equalsIgnoreCase(course.getStatus())) {
-            throw new RuntimeException("Only courses in PENDING_APPROVAL status can be published");
+            throw new ApiException("Only courses in PENDING_APPROVAL status can be published", HttpStatus.BAD_REQUEST);
         }
 
         // A1 (spec 20): chan publish neu course chua co it nhat 1 quiz co cau hoi
@@ -321,9 +326,12 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                     + "\": the course must contain at least one quiz with questions before publishing.");
         }
 
+        // Khoa hoc DAU TIEN cua Trainer luon mien phi khi publish, bat ke gia
+        // Trainer da tu chon la bao nhieu - chi ep GIA BAN (price) ve 0, GIU
+        // NGUYEN suggestedPrice de biet khoa hoc nay "dang" tri gia bao nhieu
+        // tren thi truong.
         if (courseRepository.isEligibleForFirstCoursePromotion(course.getCreator().getId(), course.getCode())) {
             course.setPrice(java.math.BigDecimal.ZERO);
-            course.setSuggestedPrice(java.math.BigDecimal.ZERO);
         }
 
         course.setStatus("PUBLISHED");
@@ -336,6 +344,10 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                 "Course published",
                 "Your course \"" + course.getTitle() + "\" has been approved and published.", course);
 
+        // Neu day la ban publish cua 1 PHIEN BAN MOI (V2 co parentId tro ve V1):
+        // chuyen V1 sang ARCHIVED va bao cho tat ca hoc vien dang hoc cac
+        // phien ban cu biet co ban cap nhat moi (notification, khong tu dong
+        // chuyen ho sang V2 - hoc vien tu chon switch-version).
         if (course.getParentId() != null) {
             Course originalCourse = courseRepository.findById(course.getParentId())
                     .orElse(null);
@@ -370,10 +382,10 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
     public void rejectCourse(Long courseId, String reason) {
         Course course = courseRepository.findById(courseId)
                 .filter(c -> c.getDeletedAt() == null)
-                .orElseThrow(() -> new RuntimeException("Course not found with ID: " + courseId));
+                .orElseThrow(() -> new ApiException("Course not found with ID: " + courseId, HttpStatus.NOT_FOUND));
 
         if (!"PENDING_APPROVAL".equalsIgnoreCase(course.getStatus())) {
-            throw new RuntimeException("Only courses in PENDING_APPROVAL status can be rejected");
+            throw new ApiException("Only courses in PENDING_APPROVAL status can be rejected", HttpStatus.BAD_REQUEST);
         }
 
         course.setStatus("REJECTED");
@@ -393,10 +405,10 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
     public void hideCourse(Long courseId) {
         Course course = courseRepository.findById(courseId)
                 .filter(c -> c.getDeletedAt() == null)
-                .orElseThrow(() -> new RuntimeException("Course not found with ID: " + courseId));
+                .orElseThrow(() -> new ApiException("Course not found with ID: " + courseId, HttpStatus.NOT_FOUND));
 
         if (!"PUBLISHED".equalsIgnoreCase(course.getStatus())) {
-            throw new RuntimeException("Only courses in PUBLISHED status can be hidden");
+            throw new ApiException("Only courses in PUBLISHED status can be hidden", HttpStatus.BAD_REQUEST);
         }
 
         course.setStatus("HIDDEN");
@@ -408,10 +420,10 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
     public void unhideCourse(Long courseId) {
         Course course = courseRepository.findById(courseId)
                 .filter(c -> c.getDeletedAt() == null)
-                .orElseThrow(() -> new RuntimeException("Course not found with ID: " + courseId));
+                .orElseThrow(() -> new ApiException("Course not found with ID: " + courseId, HttpStatus.NOT_FOUND));
 
         if (!"HIDDEN".equalsIgnoreCase(course.getStatus()) && !"ARCHIVED".equalsIgnoreCase(course.getStatus())) {
-            throw new RuntimeException("Only hidden or archived courses can be unhidden");
+            throw new ApiException("Only hidden or archived courses can be unhidden", HttpStatus.BAD_REQUEST);
         }
 
         course.setStatus("PUBLISHED");

@@ -57,13 +57,6 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
         setState(() {
           final isPathwayCompleted = widget.pathway.totalSteps > 0 && 
                                      widget.pathway.completedSteps >= widget.pathway.totalSteps;
-          
-          // Only remove the initial summary if the pathway is NOT completed.
-          // If completed, the summary is the final congratulatory message, so keep it!
-          if (!isPathwayCompleted && _messages.isNotEmpty &&
-              _messages.first['content'] == widget.pathway.mentorSummary) {
-            _messages.removeAt(0);
-          }
 
           final List<Map<String, String>> historyMessages = [];
           for (var item in history) {
@@ -80,9 +73,36 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
             }
           }
           
-          // Insert the loaded history at the beginning of _messages, so that
-          // dynamic messages (like mentorSummary or unlock announcements) remain at the bottom.
-          _messages.insertAll(0, historyMessages);
+          final List<Map<String, String>> newMessagesList = [];
+          
+          // 1. Initial greeting
+          if (!isPathwayCompleted && widget.pathway.mentorSummary.trim().isNotEmpty) {
+            newMessagesList.add({
+              'role': 'mentor',
+              'content': widget.pathway.mentorSummary,
+            });
+          }
+          
+          // 2. Chat History
+          newMessagesList.addAll(historyMessages);
+          
+          // 3. Final Congratulatory Message
+          if (isPathwayCompleted && widget.pathway.mentorSummary.trim().isNotEmpty) {
+            newMessagesList.add({
+              'role': 'mentor',
+              'content': widget.pathway.mentorSummary,
+            });
+          }
+          
+          // 4. Preserve dynamic unlock announcements generated during THIS session
+          final dynamicAnnouncements = _messages.where((m) => 
+            m['content'] != widget.pathway.mentorSummary
+          ).toList();
+          
+          newMessagesList.addAll(dynamicAnnouncements);
+          
+          _messages.clear();
+          _messages.addAll(newMessagesList);
         });
         _scrollToBottom();
       }

@@ -2559,14 +2559,24 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     );
   }
 
+  // User action: Hoc vien bam "Submit" sau khi lam quiz cuoi bai.
+  // _lessonDetail.questions[i].correctIndex co the la NULL (Backend co tinh
+  // an dap an dung o lan lam bai DAU TIEN - xem LessonServiceImpl
+  // .getLessonDetail, bien hasPriorAttempt) nen KHONG con dung duoc de tu
+  // cham diem hien thi cho nguoi dung nua. Diem hien thi/quyet dinh pass-fail
+  // BAT BUOC phai lay tu ket qua Backend tra ve sau khi nop bai (Backend tu
+  // cham lai that su qua computeServerSideScore).
   Future<void> _submitQuiz(List<QuizQuestion> activeQuestions) async {
+    // Diem TAM tinh o day chi de gui kem request lam gia tri du phong (fallback)
+    // cho truong hop Backend khong tim thay du lieu cau hoi de cham lai - KHONG
+    // dung de hien thi cho hoc vien, vi correctIndex co the dang bi an (null -> 0).
     int correctCount = 0;
     for (int i = 0; i < activeQuestions.length; i++) {
       if (_selectedAnswers[i] == activeQuestions[i].correctIndex) {
         correctCount++;
       }
     }
-    final score = (correctCount / activeQuestions.length) * 10.0;
+    final fallbackScore = (correctCount / activeQuestions.length) * 10.0;
     final submittedAnswers = Map<int, int>.from(_selectedAnswers);
 
     setState(() {
@@ -2575,32 +2585,46 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
 
     toggleFullscreen(false);
 
+    double displayScore = fallbackScore;
+
     try {
-      await _lessonRepository.postQuizAttempt(
+      final postResult = await _lessonRepository.postQuizAttempt(
         _currentLessonId,
         _currentUserId,
-        score,
+        fallbackScore,
         submittedAnswers,
       );
+
+      // Doc diem THAT SU tu response cua Backend (dang "X.X / 10.0"), day moi
+      // la diem da duoc cham lai tu dap an dung trong DB - nguon su that duy nhat.
+      if (postResult is Map) {
+        final gradeStr = postResult['grade']?.toString();
+        final parsedScore = gradeStr != null
+            ? double.tryParse(gradeStr.split('/').first.trim())
+            : null;
+        if (parsedScore != null) {
+          displayScore = parsedScore;
+        }
+      }
 
       final List<dynamic> attemptsData = await _lessonRepository.fetchQuizAttempts(_currentLessonId, _currentUserId);
       final List<QuizAttempt> parsedAttempts = [];
       final List<Map<int, int>> parsedAnswers = [];
-      
+
       for (final raw in attemptsData) {
         final map = Map<String, dynamic>.from(raw);
         final attemptNum = map['attemptNumber'] as int? ?? 1;
         final state = map['state'] as String? ?? 'Finished';
         final grade = map['grade'] as String? ?? '0.0';
         final submittedTime = map['submittedTime'] as String? ?? '';
-        
+
         parsedAttempts.add(QuizAttempt(
           attemptNumber: attemptNum,
           state: state,
           grade: grade,
           submittedTime: submittedTime,
         ));
-        
+
         final Map<int, int> answersMap = {};
         if (map['answers'] != null) {
           final rawAnswers = Map<String, dynamic>.from(map['answers']);
@@ -2620,7 +2644,26 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         _reviewAttemptIndex = _mockAttempts.isNotEmpty ? _mockAttempts.length - 1 : null;
       });
 
-      final quizScorePercent = (score * 10).round();
+      // Tai lai chi tiet bai hoc: gio da co it nhat 1 attempt nen Backend se
+      // tra ve correctIndex/explanation THAT (khong con bi an) - can cho man
+      // hinh "xem lai bai lam" (highlight dung/sai) hien thi dung ngay sau lan
+      // nop bai dau tien, khong phai doi tai lai trang.
+      try {
+        final refreshedLesson = await _lessonRepository.fetchLessonDetail(_currentLessonId);
+        if (mounted) {
+          setState(() {
+            _lessonDetail = refreshedLesson;
+          });
+        }
+      } catch (e) {
+        debugPrint('Error refreshing lesson detail after quiz submit: $e');
+      }
+
+      // Neu diem duoi 60% (6/10): goi rieng sang tinh nang Learning Pathway
+      // (AI dieu huong lo trinh hoc) de tao lai lo trinh phu hop hon cho hoc
+      // vien - day la tinh nang KHAC voi completeLesson, khong anh huong toi
+      // viec bai hoc da duoc danh dau hoan thanh hay chua.
+      final quizScorePercent = (displayScore * 10).round();
       if (quizScorePercent < 60) {
         final pathwayRepository = PathwayRepository();
         final pathway = await pathwayRepository.getMyPathway();
@@ -2663,11 +2706,11 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     }
 
     if (!mounted) return;
-    final quizScorePercent = (score * 10).round();
+    final quizScorePercent = (displayScore * 10).round();
     final isPassed = quizScorePercent >= 60;
     ToastHelper.showSuccess(
       context,
-      'Quiz submitted! Score: ${score.toStringAsFixed(1)} / 10.0${isPassed ? " (Passed 🎉)" : ""}',
+      'Quiz submitted! Score: ${displayScore.toStringAsFixed(1)} / 10.0${isPassed ? " (Passed 🎉)" : ""}',
     );
 
     if (isPassed && _courseDetail != null) {
@@ -4668,6 +4711,10 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     );
   }
 
+  // User action: Hoc vien bam "Mark as completed" tren bai hoc dang video/text
+  // (khong phai quiz). Goi PUT /lessons/{id}/complete roi cap nhat lai UI
+  // (thanh sidebar, % tien do) dua tren du lieu tra ve, khong doi cho load lai
+  // ca trang.
   Future<void> _markLessonAsCompleted(
     int lessonId,
     int? nextLessonId,

@@ -3,17 +3,17 @@ No,Module code,Passed,Failed,Pending,N/A,Number of test cases
 2,Roles & Permissions Management,0,0,10,0,10
 3,Account Management,0,0,20,0,20
 4,Profile Management,0,0,14,0,14
-5,Trainer Onboarding,0,0,17,0,17
-6,Course Management,0,0,58,0,58
-7,Course Content Management,0,0,19,0,19
+5,Trainer Onboarding,0,0,18,0,18
+6,Course Management,0,0,59,0,59
+7,Course Content Management,0,0,20,0,20
 8,Question Bank Management,0,0,20,0,20
-9,Exam Management,0,0,41,0,41
+9,Exam Management,0,0,46,0,46
 10,AI Assistant,0,0,10,0,10
-11,Learning Pathway,0,0,31,0,31
-12,Recommendation,0,0,8,0,8
-13,Payment & Revenue,0,0,26,0,26
-14,Comment Management,0,0,15,0,15
+11,Learning Pathway,0,0,35,0,35
+12,Recommendation,0,0,9,0,9
+13,Payment & Revenue,0,0,32,0,32
+14,Comment Management,0,0,16,0,16
 15,Notification Management,0,0,10,0,10
-16,Ticket Management,0,0,16,0,16
+16,Ticket Management,0,0,18,0,18
 17,Dashboard & Reports,0,0,11,0,11
-,Sub total,0,0,368,0,368
+,Sub total,0,0,390,0,390

@@ -27,6 +27,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -413,7 +414,9 @@ class TicketServiceImplTest {
         when(userRepository.findById(99L)).thenReturn(Optional.of(user(99L, "trainer@example.com", "TRAINER")));
 
         assertThrows(RuntimeException.class,
-                () -> service.processTicket(99L, 1L, TicketProcessDTO.builder().action("REJECT").build()));
+                () -> service.processTicket(99L, 1L,
+                        TicketProcessDTO.builder().action("REJECT").rejectionReason("Refund window expired").build()));
+        verify(ticketRepository, never()).save(any());
     }
 
     @Test
@@ -467,7 +470,7 @@ class TicketServiceImplTest {
 
         assertEquals("REJECTED", t.getStatus());
         assertEquals("Not a valid ticket", t.getRejectionReason());
-        assertEquals(null, t.getAdminResponse());
+        assertNull(t.getAdminResponse());
     }
 
     @Test

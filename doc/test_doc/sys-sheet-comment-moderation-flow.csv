@@ -1,10 +1,10 @@
 Workflow,Lesson Comment- Like & Moderation Flow
 Test requirement,"Verify the complete end-to-end comment lifecycle through the actual UI: posting on a Lesson/Quiz, the Rule Engine's APPROVED/PENDING/REJECTED outcomes and their visibility rules, edit re-evaluation, reply/like, own-comment management, and Admin moderation (view/approve/reject/delete) via the Comment Management dashboard."
-Number of TCs,15
+Number of TCs,16
 Testing Round,Passed,Failed,Pending,N/A
-Round 1,0,0,15,0
-Round 2,0,0,15,0
-Round 3,0,0,15,0
+Round 1,0,0,16,0
+Round 2,0,0,16,0
+Round 3,0,0,16,0
 
 Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
 Post & Moderation Outcomes,,,,
@@ -28,3 +28,5 @@ SYS_FLOW_CMT_TC13,"Admin approves a PENDING comment from the detail dialog, maki
 SYS_FLOW_CMT_TC14,"Admin deletes a comment (including one it doesn't own) from the table and it is removed for everyone.","1. From the Comment Management table, click the Delete (trash) icon on any comment (any status/author) and confirm in the ""Delete Comment"" dialog.","The comment is hard-deleted; it disappears from both the Comment Management table and the public Lesson Discussion thread.","At least one comment exists."
 Security,,,,
 SYS_FLOW_CMT_TC15,"Posting a comment containing an HTML/script tag payload is checked for whether it renders as executable content.","1. As a Learner, post a comment whose text is <script>alert('x')</script> or <img src=x onerror=alert(1)>. 2. If it becomes APPROVED (no blacklist/regex match on this payload), view the Discussion thread as another user.","The Flutter UI's Text widgets render the payload as inert, literal on-screen text (e.g. the visible string ""<script>alert('x')</script>"") since Flutter never interprets comment content as HTML - no script execution is possible through this client, so this specific UI case should Pass. However, per itc-sheet-comment.csv COMMENT_FT12 the raw content is still stored and returned by the API completely unescaped (documented, not yet fixed at the data layer) - record this as a live data-layer gap relevant to any future non-Flutter consumer of the same API, even though it is not exploitable through today's app.","Learner has access to a Lesson."
+New Coverage (verified 2026-08-18),,,,
+SYS_FLOW_CMT_TC16,"A Trainer viewing a Lesson's Discussion section by default has no way to post a comment, since CommentController now requires the RATE_AND_COMMENT permission (LEARNER only, by default) or ADMINISTRATOR.","1. Log in as a Trainer with only default seeded permissions. 2. Open a Lesson's Discussion section and attempt to submit a comment through the same ""Write a comment..."" field used in TC01.","Either the comment field is not offered to this role in the current UI, or - if the UI does render it - submitting returns 403 Forbidden from POST /api/v1/comments/lesson/{lessonId}, since @PreAuthorize rejects a Trainer lacking RATE_AND_COMMENT (per itc-sheet-comment.csv COMMENT_FT16). Verify live which of the two the current build actually does, since this permission gate was not previously documented.","A Trainer account with only default seeded permissions is logged in and has access to a Lesson."

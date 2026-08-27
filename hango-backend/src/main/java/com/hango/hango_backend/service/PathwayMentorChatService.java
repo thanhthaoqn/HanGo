@@ -35,6 +35,7 @@ public class PathwayMentorChatService {
     private final LessonRepository lessonRepository;
     private final LessonProgressRepository lessonProgressRepository;
     private final CourseRepository courseRepository;
+    private final PathwayMessageRepository pathwayMessageRepository;
 
     private static final int MAX_HISTORY_MESSAGES = 10;
 
@@ -102,6 +103,7 @@ public class PathwayMentorChatService {
 
         conversation.getMessages().add(userMessage);
         conversation.getMessages().add(assistantMessage);
+        pathwayMessageRepository.saveAll(List.of(userMessage, assistantMessage));
         conversationRepository.save(conversation);
 
         // Generate suggested follow-up questions

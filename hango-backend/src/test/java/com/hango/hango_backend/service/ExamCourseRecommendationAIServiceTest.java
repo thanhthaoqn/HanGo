@@ -52,6 +52,7 @@ class ExamCourseRecommendationAIServiceTest {
     private ExamAttempt attempt(Long id) {
         ExamAttempt a = new ExamAttempt();
         a.setId(id);
+        a.setStudent(com.hango.hango_backend.entity.User.builder().id(1L).build());
         return a;
     }
 
@@ -256,6 +257,20 @@ class ExamCourseRecommendationAIServiceTest {
 
         assertEquals("", result.getWeaknessSummary());
         assertEquals(1, result.getRecommendedCourses().size());
+    }
+
+    @Test
+    void recommendCoursesAIShouldIncludeExplicitWeakestSkillInGeneratedSystemPrompt() {
+        when(examAttemptRepository.findById(1L)).thenReturn(Optional.of(attempt(1L)));
+        when(examResultAnalyzerService.analyzeLatestExamAttempt(any())).thenReturn(analysis(5));
+        when(courseRepository.findAll()).thenReturn(List.of());
+        org.mockito.ArgumentCaptor<String> promptCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        when(geminiClientService.generateChatResponse(promptCaptor.capture(), any()))
+                .thenReturn("{\"weaknessSummary\":\"ok\",\"recommendedCourses\":[]}");
+
+        service.recommendCoursesAI(1L, "Listening", 1L);
+
+        assertTrue(promptCaptor.getValue().contains("Listening"));
     }
 
     @Test
