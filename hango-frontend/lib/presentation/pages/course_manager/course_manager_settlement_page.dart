@@ -1110,6 +1110,23 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
     return '${val.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} VNĐ';
   }
 
+  String _formatDateTime(dynamic dateTime) {
+    if (dateTime == null) return '-';
+    try {
+      final str = dateTime.toString();
+      if (str.isEmpty || str == 'null') return '-';
+      final dt = DateTime.parse(str).toLocal();
+      final day = dt.day.toString().padLeft(2, '0');
+      final month = dt.month.toString().padLeft(2, '0');
+      final year = dt.year.toString();
+      final hour = dt.hour.toString().padLeft(2, '0');
+      final minute = dt.minute.toString().padLeft(2, '0');
+      return '$hour:$minute $day/$month/$year';
+    } catch (_) {
+      return dateTime.toString();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -1531,6 +1548,17 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                   );
                 }
 
+                displayList.sort((a, b) {
+                  final timeA = a['createdAt']?.toString() ?? '';
+                  final timeB = b['createdAt']?.toString() ?? '';
+                  if (timeA.isNotEmpty && timeB.isNotEmpty) {
+                    return timeB.compareTo(timeA);
+                  }
+                  final idA = (a['id'] ?? 0) as int;
+                  final idB = (b['id'] ?? 0) as int;
+                  return idB.compareTo(idA);
+                });
+
                 final totalItems = displayList.length;
                 final totalPages = (totalItems / _statementItemsPerPage).ceil().clamp(1, 999999);
                 final safeCurrentPage = _statementCurrentPage.clamp(1, totalPages);
@@ -1552,6 +1580,7 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                         headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
                         columns: [
                           DataColumn(label: Text(isVi ? 'Mã Báo cáo' : 'Statement Code', style: _headerStyle)),
+                          DataColumn(label: Text(isVi ? 'Thời gian tạo' : 'Created At', style: _headerStyle)),
                           DataColumn(label: Text(isVi ? 'Giáo viên' : 'Trainer Name', style: _headerStyle)),
                           DataColumn(label: Text(isVi ? 'Loại' : 'Type', style: _headerStyle)),
                           DataColumn(label: Text(isVi ? 'Kỳ Tháng' : 'Period', style: _headerStyle)),
@@ -1584,6 +1613,7 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                                   ),
                                 ),
                               ),
+                              DataCell(Text(_formatDateTime(s['createdAt']), style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)))),
                               DataCell(
                                 InkWell(
                                   onTap: () => _showStatementDetailDialog(s as Map<String, dynamic>),
@@ -1922,6 +1952,7 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                     headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
                     columns: [
                       DataColumn(label: Text(isVi ? 'STT' : 'No', style: _headerStyle)),
+                      DataColumn(label: Text(isVi ? 'Thời gian GD' : 'Payment Time', style: _headerStyle)),
                       DataColumn(label: Text(isVi ? 'Mã GD (TxnRef)' : 'Txn Reference', style: _headerStyle)),
                       DataColumn(label: Text(isVi ? 'Học viên' : 'Learner', style: _headerStyle)),
                       DataColumn(label: Text(isVi ? 'Khóa học' : 'Course Title', style: _headerStyle)),
@@ -1948,6 +1979,7 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                       return DataRow(
                         cells: [
                           DataCell(Text('${_paymentsPage * _paymentsPageSize + idx + 1}')),
+                          DataCell(Text(_formatDateTime(p['createdAt'] ?? p['paidAt']), style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)))),
                           DataCell(Text(txnRef, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
                           DataCell(Column(
                             mainAxisAlignment: MainAxisAlignment.center,

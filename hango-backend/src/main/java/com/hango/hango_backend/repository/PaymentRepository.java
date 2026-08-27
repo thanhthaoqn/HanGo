@@ -100,7 +100,8 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
            "     OR LOWER(p.txnRef) LIKE :search " +
            "     OR LOWER(u.fullName) LIKE :search " +
            "     OR LOWER(u.email) LIKE :search " +
-           "     OR LOWER(c.title) LIKE :search)")
+           "     OR LOWER(c.title) LIKE :search) " +
+           "ORDER BY p.createdAt DESC, p.id DESC")
     Page<Payment> findAllForManager(@Param("status") String status,
                                      @Param("settlementStatus") String settlementStatus,
                                      @Param("search") String search,

@@ -159,7 +159,17 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
         } else {
             list = statementRepository.findAll();
         }
-        return list.stream().map(this::mapToDTO).collect(Collectors.toList());
+        return list.stream()
+                .sorted((a, b) -> {
+                    if (b.getCreatedAt() != null && a.getCreatedAt() != null) {
+                        return b.getCreatedAt().compareTo(a.getCreatedAt());
+                    }
+                    if (b.getId() != null && a.getId() != null) {
+                        return b.getId().compareTo(a.getId());
+                    }
+                    return 0;
+                })
+                .map(this::mapToDTO).collect(Collectors.toList());
     }
 
     @Override
