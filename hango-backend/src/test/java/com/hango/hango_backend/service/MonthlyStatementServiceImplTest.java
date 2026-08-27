@@ -345,6 +345,201 @@ class MonthlyStatementServiceImplTest {
     }
 
     // =================================================================
+    // confirmTrainerStatement (continued) / rejectTrainerStatement
+    // =================================================================
+
+    @Test
+    void rejectTrainerStatementShouldThrowWhenStatementNotFound() {
+        when(statementRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> statementService.rejectTrainerStatement(1L, 5L, "reason"));
+    }
+
+    @Test
+    void rejectTrainerStatementShouldThrowWhenNotOwnedByCallingTrainer() {
+        User owner = trainer(1L, "owner@example.com");
+        MonthlyStatement statement = MonthlyStatement.builder().id(1L).trainer(owner).periodMonth("2026-07").build();
+        when(statementRepository.findById(1L)).thenReturn(Optional.of(statement));
+
+        assertThrows(RuntimeException.class, () -> statementService.rejectTrainerStatement(1L, 999L, "reason"));
+    }
+
+    @Test
+    void rejectTrainerStatementShouldSetStatusRejectedAndAppendReasonToAdminNotes() {
+        User owner = trainer(1L, "owner@example.com");
+        MonthlyStatement statement = MonthlyStatement.builder().id(1L).trainer(owner).periodMonth("2026-07")
+                .adminNotes("Existing note").build();
+        when(statementRepository.findById(1L)).thenReturn(Optional.of(statement));
+        when(statementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(trainerProfileRepository.findById(1L)).thenReturn(Optional.empty());
+
+        MonthlyStatementDTO result = statementService.rejectTrainerStatement(1L, 1L, "Amount looks wrong");
+
+        assertEquals("REJECTED", result.getStatus());
+        assertTrue(statement.getAdminNotes().contains("Existing note"));
+        assertTrue(statement.getAdminNotes().contains("Rejected by Trainer: Amount looks wrong"));
+    }
+
+    @Test
+    void rejectTrainerStatementShouldSkipAppendingNoteWhenReasonBlank() {
+        User owner = trainer(1L, "owner@example.com");
+        MonthlyStatement statement = MonthlyStatement.builder().id(1L).trainer(owner).periodMonth("2026-07").build();
+        when(statementRepository.findById(1L)).thenReturn(Optional.of(statement));
+        when(statementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(trainerProfileRepository.findById(1L)).thenReturn(Optional.empty());
+
+        statementService.rejectTrainerStatement(1L, 1L, "   ");
+
+        assertEquals(null, statement.getAdminNotes());
+    }
+
+    // =================================================================
+    // cancelStatement
+    // =================================================================
+
+    @Test
+    void cancelStatementShouldThrowWhenStatementNotFound() {
+        when(statementRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> statementService.cancelStatement(1L));
+    }
+
+    @Test
+    void cancelStatementShouldSetCancelledAndReleaseLinkedPaymentsToPending() {
+        User owner = trainer(1L, "owner@example.com");
+        MonthlyStatement statement = MonthlyStatement.builder().id(1L).trainer(owner).periodMonth("2026-07")
+                .status("PENDING_TRAINER_CONFIRM").build();
+        Payment linked = payment(owner, new BigDecimal("100000"), "IN_STATEMENT", LocalDateTime.now());
+        linked.setStatementId(1L);
+        when(statementRepository.findById(1L)).thenReturn(Optional.of(statement));
+        when(statementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.findByStatementId(1L)).thenReturn(List.of(linked));
+        when(trainerProfileRepository.findById(1L)).thenReturn(Optional.empty());
+
+        MonthlyStatementDTO result = statementService.cancelStatement(1L);
+
+        assertEquals("CANCELLED", result.getStatus());
+        assertEquals(null, linked.getStatementId());
+        assertEquals("PENDING", linked.getSettlementStatus());
+        verify(paymentRepository).save(linked);
+    }
+
+    // =================================================================
+    // regenerateStatement
+    // =================================================================
+
+    @Test
+    void regenerateStatementShouldThrowWhenStatementNotFound() {
+        when(statementRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> statementService.regenerateStatement(1L));
+    }
+
+    @Test
+    void regenerateStatementShouldThrowWhenStatusNotRejectedOrCancelled() {
+        User owner = trainer(1L, "owner@example.com");
+        MonthlyStatement statement = MonthlyStatement.builder().id(1L).trainer(owner).periodMonth("2026-07")
+                .status("PENDING_TRAINER_CONFIRM").build();
+        when(statementRepository.findById(1L)).thenReturn(Optional.of(statement));
+
+        assertThrows(IllegalStateException.class, () -> statementService.regenerateStatement(1L));
+    }
+
+    @Test
+    void regenerateStatementShouldRecalculateFromLinkedPaymentsAndNotifyTrainer() {
+        User owner = trainer(1L, "owner@example.com");
+        MonthlyStatement statement = MonthlyStatement.builder().id(1L).trainer(owner).periodMonth("2026-07")
+                .status("REJECTED").build();
+        Payment linked = payment(owner, new BigDecimal("100000"), "IN_STATEMENT", LocalDateTime.now());
+        when(statementRepository.findById(1L)).thenReturn(Optional.of(statement));
+        when(statementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.findByStatementId(1L)).thenReturn(List.of(linked));
+        when(trainerProfileRepository.findById(1L)).thenReturn(Optional.of(
+                TrainerProfile.builder().userId(1L).trainerType("PROFESSIONAL").build()));
+
+        MonthlyStatementDTO result = statementService.regenerateStatement(1L);
+
+        assertEquals("PENDING_TRAINER_CONFIRM", result.getStatus());
+        assertEquals(1, result.getTotalOrders());
+        assertEquals(new BigDecimal("70000.00"), result.getTotalTrainerGross());
+        verify(notificationService).notifyUser(eq(owner), eq(NotificationService.TYPE_STATEMENT_READY), any(), any(), any());
+    }
+
+    @Test
+    void regenerateStatementShouldFallBackToTrainersPendingPaymentsWhenNoneLinked() {
+        User owner = trainer(1L, "owner@example.com");
+        MonthlyStatement statement = MonthlyStatement.builder().id(1L).trainer(owner).periodMonth("2026-07")
+                .status("CANCELLED").build();
+        Payment fallback = payment(owner, new BigDecimal("100000"), "PENDING", LocalDateTime.now());
+        when(statementRepository.findById(1L)).thenReturn(Optional.of(statement));
+        when(statementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.findByStatementId(1L)).thenReturn(List.of());
+        when(paymentRepository.findByCourseCreatorIdAndStatus(1L, "SUCCESS")).thenReturn(List.of(fallback));
+        when(trainerProfileRepository.findById(1L)).thenReturn(Optional.of(
+                TrainerProfile.builder().userId(1L).trainerType("PROFESSIONAL").build()));
+
+        MonthlyStatementDTO result = statementService.regenerateStatement(1L);
+
+        assertEquals(1, result.getTotalOrders());
+    }
+
+    // =================================================================
+    // getStatementPayments
+    // =================================================================
+
+    @Test
+    void getStatementPaymentsShouldMapLinkedPaymentsToManagerDTO() {
+        User buyer = trainer(3L, "buyer@example.com");
+        User creator = trainer(2L, "creator@example.com");
+        Course course = Course.builder().id(1L).title("Course A").creator(creator).build();
+        Payment p = Payment.builder().id(80L).user(buyer).course(course).txnRef("80")
+                .amount(new BigDecimal("100000")).status("SUCCESS").statementId(5L).build();
+        when(paymentRepository.findByStatementId(5L)).thenReturn(List.of(p));
+
+        List<com.hango.hango_backend.dto.ManagerPaymentDTO> result = statementService.getStatementPayments(5L);
+
+        assertEquals(1, result.size());
+        assertEquals("Course A", result.get(0).getCourseTitle());
+        assertEquals("Trainer 2", result.get(0).getTrainerName());
+        assertEquals(2L, result.get(0).getTrainerId());
+    }
+
+    @Test
+    void getStatementPaymentsShouldReturnEmptyListWhenNoPaymentsLinked() {
+        when(paymentRepository.findByStatementId(9L)).thenReturn(List.of());
+
+        List<com.hango.hango_backend.dto.ManagerPaymentDTO> result = statementService.getStatementPayments(9L);
+
+        assertTrue(result.isEmpty());
+    }
+
+    // =================================================================
+    // exportStatementsToExcel
+    // =================================================================
+
+    @Test
+    void exportStatementsToExcelShouldReturnNonEmptyWorkbookBytes() {
+        User owner = trainer(1L, "owner@example.com");
+        MonthlyStatement statement = MonthlyStatement.builder().id(1L).trainer(owner).periodMonth("2026-07")
+                .status("PAID").netPayoutAmount(new BigDecimal("500000")).build();
+        when(statementRepository.findAll()).thenReturn(List.of(statement));
+        when(trainerProfileRepository.findById(1L)).thenReturn(Optional.empty());
+
+        byte[] result = statementService.exportStatementsToExcel(null, null);
+
+        assertTrue(result.length > 0);
+    }
+
+    @Test
+    void exportStatementsToExcelShouldReturnValidWorkbookWhenNoStatementsMatch() {
+        when(statementRepository.findByPeriodMonth("2026-08")).thenReturn(List.of());
+
+        byte[] result = statementService.exportStatementsToExcel("2026-08", null);
+
+        assertTrue(result.length > 0);
+    }
+
+    // =================================================================
     // settleStatement
     // =================================================================
 
@@ -353,6 +548,73 @@ class MonthlyStatementServiceImplTest {
         when(statementRepository.findById(1L)).thenReturn(Optional.empty());
 
         assertThrows(RuntimeException.class, () -> statementService.settleStatement(1L, "TXN1", "note"));
+    }
+
+    @Test
+    void settleStatementThreeArgOverloadShouldThrowBecausePayoutReceiptUrlIsRequired() {
+        User owner = trainer(1L, "owner@example.com");
+        MonthlyStatement statement = MonthlyStatement.builder().id(2L).trainer(owner).periodMonth("2026-07")
+                .netPayoutAmount(new BigDecimal("500000")).build();
+        when(statementRepository.findById(2L)).thenReturn(Optional.of(statement));
+
+        assertThrows(IllegalArgumentException.class, () -> statementService.settleStatement(2L, "TXN-999", "note"));
+    }
+
+    @Test
+    void settleStatementShouldThrowWhenBankTxnRefIsBlank() {
+        User owner = trainer(1L, "owner@example.com");
+        MonthlyStatement statement = MonthlyStatement.builder().id(3L).trainer(owner).periodMonth("2026-07").build();
+        when(statementRepository.findById(3L)).thenReturn(Optional.of(statement));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> statementService.settleStatement(3L, "  ", "note", "https://example.com/r.png"));
+    }
+
+    @Test
+    void settleStatementShouldThrowWhenBankTxnRefTooShort() {
+        User owner = trainer(1L, "owner@example.com");
+        MonthlyStatement statement = MonthlyStatement.builder().id(4L).trainer(owner).periodMonth("2026-07").build();
+        when(statementRepository.findById(4L)).thenReturn(Optional.of(statement));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> statementService.settleStatement(4L, "AB", "note", "https://example.com/r.png"));
+    }
+
+    @Test
+    void settleStatementShouldThrowWhenReceiptUrlDoesNotStartWithHttp() {
+        User owner = trainer(1L, "owner@example.com");
+        MonthlyStatement statement = MonthlyStatement.builder().id(5L).trainer(owner).periodMonth("2026-07").build();
+        when(statementRepository.findById(5L)).thenReturn(Optional.of(statement));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> statementService.settleStatement(5L, "TXN-123", "note", "ftp://example.com/r.png"));
+    }
+
+    @Test
+    void settleStatementShouldThrowWhenReceiptUrlHasUnsupportedExtension() {
+        User owner = trainer(1L, "owner@example.com");
+        MonthlyStatement statement = MonthlyStatement.builder().id(6L).trainer(owner).periodMonth("2026-07").build();
+        when(statementRepository.findById(6L)).thenReturn(Optional.of(statement));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> statementService.settleStatement(6L, "TXN-123", "note", "https://example.com/r.webp"));
+    }
+
+    @Test
+    void settleStatementShouldUpdateLinkedPaymentsToSettled() {
+        User owner = trainer(1L, "owner@example.com");
+        MonthlyStatement statement = MonthlyStatement.builder().id(7L).trainer(owner).periodMonth("2026-07")
+                .netPayoutAmount(new BigDecimal("500000")).build();
+        Payment linked = payment(owner, new BigDecimal("100000"), "IN_STATEMENT", LocalDateTime.now());
+        when(statementRepository.findById(7L)).thenReturn(Optional.of(statement));
+        when(statementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.findByStatementId(7L)).thenReturn(List.of(linked));
+        when(trainerProfileRepository.findById(1L)).thenReturn(Optional.empty());
+
+        statementService.settleStatement(7L, "TXN-777", "note", "https://example.com/r.jpg");
+
+        assertEquals("SETTLED", linked.getSettlementStatus());
+        verify(paymentRepository).save(linked);
     }
 
     @Test

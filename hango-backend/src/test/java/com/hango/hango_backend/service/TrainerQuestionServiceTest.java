@@ -88,6 +88,10 @@ class TrainerQuestionServiceTest {
                 .build();
     }
 
+    private List<CreateOptionDTO> correctOption() {
+        return List.of(CreateOptionDTO.builder().optionText("A").isCorrect(true).build());
+    }
+
     // =================================================================
     // getTrainerQuestions
     // =================================================================
@@ -183,6 +187,45 @@ class TrainerQuestionServiceTest {
         assertTrue(sqlCaptor.getValue().contains("q.question_text LIKE ?"));
     }
 
+    @Test
+    void getTrainerQuestionsShouldAddSkillConditionAndParamWhenSkillIdProvided() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Object[]> paramsCaptor = ArgumentCaptor.forClass(Object[].class);
+        when(jdbcTemplate.query(sqlCaptor.capture(), any(RowMapper.class), paramsCaptor.capture())).thenReturn(List.of());
+
+        service.getTrainerQuestions("trainer@example.com", "ALL", null, null, 7L, null, null, null, null, null);
+
+        assertTrue(sqlCaptor.getValue().contains("AND q.skill_param_id = ?"));
+        assertTrue(List.of(paramsCaptor.getValue()).contains(7L));
+    }
+
+    @Test
+    void getTrainerQuestionsShouldAddCategoryConditionAndParamWhenCategoryIdProvided() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Object[]> paramsCaptor = ArgumentCaptor.forClass(Object[].class);
+        when(jdbcTemplate.query(sqlCaptor.capture(), any(RowMapper.class), paramsCaptor.capture())).thenReturn(List.of());
+
+        service.getTrainerQuestions("trainer@example.com", "ALL", null, null, null, 8L, null, null, null, null);
+
+        assertTrue(sqlCaptor.getValue().contains("AND q.category_id = ?"));
+        assertTrue(List.of(paramsCaptor.getValue()).contains(8L));
+    }
+
+    @Test
+    void getTrainerQuestionsShouldAddDifficultyConditionAndParamWhenDifficultyIdProvided() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Object[]> paramsCaptor = ArgumentCaptor.forClass(Object[].class);
+        when(jdbcTemplate.query(sqlCaptor.capture(), any(RowMapper.class), paramsCaptor.capture())).thenReturn(List.of());
+
+        service.getTrainerQuestions("trainer@example.com", "ALL", null, null, null, null, 9L, null, null, null);
+
+        assertTrue(sqlCaptor.getValue().contains("AND q.difficulty_param_id = ?"));
+        assertTrue(List.of(paramsCaptor.getValue()).contains(9L));
+    }
+
     // =================================================================
     // createQuestionBankGroup
     // =================================================================
@@ -210,7 +253,7 @@ class TrainerQuestionServiceTest {
         when(questionRepository.save(any(Question.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Map<String, Object> result = service.createQuestionBankGroup("trainer@example.com",
-                groupRequest("Reading passage", List.of(subQuestion("Q1", null, List.of()))));
+                groupRequest("Reading passage", List.of(subQuestion("Q1", null, correctOption()))));
 
         assertEquals(500L, result.get("groupId"));
         verify(questionGroupRepository).save(any(QuestionGroup.class));
@@ -225,7 +268,7 @@ class TrainerQuestionServiceTest {
         when(questionRepository.save(any(Question.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Map<String, Object> result = service.createQuestionBankGroup("trainer@example.com",
-                groupRequest("   ", List.of(subQuestion("Q1", null, List.of()))));
+                groupRequest("   ", List.of(subQuestion("Q1", null, correctOption()))));
 
         assertNull(result.get("groupId"));
         verify(questionGroupRepository, never()).save(any());
@@ -240,7 +283,7 @@ class TrainerQuestionServiceTest {
         ArgumentCaptor<Question> captor = ArgumentCaptor.forClass(Question.class);
         when(questionRepository.save(captor.capture())).thenAnswer(inv -> inv.getArgument(0));
 
-        service.createQuestionBankGroup("trainer@example.com", groupRequest(null, List.of(subQuestion("Q1", null, List.of()))));
+        service.createQuestionBankGroup("trainer@example.com", groupRequest(null, List.of(subQuestion("Q1", null, correctOption()))));
 
         assertEquals("PRIVATE", captor.getValue().getStatus());
     }
@@ -255,7 +298,7 @@ class TrainerQuestionServiceTest {
         ArgumentCaptor<Question> captor = ArgumentCaptor.forClass(Question.class);
         when(questionRepository.save(captor.capture())).thenAnswer(inv -> inv.getArgument(0));
 
-        service.createQuestionBankGroup("trainer@example.com", groupRequest(null, List.of(subQuestion("Q1", 99L, List.of()))));
+        service.createQuestionBankGroup("trainer@example.com", groupRequest(null, List.of(subQuestion("Q1", 99L, correctOption()))));
 
         assertEquals(99L, captor.getValue().getDifficulty().getId());
     }
@@ -274,7 +317,7 @@ class TrainerQuestionServiceTest {
                 .questionText("Q1")
                 .explanation("exp")
                 .skillParamId(88L)
-                .options(List.of())
+                .options(correctOption())
                 .build();
         service.createQuestionBankGroup("trainer@example.com", groupRequest(null, List.of(subQ)));
 
@@ -298,6 +341,42 @@ class TrainerQuestionServiceTest {
     }
 
     @Test
+    void createQuestionBankGroupShouldSetCategoryFromRepositoryWhenNoPassageTextAndCategoryIdProvided() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        QuestionCategory category = new QuestionCategory();
+        category.setId(1L);
+        when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
+        when(systemParameterRepository.findById(2L)).thenReturn(Optional.of(SystemParameter.builder().id(2L).build()));
+        when(systemParameterRepository.findById(3L)).thenReturn(Optional.of(SystemParameter.builder().id(3L).build()));
+        ArgumentCaptor<Question> captor = ArgumentCaptor.forClass(Question.class);
+        when(questionRepository.save(captor.capture())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.createQuestionBankGroup("trainer@example.com", groupRequest(null, List.of(subQuestion("Q1", null, correctOption()))));
+
+        assertEquals(1L, captor.getValue().getCategory().getId());
+    }
+
+    @Test
+    void createQuestionBankGroupShouldLeaveCategoryNullWhenPassageTextProvided() {
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
+        when(systemParameterRepository.findById(2L)).thenReturn(Optional.of(SystemParameter.builder().id(2L).build()));
+        when(systemParameterRepository.findById(3L)).thenReturn(Optional.of(SystemParameter.builder().id(3L).build()));
+        when(questionGroupRepository.save(any(QuestionGroup.class))).thenAnswer(inv -> {
+            QuestionGroup g = inv.getArgument(0);
+            g.setId(500L);
+            return g;
+        });
+        ArgumentCaptor<Question> captor = ArgumentCaptor.forClass(Question.class);
+        when(questionRepository.save(captor.capture())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.createQuestionBankGroup("trainer@example.com",
+                groupRequest("Reading passage", List.of(subQuestion("Q1", null, correctOption()))));
+
+        assertNull(captor.getValue().getCategory());
+        verify(categoryRepository, never()).findById(any());
+    }
+
+    @Test
     void createQuestionBankGroupShouldReturnQuestionIdsInResponse() {
         when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(trainer(1L, "trainer@example.com")));
         when(categoryRepository.findById(1L)).thenReturn(Optional.of(new QuestionCategory()));
@@ -310,7 +389,7 @@ class TrainerQuestionServiceTest {
         });
 
         Map<String, Object> result = service.createQuestionBankGroup("trainer@example.com",
-                groupRequest(null, List.of(subQuestion("Q1", null, List.of()))));
+                groupRequest(null, List.of(subQuestion("Q1", null, correctOption()))));
 
         assertEquals(List.of(77L), result.get("questionIds"));
     }
@@ -472,11 +551,11 @@ class TrainerQuestionServiceTest {
         when(questionRepository.save(any(Question.class))).thenAnswer(inv -> inv.getArgument(0));
 
         service.updateQuestionBankGroup("trainer@example.com", 500L, true,
-                groupRequest("Updated passage", List.of(subQuestion("New Q1", null, null))));
+                groupRequest("Updated passage", List.of(subQuestion("New Q1", null, correctOption()))));
 
         verify(questionRepository).deleteAll(oldQuestions);
         assertEquals("Updated passage", group.getContextText());
-        verify(questionRepository).save(any(Question.class));
+        verify(questionRepository, times(2)).save(any(Question.class));
     }
 
     @Test
@@ -489,11 +568,11 @@ class TrainerQuestionServiceTest {
         when(questionRepository.save(any(Question.class))).thenAnswer(inv -> inv.getArgument(0));
 
         service.updateQuestionBankGroup("intruder@example.com", 500L, true,
-                groupRequest("Hijacked passage", List.of(subQuestion("New Q1", null, null))));
+                groupRequest("Hijacked passage", List.of(subQuestion("New Q1", null, correctOption()))));
 
         assertEquals("Hijacked passage", group.getContextText());
-        verify(questionRepository).deleteAll(List.of());
-        verify(questionRepository).save(any(Question.class));
+        verify(questionRepository, never()).deleteAll(any());
+        verify(questionRepository, times(2)).save(any(Question.class));
     }
 
     @Test
@@ -517,6 +596,26 @@ class TrainerQuestionServiceTest {
     }
 
     @Test
+    void updateQuestionBankGroupSingleShouldSetCategoryFromRepositoryWhenCategoryIdProvided() {
+        User owner = trainer(1L, "trainer@example.com");
+        when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(owner));
+        Question oldQ = new Question();
+        oldQ.setId(10L);
+        oldQ.setCreatedBy(owner);
+        when(questionRepository.findById(10L)).thenReturn(Optional.of(oldQ));
+        QuestionCategory category = new QuestionCategory();
+        category.setId(1L);
+        when(categoryRepository.findById(1L)).thenReturn(Optional.of(category));
+        ArgumentCaptor<Question> captor = ArgumentCaptor.forClass(Question.class);
+        when(questionRepository.save(captor.capture())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.updateQuestionBankGroup("trainer@example.com", 10L, false,
+                groupRequest(null, List.of(subQuestion("Updated Q", null, correctOption()))));
+
+        assertEquals(1L, captor.getValue().getCategory().getId());
+    }
+
+    @Test
     void updateQuestionBankGroupSingleShouldDeleteOldAndRecreate() {
         User owner = trainer(1L, "trainer@example.com");
         when(userRepository.findByEmail("trainer@example.com")).thenReturn(Optional.of(owner));
@@ -527,10 +626,10 @@ class TrainerQuestionServiceTest {
         when(questionRepository.save(any(Question.class))).thenAnswer(inv -> inv.getArgument(0));
 
         service.updateQuestionBankGroup("trainer@example.com", 10L, false,
-                groupRequest(null, List.of(subQuestion("Updated Q", null, null))));
+                groupRequest(null, List.of(subQuestion("Updated Q", null, correctOption()))));
 
-        verify(questionRepository).delete(oldQ);
-        verify(questionRepository).save(any(Question.class));
+        verify(questionRepository).deleteAll(List.of(oldQ));
+        verify(questionRepository, times(2)).save(any(Question.class));
     }
 
     // =================================================================

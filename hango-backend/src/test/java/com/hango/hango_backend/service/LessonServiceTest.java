@@ -432,6 +432,68 @@ class LessonServiceTest {
         assertEquals("2+2?", result.getQuestions().get(0).getQuestionText());
     }
 
+    private void stubJdbcOptionsForQuestion99() {
+        List<Map<String, Object>> optionRows = List.of(
+                Map.of("question_id", 99L, "option_text", "3", "is_correct", false),
+                Map.of("question_id", 99L, "option_text", "4", "is_correct", true));
+        when(jdbcTemplate.queryForList(anyString(), any(Object[].class))).thenReturn(optionRows);
+    }
+
+    @Test
+    void getLessonDetailShouldHideCorrectAnswerAndExplanationWhenUserHasNoPriorAttempt() {
+        // Security regression test: before the fix, correctIndex/explanation were
+        // always populated, letting anyone read the answer straight from the API
+        // response (e.g. via browser DevTools) without ever attempting the quiz.
+        Lesson l = lesson(1L, course(10L));
+        when(lessonRepository.findById(1L)).thenReturn(Optional.of(l));
+        when(commentService.getCommentsByLesson(1L, 1L)).thenReturn(List.of());
+        when(lessonProgressRepository.existsByUserIdAndLessonIdAndIsCompletedTrue(1L, 1L)).thenReturn(false);
+        when(quizAttemptRepository.countByLessonIdAndStudentId(1L, 1L)).thenReturn(0);
+        QuizQuestionDTO question = QuizQuestionDTO.builder().id(99L).questionText("2+2?")
+                .explanation("Because 2+2=4").options(List.of()).correctIndex(null).build();
+        stubJdbcQuestions(List.of(question));
+        stubJdbcOptionsForQuestion99();
+
+        LessonDetailDTO result = lessonService.getLessonDetail(1L, 1L);
+
+        assertEquals(List.of("3", "4"), result.getQuestions().get(0).getOptions());
+        assertNull(result.getQuestions().get(0).getCorrectIndex());
+    }
+
+    @Test
+    void getLessonDetailShouldRevealCorrectAnswerWhenUserAlreadyHasPriorAttempt() {
+        // Once the student has genuinely submitted at least 1 attempt for this
+        // lesson, it's safe (and expected, for the review screen) to reveal it.
+        Lesson l = lesson(1L, course(10L));
+        when(lessonRepository.findById(1L)).thenReturn(Optional.of(l));
+        when(commentService.getCommentsByLesson(1L, 1L)).thenReturn(List.of());
+        when(lessonProgressRepository.existsByUserIdAndLessonIdAndIsCompletedTrue(1L, 1L)).thenReturn(true);
+        when(quizAttemptRepository.countByLessonIdAndStudentId(1L, 1L)).thenReturn(1);
+        QuizQuestionDTO question = QuizQuestionDTO.builder().id(99L).questionText("2+2?")
+                .options(List.of()).correctIndex(null).build();
+        stubJdbcQuestions(List.of(question));
+        stubJdbcOptionsForQuestion99();
+
+        LessonDetailDTO result = lessonService.getLessonDetail(1L, 1L);
+
+        assertEquals(1, result.getQuestions().get(0).getCorrectIndex());
+    }
+
+    @Test
+    void getLessonDetailShouldNotCheckPriorAttemptsWhenUserIdNull() {
+        // Anonymous/unauthenticated viewers (GET /lessons/{id} is permitAll) can
+        // never have an attempt on record, so this must short-circuit without a
+        // repository call rather than passing a null userId down to the query.
+        Lesson l = lesson(1L, course(10L));
+        when(lessonRepository.findById(1L)).thenReturn(Optional.of(l));
+        when(commentService.getCommentsByLesson(1L, null)).thenReturn(List.of());
+        stubJdbcQuestions(List.of());
+
+        lessonService.getLessonDetail(1L, null);
+
+        verify(quizAttemptRepository, never()).countByLessonIdAndStudentId(any(), any());
+    }
+
     @Test
     void getLessonDetailShouldLeaveSectionAndCourseIdNullWhenSectionMissing() {
         Lesson l = Lesson.builder().id(1L).title("Orphan lesson").section(null).build();

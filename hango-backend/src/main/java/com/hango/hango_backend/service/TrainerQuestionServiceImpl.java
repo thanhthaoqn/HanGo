@@ -287,6 +287,10 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
             group.setContextText(request.getPassageText());
             group.setGroupTypeParam(skillParam);
             group = questionGroupRepository.save(group);
+        } else if (request.getCategoryId() != null) {
+            // For single (non-group) questions, categoryId really is the QuestionCategory id,
+            // matching updateQuestionBankGroup's !isGroup branch below.
+            category = categoryRepository.findById(request.getCategoryId()).orElse(null);
         }
 
         List<Long> questionIds = new ArrayList<>();

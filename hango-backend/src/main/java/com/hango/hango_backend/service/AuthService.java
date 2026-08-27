@@ -54,6 +54,11 @@ public class AuthService {
     private static final int MAX_OTP_ATTEMPTS = 5;
     private static final long OTP_RESEND_COOLDOWN_SECONDS = 60;
     private static final long VERIFICATION_TOKEN_VALIDITY_HOURS = 12;
+    // Chong brute-force dang nhap: dung lai chinh 2 cot da co san tren User
+    // (failedLoginAttempts, lockedUntil) - truoc day 2 cot nay chi bi RESET ve
+    // 0/null (trong resetPassword/changePassword) chu KHONG he bi TANG len o
+    // dau, nghia la co che khoa tai khoan chua bao gio thuc su hoat dong.
+    // Nguong/thoi luong khoa thuc te nam trong UserLockoutService.
     private static final int MAX_FAILED_LOGIN_ATTEMPTS = 5;
     private static final long LOCKOUT_DURATION_MINUTES = 15;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
@@ -134,6 +139,10 @@ public class AuthService {
     // authenticateUser
     // =================================================================
 
+    // Diem bat dau cua ca luong dang nhap (duoc AuthController.authenticateUser goi).
+    // Thu tu kiem tra: (1) email co ton tai, (2) mat khau dung, (3) email da
+    // verify chua, (4) status tai khoan co ACTIVE khong -> chi khi qua het 4
+    // buoc moi cap JWT + refresh token.
     @org.springframework.transaction.annotation.Transactional
     public LoginResponse authenticateUser(LoginRequest loginRequest) {
         String email = normalizeEmail(loginRequest.getEmail());
@@ -144,6 +153,11 @@ public class AuthService {
             throw new ApiException("Invalid email or password.", HttpStatus.UNAUTHORIZED);
         }
 
+        // Tai khoan dang bi khoa tam thoi do dang nhap sai qua nhieu lan
+        // (xem nhanh catch AuthenticationException ben duoi) - chan luon tu day,
+        // KHONG goi authenticationManager.authenticate() nua du mat khau co dung
+        // hay khong, tranh brute-force tiep tuc do trong luc bi khoa. Neu thoi
+        // gian khoa da het han thi reset bo dem truoc khi cho thu lai.
         if (user.getLockedUntil() != null) {
             if (user.getLockedUntil().isAfter(LocalDateTime.now())) {
                 logAudit(user, "LOGIN_FAILURE", user.getId(), "Account is locked until " + user.getLockedUntil());
@@ -153,11 +167,19 @@ public class AuthService {
             }
         }
 
+        // Uy quyen viec so sanh mat khau cho Spring Security: authenticationManager
+        // se goi UserDetailsServiceImpl.loadUserByUsername() de lay passwordHash tu DB,
+        // roi dung PasswordEncoder (BCrypt, xem SecurityConfig.passwordEncoder())
+        // de so sanh voi mat khau nguoi dung nhap - code o day KHONG tu so sanh password.
         try {
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(email, loginRequest.getPassword()));
             SecurityContextHolder.getContext().setAuthentication(authentication);
         } catch (AuthenticationException ex) {
+            // Chong brute-force: ghi nhan lan sai trong 1 transaction RIENG
+            // (UserLockoutService dung REQUIRES_NEW) de chac chan duoc luu xuong
+            // DB ngay ca khi transaction cua authenticateUser() nay bi rollback
+            // do ApiException duoc nem ra ngay sau day.
             boolean isLocked = userLockoutService.recordFailedAttempt(user.getId());
             if (isLocked) {
                 logAudit(user, "LOGIN_FAILURE", user.getId(), "Account locked for 15 minutes after failed attempts");
@@ -183,8 +205,14 @@ public class AuthService {
         }
 
         user.setLastLoginAt(LocalDateTime.now());
+        user.setFailedLoginAttempts(0);
+        user.setLockedUntil(null);
         userRepository.save(user);
 
+        // Danh sach role/permission nay duoc tra ve cho Frontend de FE tu quyet dinh
+        // dieu huong (xem login_page.dart _navigateAfterSuccess) - day chi la
+        // GOI Y hien thi, KHONG phai co che phan quyen that su. Phan quyen that
+        // su van do Backend kiem tra lai qua @PreAuthorize o moi API.
         List<String> roles = new java.util.ArrayList<>();
         for (org.springframework.security.core.GrantedAuthority authority : UserDetailsImpl.build(user)
                 .getAuthorities()) {

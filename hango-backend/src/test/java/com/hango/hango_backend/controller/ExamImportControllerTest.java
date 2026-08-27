@@ -264,4 +264,112 @@ class ExamImportControllerTest {
         assertEquals(200, response.getStatusCode().value());
         assertEquals(2, response.getBody().get("totalQuestionsImported"));
     }
+
+    @Test
+    void importExcelMultipleShouldReturnBadRequestWhenGroupTypeUnresolvable() throws Exception {
+        stubUserId("trainer@example.com", 1L);
+        stubKeyGeneratingInserts();
+        stubSystemParam("Vocabulary", 1L);
+        stubSystemParam("Medium", 2L);
+        lenient().when(jdbcTemplate.query(anyString(), any(org.springframework.jdbc.core.RowMapper.class), eq("Nonexistent Group")))
+                .thenReturn(List.of());
+        MockMultipartFile file = workbook(
+                List.<String[]>of(examRow("E1", "Exam 1", "Desc", "2", "5.0", "30")),
+                List.<String[]>of(groupedQuestionRow("E1", "Shared passage text", "Q1 about passage", "A",
+                        "Vocabulary", "Medium", "Nonexistent Group")));
+
+        ResponseEntity<Map<String, Object>> response = controller.importExcelMultiple(principal("trainer@example.com"), file);
+
+        assertEquals(400, response.getStatusCode().value());
+        assertTrue(response.getBody().get("error").toString().contains("Invalid Group Type"));
+    }
+
+    @Test
+    void importExcelMultipleShouldReturnBadRequestWhenDifficultyUnresolvable() throws Exception {
+        stubUserId("trainer@example.com", 1L);
+        stubKeyGeneratingInserts();
+        stubSystemParam("Vocabulary", 1L);
+        lenient().when(jdbcTemplate.query(anyString(), any(org.springframework.jdbc.core.RowMapper.class), eq("Nonexistent Difficulty")))
+                .thenReturn(List.of());
+        MockMultipartFile file = workbook(
+                List.<String[]>of(examRow("E1", "Exam 1", "Desc", "2", "5.0", "30")),
+                List.<String[]>of(standaloneQuestionRow("E1", "2+2=?", "A", "Vocabulary", "Nonexistent Difficulty")));
+
+        ResponseEntity<Map<String, Object>> response = controller.importExcelMultiple(principal("trainer@example.com"), file);
+
+        assertEquals(400, response.getStatusCode().value());
+        assertTrue(response.getBody().get("error").toString().contains("Invalid Difficulty"));
+    }
+
+    @Test
+    void importExcelMultipleShouldMapLegacySkillTypeGrammarToVocabularyWhenResolvingSystemParam() throws Exception {
+        stubUserId("trainer@example.com", 1L);
+        stubKeyGeneratingInserts();
+        stubSystemParam("Vocabulary", 1L);
+        stubSystemParam("Medium", 2L);
+        MockMultipartFile file = workbook(
+                List.<String[]>of(examRow("E1", "Exam 1", "Desc", "2", "5.0", "30")),
+                List.<String[]>of(
+                        standaloneQuestionRow("E1", "2+2=?", "A", "Grammar", "Medium"),
+                        new String[] { "E1", "2", null, "3+3=?", "Opt A", "Opt B", "Opt C", "Opt D", "A", "expl",
+                                "Grammar", "Medium", null }));
+
+        ResponseEntity<Map<String, Object>> response = controller.importExcelMultiple(principal("trainer@example.com"), file);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(2, response.getBody().get("totalQuestionsImported"));
+    }
+
+    @Test
+    void importExcelMultipleShouldResolveBlankThumbnailToDefaultThumbnailUrl() throws Exception {
+        stubUserId("trainer@example.com", 1L);
+        stubKeyGeneratingInserts();
+        stubSystemParam("Vocabulary", 1L);
+        stubSystemParam("Medium", 2L);
+        MockMultipartFile file = workbook(
+                List.<String[]>of(examRow("E1", "Exam 1", "Desc", "2", "5.0", "30")),
+                List.<String[]>of(
+                        standaloneQuestionRow("E1", "2+2=?", "A", "Vocabulary", "Medium"),
+                        new String[] { "E1", "2", null, "3+3=?", "Opt A", "Opt B", "Opt C", "Opt D", "A", "expl",
+                                "Vocabulary", "Medium", null }));
+
+        ResponseEntity<Map<String, Object>> response = controller.importExcelMultiple(principal("trainer@example.com"), file);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(com.hango.hango_backend.entity.Exam.DEFAULT_THUMBNAIL_URL, response.getBody().get("examThumbnailUrl"));
+    }
+
+    @Test
+    void importExcelMultipleShouldRejectSecondExamRowAsOnlyOneExamAllowedPerImport() throws Exception {
+        stubUserId("trainer@example.com", 1L);
+        stubKeyGeneratingInserts();
+        stubSystemParam("Vocabulary", 1L);
+        stubSystemParam("Medium", 2L);
+        MockMultipartFile file = workbook(
+                List.<String[]>of(
+                        examRow("E1", "Exam 1", "Desc", "2", "5.0", "30"),
+                        examRow("E2", "Exam 2", "Desc", "2", "5.0", "30")),
+                List.<String[]>of(
+                        standaloneQuestionRow("E1", "2+2=?", "A", "Vocabulary", "Medium"),
+                        new String[] { "E1", "2", null, "3+3=?", "Opt A", "Opt B", "Opt C", "Opt D", "A", "expl",
+                                "Vocabulary", "Medium", null }));
+
+        ResponseEntity<Map<String, Object>> response = controller.importExcelMultiple(principal("trainer@example.com"), file);
+
+        assertEquals(400, response.getStatusCode().value());
+        assertTrue(response.getBody().get("error").toString().contains("Only one exam is allowed per import"));
+    }
+
+    // =================================================================
+    // downloadTemplate
+    // =================================================================
+
+    @Test
+    void downloadTemplateShouldReturnTemplateFileBytesWithAttachmentHeader() {
+        ResponseEntity<byte[]> response = controller.downloadTemplate();
+
+        assertEquals(200, response.getStatusCode().value());
+        assertTrue(response.getBody().length > 0);
+        assertTrue(response.getHeaders().getFirst("Content-Disposition").contains("Hango_Exam_Import_Template.xlsx"));
+    }
 }
