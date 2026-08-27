@@ -39,6 +39,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     private final NotificationService notificationService;
     private final CloudinaryService cloudinaryService;
     private final ExamHistoryService examHistoryService;
+    private final CourseQuizValidationService courseQuizValidationService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private String getBaseCode(String code, Long id) {
@@ -876,6 +877,11 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         }
 
         if (isManager) {
+            // A1 (spec 20): chan publish neu course chua co it nhat 1 quiz co cau hoi
+            if (!courseQuizValidationService.hasAtLeastOneQuiz(course.getId())) {
+                throw new RuntimeException("Cannot publish \"" + course.getTitle()
+                        + "\": the course must contain at least one quiz with questions before publishing.");
+            }
             course.setStatus("PUBLISHED");
             course.setPublishedAt(java.time.LocalDateTime.now());
             course.setLatestVersionId(course.getId());
@@ -1340,6 +1346,12 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         if (profile == null || !"VERIFIED".equalsIgnoreCase(profile.getStatus())) {
             throw new IllegalStateException(
                     "Bạn cần hoàn thiện hồ sơ và được Admin phê duyệt để bắt đầu bán khóa học.");
+        }
+
+        // A1 (spec 20): chan publish neu course chua co it nhat 1 quiz co cau hoi
+        if (!courseQuizValidationService.hasAtLeastOneQuiz(course.getId())) {
+            throw new RuntimeException("Cannot publish \"" + course.getTitle()
+                    + "\": the course must contain at least one quiz with questions before publishing.");
         }
 
         course.setStatus("PUBLISHED");

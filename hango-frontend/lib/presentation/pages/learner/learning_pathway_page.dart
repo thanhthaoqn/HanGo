@@ -10,6 +10,7 @@ import '../../../domain/entities/learning_pathway.dart';
 import '../../../data/repositories/pathway_repository.dart';
 import '../../../utils/language_manager.dart';
 import '../course/course_detail_page.dart';
+import 'mastery_quiz_page.dart';
 
 class LearningPathwayPage extends StatefulWidget {
   final bool isEmbedded;
@@ -47,6 +48,9 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
         _pathway = pathway;
         _selectedNode = _initialSelectedNode(pathway.nodes);
       });
+      // C3 (spec 20): tu dong lay pending reroute suggestion sau moi lan load
+      // (thay cho viec persist suggestion vao database)
+      _refreshRerouteSuggestion();
     } catch (e) {
       if (!mounted) return;
       // 404 = user chua co pathway nao (chua lam exam) -> hien man hinh empty state
@@ -136,36 +140,57 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
     );
   }
 
-  Future<void> _submitMastery(int nodeId, int score) async {
-    if (_pathway == null) return;
+  /// C3 (spec 20): goi lai policy suggestions sau khi load pathway de card
+  /// "Pathway update suggestion" luon hien dung du khi user refresh trang.
+  Future<void> _refreshRerouteSuggestion() async {
+    final current = _pathway;
+    if (current == null) return;
     try {
-      final updatedPathway = await _repository.submitNodeMastery(
-        pathwayId: _pathway!.pathwayId,
-        nodeId: nodeId,
-        score: score,
-      );
+      final updated = await _repository.suggestReroute(pathwayId: current.pathwayId);
+      if (!mounted || _pathway == null || _pathway!.pathwayId != updated.pathwayId) return;
       setState(() {
-        _pathway = updatedPathway;
+        // Giu node dang chon, chi cap nhat suggestion moi
+        _pathway = _preparePathwayForDisplay(updated);
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Mastery updated successfully! Score: $score'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to update mastery: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+    } catch (_) {
+      // Khong co suggestion / loi mang: bo qua im lang
     }
   }
+
+  /// B4 (spec 20): mo man hinh Mastery Quiz that thay cho mock score 90/100.
+  Future<void> _openMasteryQuiz(PathwayNode node) async {
+    if (_pathway == null) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MasteryQuizPage(
+          pathwayId: _pathway!.pathwayId,
+          node: node,
+          isDarkMode: _isDarkMode,
+          onCompleted: (updatedPathway) {
+            if (!mounted) return;
+            setState(() {
+              _pathway = _preparePathwayForDisplay(updatedPathway);
+            });
+          },
+        ),
+      ),
+    );
+    // E1 (spec 20): refresh tien do sau khi quay ve tu man hinh quiz
+    if (mounted) _loadPathway();
+  }
+
+  /// E1 (spec 20): mo khoa hoc va refresh pathway khi quay ve de tien do/status khong bi stale.
+  Future<void> _openCourseAndRefresh(PathwayNode node) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CourseDetailPage(courseId: node.courseId),
+      ),
+    );
+    if (mounted) _loadPathway();
+  }
+
 
   void _showSkillAnalysis() {
     final pathway = _pathway;
@@ -389,6 +414,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
                   nodes: _pathway!.nodes,
                   onNodeTap: _handleNodeTap,
                   onFastTrackTap: _handleFastTrack,
+                  onMasteryTap: _openMasteryQuiz,
                   selectedNode: _selectedNode,
                   isDarkMode: _isDarkMode,
                   contentPadding: const EdgeInsets.only(right: 480), // Padding to not hide nodes under mentor
@@ -396,15 +422,10 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
                     pathway: _pathway!,
                     isDarkMode: _isDarkMode,
                     onStartLearning: (node) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => CourseDetailPage(courseId: node.courseId),
-                        ),
-                      );
+                      _openCourseAndRefresh(node);
                     },
-                    onTakeMastery: (node) => _submitMastery(node.id, 90), // Mock score
-                    onReview: (node) => _submitMastery(node.id, 100), // Mock score
+                    onTakeMastery: _openMasteryQuiz,
+                    onReview: _openMasteryQuiz,
                   ),
                 ),
               ),
@@ -445,6 +466,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
             nodes: _pathway!.nodes,
             onNodeTap: _handleNodeTap,
             onFastTrackTap: _handleFastTrack,
+            onMasteryTap: _openMasteryQuiz,
             selectedNode: _selectedNode,
             isDarkMode: _isDarkMode,
             contentPadding: const EdgeInsets.only(bottom: 100),
@@ -452,15 +474,10 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
               pathway: _pathway!,
               isDarkMode: _isDarkMode,
               onStartLearning: (node) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => CourseDetailPage(courseId: node.courseId),
-                  ),
-                );
+                _openCourseAndRefresh(node);
               },
-              onTakeMastery: (node) => _submitMastery(node.id, 90), // Mock score
-              onReview: (node) => _submitMastery(node.id, 100), // Mock score
+              onTakeMastery: _openMasteryQuiz,
+              onReview: _openMasteryQuiz,
             ),
           ),
         ),

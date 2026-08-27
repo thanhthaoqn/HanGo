@@ -40,13 +40,18 @@ public class ExamCourseRecommendationAIService {
      * Gợi ý khóa học bằng AI dựa trên examAttempt.answersJson/score.
      * Fallback: nếu AI fail => trả weaknessSummary rỗng + list rỗng để FE quay về rule-based.
      */
-    public ExamCourseRecommendationAIResponseDTO recommendCoursesAI(Long examAttemptId, String weakestSkill) {
+    public ExamCourseRecommendationAIResponseDTO recommendCoursesAI(Long examAttemptId, String weakestSkill, Long currentUserId) {
         if (examAttemptId == null) {
             throw new ApiException("examAttemptId is required", HttpStatus.BAD_REQUEST);
         }
 
         ExamAttempt attempt = examAttemptRepository.findById(examAttemptId)
                 .orElseThrow(() -> new ApiException("ExamAttempt not found", HttpStatus.NOT_FOUND));
+
+        // E6 (spec 20): ownership check - khong cho doc phan tich bai thi cua nguoi khac
+        if (currentUserId == null || !attempt.getStudent().getId().equals(currentUserId)) {
+            throw new ApiException("Access denied to this exam attempt", HttpStatus.FORBIDDEN);
+        }
 
         // Buoc 1: phan tich answersJson cua attempt de rut ra lo hong kien thuc
         ExamResultAnalysisDTO analysis = examResultAnalyzerService.analyzeLatestExamAttempt(attempt);

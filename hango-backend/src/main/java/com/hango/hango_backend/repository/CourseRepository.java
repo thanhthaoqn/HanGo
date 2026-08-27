@@ -154,6 +154,10 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
 
     Optional<Course> findByIdAndParentIdIsNullAndDeletedAtIsNull(Long id);
 
+    // Tim khoa hoc remedial cung category de chen vao pathway khi learner bi DETOUR (spec 20 - C2)
+    @EntityGraph(attributePaths = {"creator", "category", "difficulty"})
+    List<Course> findByStatusIgnoreCaseAndCategoryIdAndDeletedAtIsNull(String status, Long categoryId);
+
     @Query("SELECT c FROM Course c LEFT JOIN FETCH c.category LEFT JOIN FETCH c.difficulty LEFT JOIN FETCH c.creator LEFT JOIN FETCH c.categories WHERE c.id = :id")
     Optional<Course> findByIdWithDetails(@Param("id") Long id);
 
