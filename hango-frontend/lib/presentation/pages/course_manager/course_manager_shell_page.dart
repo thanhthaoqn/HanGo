@@ -4,8 +4,8 @@ import '../../widgets/course_manager_sidebar.dart';
 import 'course_manager_dashboard_page.dart';
 import 'course_manager_courses_page.dart';
 import 'course_manager_exams_page.dart';
-import 'course_manager_matrix_management_page.dart';
-import 'course_manager_question_bank_page.dart';
+import 'exam_matrix/course_manager_matrix_management_page.dart';
+import 'question_bank/course_manager_question_bank_page.dart';
 import 'course_manager_settlement_page.dart';
 
 /// Tab order for the shell's [IndexedStack], matching the route keys

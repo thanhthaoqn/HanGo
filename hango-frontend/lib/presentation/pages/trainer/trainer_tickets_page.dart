@@ -1,8 +1,6 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../data/models/ticket_model.dart';
 import '../../../data/services/ticket_service.dart';
-import '../../../utils/toast_helper.dart';
 import '../../widgets/trainer/trainer_sidebar.dart';
 import '../ticket/create_ticket_modal.dart';
 
@@ -63,7 +61,7 @@ class _TrainerTicketsPageState extends State<TrainerTicketsPage> {
     if (status == 'APPROVED') {
       bg = const Color(0xFFDCFCE7);
       fg = const Color(0xFF15803D);
-      label = 'Approved';
+      label = 'Accepted';
     } else if (status == 'REJECTED') {
       bg = const Color(0xFFFEE2E2);
       fg = const Color(0xFFDC2626);
@@ -82,7 +80,12 @@ class _TrainerTicketsPageState extends State<TrainerTicketsPage> {
       ),
       child: Text(
         label,
-        style: TextStyle(color: fg, fontWeight: FontWeight.bold, fontSize: 11, fontFamily: 'Outfit'),
+        style: TextStyle(
+          color: fg,
+          fontWeight: FontWeight.bold,
+          fontSize: 11,
+          fontFamily: 'Outfit',
+        ),
       ),
     );
   }
@@ -129,18 +132,13 @@ class _TrainerTicketsPageState extends State<TrainerTicketsPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Support & Disputes',
+                      'Support Tickets',
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF1E293B),
                         fontFamily: 'Outfit',
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Submit and track content bugs, revenue disputes, tax/bank info updates ($_totalElements total)',
-                      style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontFamily: 'Outfit'),
                     ),
                   ],
                 ),
@@ -158,10 +156,19 @@ class _TrainerTicketsPageState extends State<TrainerTicketsPage> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF28B79B),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                     elevation: 0,
-                    textStyle: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit', fontSize: 13),
+                    textStyle: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Outfit',
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ],
@@ -177,9 +184,7 @@ class _TrainerTicketsPageState extends State<TrainerTicketsPage> {
                   const SizedBox(width: 8),
                   _buildFilterChip('PENDING', 'Pending'),
                   const SizedBox(width: 8),
-                  _buildFilterChip('PROCESSING', 'Processing'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('APPROVED', 'Approved'),
+                  _buildFilterChip('APPROVED', 'Accepted'),
                   const SizedBox(width: 8),
                   _buildFilterChip('REJECTED', 'Rejected'),
                 ],
@@ -193,7 +198,9 @@ class _TrainerTicketsPageState extends State<TrainerTicketsPage> {
             if (_isLoading && _tickets.isEmpty)
               const SizedBox(
                 height: 250,
-                child: Center(child: CircularProgressIndicator(color: Color(0xFF28B79B))),
+                child: Center(
+                  child: CircularProgressIndicator(color: Color(0xFF28B79B)),
+                ),
               )
             else if (_tickets.isEmpty)
               Container(
@@ -208,11 +215,20 @@ class _TrainerTicketsPageState extends State<TrainerTicketsPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.confirmation_number_outlined, size: 40, color: Color(0xFFCBD5E1)),
+                      Icon(
+                        Icons.confirmation_number_outlined,
+                        size: 40,
+                        color: Color(0xFFCBD5E1),
+                      ),
                       SizedBox(height: 10),
                       Text(
                         'No support requests found',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF64748B), fontFamily: 'Outfit'),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: Color(0xFF64748B),
+                          fontFamily: 'Outfit',
+                        ),
                       ),
                     ],
                   ),
@@ -225,7 +241,8 @@ class _TrainerTicketsPageState extends State<TrainerTicketsPage> {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: _tickets.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 12),
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final t = _tickets[index];
                       return Container(
@@ -251,7 +268,11 @@ class _TrainerTicketsPageState extends State<TrainerTicketsPage> {
                                 color: const Color(0xFFE6FFFA),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: const Icon(Icons.confirmation_number_outlined, color: Color(0xFF28B79B), size: 20),
+                              child: const Icon(
+                                Icons.confirmation_number_outlined,
+                                color: Color(0xFF28B79B),
+                                size: 20,
+                              ),
                             ),
                             const SizedBox(width: 16),
                             Expanded(
@@ -262,7 +283,12 @@ class _TrainerTicketsPageState extends State<TrainerTicketsPage> {
                                     children: [
                                       Text(
                                         '#${t.ticketCode}',
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF28B79B), fontFamily: 'Outfit'),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                          color: Color(0xFF28B79B),
+                                          fontFamily: 'Outfit',
+                                        ),
                                       ),
                                       const SizedBox(width: 8),
                                       _buildStatusBadge(t.status),
@@ -271,14 +297,23 @@ class _TrainerTicketsPageState extends State<TrainerTicketsPage> {
                                   const SizedBox(height: 4),
                                   Text(
                                     t.title,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A), fontFamily: 'Outfit'),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      color: Color(0xFF0F172A),
+                                      fontFamily: 'Outfit',
+                                    ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
                                     'Created: ${t.createdAt}',
-                                    style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontFamily: 'Outfit'),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Color(0xFF94A3B8),
+                                      fontFamily: 'Outfit',
+                                    ),
                                   ),
                                 ],
                               ),
@@ -288,11 +323,25 @@ class _TrainerTicketsPageState extends State<TrainerTicketsPage> {
                               onPressed: () => _showDetailModal(t),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: const Color(0xFF334155),
-                                side: const BorderSide(color: Color(0xFFCBD5E1)),
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                side: const BorderSide(
+                                  color: Color(0xFFCBD5E1),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 10,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
                               ),
-                              child: const Text('View', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, fontFamily: 'Outfit')),
+                              child: const Text(
+                                'View',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  fontFamily: 'Outfit',
+                                ),
+                              ),
                             ),
                           ],
                         ),
@@ -321,7 +370,11 @@ class _TrainerTicketsPageState extends State<TrainerTicketsPage> {
                 children: [
                   Text(
                     'Total $_totalElements request(s)',
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontFamily: 'Outfit'),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF64748B),
+                      fontFamily: 'Outfit',
+                    ),
                   ),
                   Row(
                     children: [
@@ -335,7 +388,9 @@ class _TrainerTicketsPageState extends State<TrainerTicketsPage> {
                             : null,
                       ),
                       const SizedBox(width: 4),
-                      ...List.generate(_totalPages > 0 ? _totalPages : 1, (index) {
+                      ...List.generate(_totalPages > 0 ? _totalPages : 1, (
+                        index,
+                      ) {
                         final pageNum = index + 1;
                         final isCurrent = index == _currentPage;
 
@@ -349,14 +404,18 @@ class _TrainerTicketsPageState extends State<TrainerTicketsPage> {
                             height: 32,
                             margin: const EdgeInsets.symmetric(horizontal: 4),
                             decoration: BoxDecoration(
-                              color: isCurrent ? const Color(0xFF28B79B) : Colors.transparent,
+                              color: isCurrent
+                                  ? const Color(0xFF28B79B)
+                                  : Colors.transparent,
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Center(
                               child: Text(
                                 '$pageNum',
                                 style: TextStyle(
-                                  color: isCurrent ? Colors.white : const Color(0xFF4B5563),
+                                  color: isCurrent
+                                      ? Colors.white
+                                      : const Color(0xFF4B5563),
                                   fontWeight: FontWeight.bold,
                                   fontSize: 13,
                                   fontFamily: 'Outfit',
@@ -391,10 +450,13 @@ class _TrainerTicketsPageState extends State<TrainerTicketsPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      drawer: !isDesktop ? const Drawer(child: TrainerSidebar(activeIndex: 6)) : null,
+      drawer: !isDesktop
+          ? const Drawer(child: TrainerSidebar(activeIndex: 6))
+          : null,
       body: Row(
         children: [
-          if (isDesktop) const SizedBox(width: 250, child: TrainerSidebar(activeIndex: 6)),
+          if (isDesktop)
+            const SizedBox(width: 250, child: TrainerSidebar(activeIndex: 6)),
           Expanded(child: content),
         ],
       ),
@@ -419,14 +481,18 @@ class _TrainerTicketsPageState extends State<TrainerTicketsPage> {
           color: isSelected ? const Color(0xFFE6FFFA) : const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? const Color(0xFF28B79B) : const Color(0xFFE2E8F0),
+            color: isSelected
+                ? const Color(0xFF28B79B)
+                : const Color(0xFFE2E8F0),
             width: isSelected ? 1.5 : 1,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? const Color(0xFF28B79B) : const Color(0xFF64748B),
+            color: isSelected
+                ? const Color(0xFF28B79B)
+                : const Color(0xFF64748B),
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
             fontSize: 12,
             fontFamily: 'Outfit',
@@ -441,35 +507,26 @@ class _TrainerTicketDetailDialog extends StatefulWidget {
   final int ticketId;
   final VoidCallback onRefresh;
 
-  const _TrainerTicketDetailDialog({required this.ticketId, required this.onRefresh});
+  const _TrainerTicketDetailDialog({
+    required this.ticketId,
+    required this.onRefresh,
+  });
 
   @override
-  State<_TrainerTicketDetailDialog> createState() => _TrainerTicketDetailDialogState();
+  State<_TrainerTicketDetailDialog> createState() =>
+      _TrainerTicketDetailDialogState();
 }
 
-class _TrainerTicketDetailDialogState extends State<_TrainerTicketDetailDialog> {
+class _TrainerTicketDetailDialogState
+    extends State<_TrainerTicketDetailDialog> {
   final _ticketService = TicketService();
-  final _replyController = TextEditingController();
   TicketModel? _ticket;
   bool _isLoading = true;
-  bool _isSending = false;
-  String? _replyError;
-  Timer? _pollingTimer;
 
   @override
   void initState() {
     super.initState();
     _loadDetail(isInitial: true);
-    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      _loadDetail(isInitial: false);
-    });
-  }
-
-  @override
-  void dispose() {
-    _pollingTimer?.cancel();
-    _replyController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadDetail({bool isInitial = false}) async {
@@ -487,35 +544,6 @@ class _TrainerTicketDetailDialogState extends State<_TrainerTicketDetailDialog> 
     }
   }
 
-  void _sendReply() async {
-    final text = _replyController.text.trim();
-    if (text.isEmpty) {
-      setState(() {
-        _replyError = 'Please enter a reply message.';
-      });
-      return;
-    } else {
-      setState(() {
-        _replyError = null;
-      });
-    }
-
-    setState(() => _isSending = true);
-    final res = await _ticketService.addMessage(widget.ticketId, text);
-    if (mounted) {
-      setState(() => _isSending = false);
-      if (res['success'] == true) {
-        _replyController.clear();
-        setState(() => _replyError = null);
-        ToastHelper.showSuccess(context, 'Response sent successfully!');
-        _loadDetail(isInitial: false);
-        widget.onRefresh();
-      } else {
-        ToastHelper.showError(context, res['message'] ?? 'Failed to send reply.');
-      }
-    }
-  }
-
   Widget _buildStatusBadge(String status) {
     Color bg = const Color(0xFFFEF3C7);
     Color fg = const Color(0xFFD97706);
@@ -524,7 +552,7 @@ class _TrainerTicketDetailDialogState extends State<_TrainerTicketDetailDialog> 
     if (status == 'APPROVED') {
       bg = const Color(0xFFDCFCE7);
       fg = const Color(0xFF15803D);
-      label = 'Approved';
+      label = 'Accepted';
     } else if (status == 'REJECTED') {
       bg = const Color(0xFFFEE2E2);
       fg = const Color(0xFFDC2626);
@@ -572,11 +600,24 @@ class _TrainerTicketDetailDialogState extends State<_TrainerTicketDetailDialog> 
       children: [
         Icon(icon, size: 14, color: const Color(0xFF64748B)),
         const SizedBox(width: 8),
-        Text('$label: ', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B), fontFamily: 'Outfit')),
+        Text(
+          '$label: ',
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF64748B),
+            fontFamily: 'Outfit',
+          ),
+        ),
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E293B), fontFamily: 'Outfit'),
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E293B),
+              fontFamily: 'Outfit',
+            ),
             overflow: TextOverflow.ellipsis,
           ),
         ),
@@ -588,11 +629,26 @@ class _TrainerTicketDetailDialogState extends State<_TrainerTicketDetailDialog> 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(_ticket!.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A), fontFamily: 'Outfit')),
+        Text(
+          _ticket!.title,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0F172A),
+            fontFamily: 'Outfit',
+          ),
+        ),
         const SizedBox(height: 6),
         Row(
           children: [
-            Text('#${_ticket!.ticketCode}', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF28B79B), fontSize: 12)),
+            Text(
+              '#${_ticket!.ticketCode}',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF28B79B),
+                fontSize: 12,
+              ),
+            ),
             const SizedBox(width: 8),
             _buildStatusBadge(_ticket!.status),
           ],
@@ -602,7 +658,15 @@ class _TrainerTicketDetailDialogState extends State<_TrainerTicketDetailDialog> 
         const SizedBox(height: 12),
 
         // Original Request Description
-        const Text('Original Request Description', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155), fontFamily: 'Outfit')),
+        const Text(
+          'Original Request Description',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+            color: Color(0xFF334155),
+            fontFamily: 'Outfit',
+          ),
+        ),
         const SizedBox(height: 8),
         Container(
           width: double.infinity,
@@ -615,9 +679,19 @@ class _TrainerTicketDetailDialogState extends State<_TrainerTicketDetailDialog> 
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Created: ${_formatDateTime(_ticket!.createdAt)}', style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+              Text(
+                'Created: ${_formatDateTime(_ticket!.createdAt)}',
+                style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+              ),
               const SizedBox(height: 6),
-              Text(_ticket!.description, style: const TextStyle(fontSize: 13, color: Color(0xFF334155), height: 1.4)),
+              Text(
+                _ticket!.description,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF334155),
+                  height: 1.4,
+                ),
+              ),
             ],
           ),
         ),
@@ -628,7 +702,15 @@ class _TrainerTicketDetailDialogState extends State<_TrainerTicketDetailDialog> 
             _ticket!.adminResponse != null &&
             _ticket!.adminResponse!.isNotEmpty &&
             !_ticket!.adminResponse!.startsWith('Ticket rejected')) ...[
-          const Text('Admin Response / Note', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF15803D), fontFamily: 'Outfit')),
+          const Text(
+            'Admin Response / Note',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: Color(0xFF15803D),
+              fontFamily: 'Outfit',
+            ),
+          ),
           const SizedBox(height: 8),
           Container(
             width: double.infinity,
@@ -638,14 +720,30 @@ class _TrainerTicketDetailDialogState extends State<_TrainerTicketDetailDialog> 
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: const Color(0xFFBBF7D0)),
             ),
-            child: Text(_ticket!.adminResponse!, style: const TextStyle(fontSize: 13, color: Color(0xFF166534), height: 1.4)),
+            child: Text(
+              _ticket!.adminResponse!,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF166534),
+                height: 1.4,
+              ),
+            ),
           ),
           const SizedBox(height: 16),
         ],
 
         // Rejection Reason (if Rejected)
-        if (_ticket!.rejectionReason != null && _ticket!.rejectionReason!.isNotEmpty) ...[
-          const Text('Rejection Reason', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFDC2626), fontFamily: 'Outfit')),
+        if (_ticket!.rejectionReason != null &&
+            _ticket!.rejectionReason!.isNotEmpty) ...[
+          const Text(
+            'Rejection Reason',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: Color(0xFFDC2626),
+              fontFamily: 'Outfit',
+            ),
+          ),
           const SizedBox(height: 8),
           Container(
             width: double.infinity,
@@ -655,13 +753,28 @@ class _TrainerTicketDetailDialogState extends State<_TrainerTicketDetailDialog> 
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: const Color(0xFFFCA5A5)),
             ),
-            child: Text(_ticket!.rejectionReason!, style: const TextStyle(fontSize: 13, color: Color(0xFF991B1B), height: 1.4)),
+            child: Text(
+              _ticket!.rejectionReason!,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF991B1B),
+                height: 1.4,
+              ),
+            ),
           ),
           const SizedBox(height: 16),
         ],
 
-        // Ticket Audit & Metadata Summary Card
-        const Text('Ticket Information & Audit', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155), fontFamily: 'Outfit')),
+        // Ticket Metadata Summary Card
+        const Text(
+          'Ticket Information',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+            color: Color(0xFF334155),
+            fontFamily: 'Outfit',
+          ),
+        ),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.all(14),
@@ -672,148 +785,29 @@ class _TrainerTicketDetailDialogState extends State<_TrainerTicketDetailDialog> 
           ),
           child: Column(
             children: [
-              _buildAuditRow(Icons.calendar_today_rounded, 'Submitted Date', _formatDateTime(_ticket!.createdAt)),
+              _buildAuditRow(
+                Icons.calendar_today_rounded,
+                'Submitted Date',
+                _formatDateTime(_ticket!.createdAt),
+              ),
               const Divider(height: 16, color: Color(0xFFF1F5F9)),
-              _buildAuditRow(Icons.history_rounded, 'Last Updated', _formatDateTime(_ticket!.updatedAt)),
-              if (_ticket!.processedByName != null && _ticket!.processedByName!.isNotEmpty) ...[
+              _buildAuditRow(
+                Icons.history_rounded,
+                'Last Updated',
+                _formatDateTime(_ticket!.updatedAt),
+              ),
+              if (_ticket!.processedByName != null &&
+                  _ticket!.processedByName!.isNotEmpty) ...[
                 const Divider(height: 16, color: Color(0xFFF1F5F9)),
-                _buildAuditRow(Icons.admin_panel_settings_rounded, 'Processed By', _ticket!.processedByName!),
+                _buildAuditRow(
+                  Icons.admin_panel_settings_rounded,
+                  'Processed By',
+                  _ticket!.processedByName!,
+                ),
               ],
             ],
           ),
         ),
-        const SizedBox(height: 16),
-      ],
-    );
-  }
-
-  Widget _buildConversationList({bool shrinkWrap = false}) {
-    if (_ticket!.messages.isEmpty) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF8FAFC),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFF1F5F9)),
-        ),
-        child: const Center(
-          child: Text('No additional responses yet.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontFamily: 'Outfit')),
-        ),
-      );
-    }
-    return ListView.separated(
-      shrinkWrap: shrinkWrap,
-      physics: shrinkWrap ? const NeverScrollableScrollPhysics() : const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(right: 4),
-      itemCount: _ticket!.messages.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        final msg = _ticket!.messages[index];
-        final isStaff = msg.senderRole == 'ADMINISTRATOR' || msg.senderRole == 'COURSE_MANAGER';
-        return Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: isStaff ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: isStaff ? const Color(0xFFBBF7D0) : const Color(0xFFE2E8F0)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('${msg.senderName} (${msg.senderRole})', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isStaff ? const Color(0xFF166534) : const Color(0xFF0F172A))),
-                  Text(_formatDateTime(msg.createdAt), style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(msg.message, style: const TextStyle(fontSize: 13, color: Color(0xFF334155), height: 1.3)),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildChatInputBox() {
-    if (_ticket!.status == 'APPROVED' || _ticket!.status == 'REJECTED') {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF8FAFC),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-        ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.lock_outline_rounded, size: 16, color: Color(0xFF64748B)),
-            SizedBox(width: 8),
-            Text('This ticket is closed. No further replies required.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontFamily: 'Outfit')),
-          ],
-        ),
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _replyController,
-                style: const TextStyle(fontSize: 13, fontFamily: 'Outfit'),
-                onChanged: (val) {
-                  if (_replyError != null && val.trim().isNotEmpty) {
-                    setState(() => _replyError = null);
-                  }
-                },
-                decoration: InputDecoration(
-                  hintText: 'Type your reply...',
-                  hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: _replyError != null ? Colors.red : const Color(0xFFCBD5E1), width: _replyError != null ? 1.5 : 1.0),
-                  ),
-                  fillColor: const Color(0xFFF8FAFC),
-                  filled: true,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            ElevatedButton.icon(
-              onPressed: _isSending ? null : _sendReply,
-              icon: _isSending
-                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.send_rounded, size: 16),
-              label: const Text('Send'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF28B79B),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
-          ],
-        ),
-        if (_replyError != null) ...[
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              const Icon(Icons.error_outline_rounded, size: 14, color: Color(0xFFDC2626)),
-              const SizedBox(width: 4),
-              Text(
-                _replyError!,
-                style: const TextStyle(fontSize: 12, color: Color(0xFFDC2626), fontWeight: FontWeight.w500, fontFamily: 'Outfit'),
-              ),
-            ],
-          ),
-        ],
       ],
     );
   }
@@ -826,42 +820,97 @@ class _TrainerTicketDetailDialogState extends State<_TrainerTicketDetailDialog> 
     if (_isLoading) {
       return Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: const SizedBox(height: 200, width: 300, child: Center(child: CircularProgressIndicator(color: Color(0xFF28B79B)))),
+        child: const SizedBox(
+          height: 200,
+          width: 300,
+          child: Center(
+            child: CircularProgressIndicator(color: Color(0xFF28B79B)),
+          ),
+        ),
       );
     }
 
     if (_ticket == null) {
       return Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: const SizedBox(height: 150, width: 300, child: Center(child: Text('Ticket not found'))),
+        child: const SizedBox(
+          height: 150,
+          width: 300,
+          child: Center(child: Text('Ticket not found')),
+        ),
       );
     }
 
-    final dialogWidth = isDesktop ? 980.0 : (size.width * 0.94).clamp(300.0, 620.0);
-    final dialogHeight = isDesktop ? 650.0 : (size.height * 0.88).clamp(400.0, 780.0);
+    final dialogWidth = isDesktop
+        ? 980.0
+        : (size.width * 0.94).clamp(300.0, 620.0);
+    final dialogHeight = isDesktop
+        ? 520.0
+        : (size.height * 0.72).clamp(400.0, 620.0);
 
-    // Desktop Layout (Side-by-Side 2 Columns)
-    Widget desktopBody = Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    Widget bottomActions = Row(
+      mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        Expanded(flex: 5, child: SingleChildScrollView(child: _buildLeftContent())),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: VerticalDivider(width: 1, color: Color(0xFFE2E8F0)),
-        ),
-        Expanded(
-          flex: 6,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Responses & Conversation', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A), fontFamily: 'Outfit')),
-              const SizedBox(height: 10),
-              Expanded(child: _buildConversationList(shrinkWrap: false)),
-              const SizedBox(height: 12),
-              _buildChatInputBox(),
-            ],
+        OutlinedButton(
+          onPressed: () => Navigator.pop(context),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 10,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: const Text(
+            'Close',
+            style: TextStyle(
+              color: Color(0xFF64748B),
+              fontFamily: 'Outfit',
+            ),
           ),
         ),
+        if (_ticket != null &&
+            _ticket!.status != 'APPROVED' &&
+            _ticket!.status != 'REJECTED') ...[
+          const SizedBox(width: 12),
+          ElevatedButton.icon(
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => CreateTicketModal(
+                  existingTicket: _ticket,
+                  onSuccess: () {
+                    _loadDetail();
+                    widget.onRefresh();
+                  },
+                ),
+              );
+            },
+            icon: const Icon(Icons.edit_outlined, size: 16),
+            label: const Text('Update Ticket'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF59E0B),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 10,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+
+    // Desktop Layout
+    Widget desktopBody = Column(
+      children: [
+        Expanded(child: SingleChildScrollView(child: _buildLeftContent())),
+        const SizedBox(height: 12),
+        bottomActions,
       ],
     );
 
@@ -872,34 +921,12 @@ class _TrainerTicketDetailDialogState extends State<_TrainerTicketDetailDialog> 
           child: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildLeftContent(),
-                const SizedBox(height: 20),
-                const Divider(color: Color(0xFFE2E8F0)),
-                const SizedBox(height: 16),
-                const Text('Responses & Conversation', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A), fontFamily: 'Outfit')),
-                const SizedBox(height: 10),
-                _buildConversationList(shrinkWrap: true),
-                const SizedBox(height: 16),
-                _buildChatInputBox(),
-              ],
+              children: [_buildLeftContent(), const SizedBox(height: 20)],
             ),
           ),
         ),
         const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            OutlinedButton(
-              onPressed: () => Navigator.pop(context),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              child: const Text('Close', style: TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit')),
-            ),
-          ],
-        ),
+        bottomActions,
       ],
     );
 
@@ -918,7 +945,12 @@ class _TrainerTicketDetailDialogState extends State<_TrainerTicketDetailDialog> 
               children: [
                 const Text(
                   'Support Request Details',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A), fontFamily: 'Outfit'),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                    fontFamily: 'Outfit',
+                  ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close, color: Color(0xFF64748B)),

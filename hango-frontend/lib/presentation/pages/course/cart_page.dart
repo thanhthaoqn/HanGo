@@ -80,13 +80,21 @@ class _CartPageState extends State<CartPage> {
       } else {
         final cartIds = await CartManager.getCartIds();
         if (cartIds.isNotEmpty) {
-          final allCourses = await _repository.fetchCourses(search: '', filterType: 'ALL', difficulty: 'ALL');
-          coursesInCart = allCourses.where((c) => cartIds.contains(c.id.toString())).toList();
+          final allCourses = await _repository.fetchCourses(
+            search: '',
+            filterType: 'ALL',
+            difficulty: 'ALL',
+          );
+          coursesInCart = allCourses
+              .where((c) => cartIds.contains(c.id.toString()))
+              .toList();
         }
       }
 
       // Filter out courses that are currently pending deletion
-      coursesInCart = coursesInCart.where((c) => !CartManager.isPendingDeletion(c.id)).toList();
+      coursesInCart = coursesInCart
+          .where((c) => !CartManager.isPendingDeletion(c.id))
+          .toList();
 
       final enrolled = <String>{};
       for (final c in coursesInCart) {
@@ -102,7 +110,8 @@ class _CartPageState extends State<CartPage> {
         setState(() {
           _cartCourses = coursesInCart;
           _enrolledCourseIds = enrolled;
-          _canEnroll = roles.contains('ENROLL_AND_LEARN_COURSES') ||
+          _canEnroll =
+              roles.contains('ENROLL_AND_LEARN_COURSES') ||
               roles.contains('ROLE_ADMINISTRATOR');
           _isLoading = false;
         });
@@ -122,7 +131,12 @@ class _CartPageState extends State<CartPage> {
       _cartCourses.removeWhere((c) => c.id == courseId);
     });
 
-    ToastHelper.show(context, LanguageManager.isVi ? 'Đã xóa khóa học khỏi giỏ hàng' : 'Removed from cart');
+    ToastHelper.show(
+      context,
+      LanguageManager.isVi
+          ? 'Đã xóa khóa học khỏi giỏ hàng'
+          : 'Removed from cart',
+    );
     await CartManager.removeFromCart(courseId);
   }
 
@@ -130,10 +144,12 @@ class _CartPageState extends State<CartPage> {
     if (course.price <= 0) {
       return 'Miễn phí';
     }
-    final formatted = course.price.toStringAsFixed(0).replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (m) => '${m[1]}.',
-    );
+    final formatted = course.price
+        .toStringAsFixed(0)
+        .replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (m) => '${m[1]}.',
+        );
     return '$formattedđ';
   }
 
@@ -145,12 +161,18 @@ class _CartPageState extends State<CartPage> {
 
   String _formatPrice(int price) {
     return price.toString().replaceAllMapped(
-        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.') + 'đ';
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]}.',
+        ) +
+        'đ';
   }
 
   void _enrollFreeCourse(Course course) async {
     if (!_canEnroll) {
-      ToastHelper.showError(context, 'Enrollment is not available for your role.');
+      ToastHelper.showError(
+        context,
+        'Enrollment is not available for your role.',
+      );
       return;
     }
     setState(() {
@@ -158,15 +180,15 @@ class _CartPageState extends State<CartPage> {
     });
     try {
       await _repository.enrollCourse(course.id);
-      
+
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('enrolled_course_id_${course.id}', true);
-      
+
       final cartIds = await CartManager.getCartIds();
       cartIds.remove(course.id.toString());
       await CartManager.setCartIds(cartIds);
       await CartManager.updateCount();
-      
+
       if (mounted) {
         ToastHelper.showSuccess(context, 'Enrolled successfully!');
         Navigator.pushReplacement(
@@ -188,7 +210,10 @@ class _CartPageState extends State<CartPage> {
 
   void _checkoutCart() async {
     if (!_canEnroll) {
-      ToastHelper.showError(context, 'Checkout is not available for your role.');
+      ToastHelper.showError(
+        context,
+        'Checkout is not available for your role.',
+      );
       return;
     }
     final prefs = await SharedPreferences.getInstance();
@@ -196,7 +221,10 @@ class _CartPageState extends State<CartPage> {
     if (token == null || token.isEmpty) {
       if (mounted) {
         ToastHelper.show(context, 'Please log in to check out.');
-        Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginPage()));
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+        );
       }
       return;
     }
@@ -261,7 +289,10 @@ class _CartPageState extends State<CartPage> {
           await CartManager.updateCount();
 
           if (mounted) {
-            ToastHelper.showSuccess(context, 'Payment successful! Courses unlocked.');
+            ToastHelper.showSuccess(
+              context,
+              'Payment successful! Courses unlocked.',
+            );
             _loadCart();
           }
         },
@@ -281,7 +312,9 @@ class _CartPageState extends State<CartPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: widget.isEmbedded ? null : SharedHeader(isDesktop: isDesktop, activeTab: ''),
+      appBar: widget.isEmbedded
+          ? null
+          : SharedHeader(isDesktop: isDesktop, activeTab: ''),
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         child: Column(
@@ -289,7 +322,10 @@ class _CartPageState extends State<CartPage> {
             Center(
               child: Container(
                 constraints: const BoxConstraints(maxWidth: 1440),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 36,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -318,11 +354,15 @@ class _CartPageState extends State<CartPage> {
                     _isLoading
                         ? const Padding(
                             padding: EdgeInsets.symmetric(vertical: 80.0),
-                            child: Center(child: CircularProgressIndicator(color: Color(0xFF28B79B))),
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                color: Color(0xFF28B79B),
+                              ),
+                            ),
                           )
                         : _cartCourses.isEmpty
-                            ? _buildEmptyState(isVi)
-                            : _buildCartContent(isDesktop, isVi, subtotal),
+                        ? _buildEmptyState(isVi)
+                        : _buildCartContent(isDesktop, isVi, subtotal),
                   ],
                 ),
               ),
@@ -379,20 +419,31 @@ class _CartPageState extends State<CartPage> {
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF28B79B),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 14,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               onPressed: () {
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (context) => const ListCoursesPage()),
+                  MaterialPageRoute(
+                    builder: (context) => const ListCoursesPage(),
+                  ),
                 );
               },
               child: Text(
                 isVi ? 'Khám phá khóa học ngay' : 'Explore Courses Now',
-                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'Outfit'),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  fontFamily: 'Outfit',
+                ),
               ),
-            )
+            ),
           ],
         ),
       ),
@@ -404,15 +455,9 @@ class _CartPageState extends State<CartPage> {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            flex: 3,
-            child: _buildItemsList(isVi),
-          ),
+          Expanded(flex: 3, child: _buildItemsList(isVi)),
           const SizedBox(width: 32),
-          Expanded(
-            flex: 1,
-            child: _buildSummaryCard(isVi, subtotal),
-          )
+          Expanded(flex: 1, child: _buildSummaryCard(isVi, subtotal)),
         ],
       );
     } else {
@@ -447,7 +492,7 @@ class _CartPageState extends State<CartPage> {
                 color: Colors.black.withOpacity(0.02),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
-              )
+              ),
             ],
           ),
           child: Row(
@@ -461,7 +506,12 @@ class _CartPageState extends State<CartPage> {
                   color: const Color(0xFFF1F5F9),
                   child: course.thumbnailUrl.isNotEmpty
                       ? Image.network(course.thumbnailUrl, fit: BoxFit.cover)
-                      : const Center(child: Icon(Icons.school_rounded, color: Color(0xFF94A3B8))),
+                      : const Center(
+                          child: Icon(
+                            Icons.school_rounded,
+                            color: Color(0xFF94A3B8),
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(width: 16),
@@ -484,8 +534,12 @@ class _CartPageState extends State<CartPage> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '${isVi ? 'Giáo viên' : 'Educator'}: ${course.creatorName}',
-                      style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontFamily: 'Outfit'),
+                      '${isVi ? 'Giáo viên' : 'Trainer'}: ${course.creatorName}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF64748B),
+                        fontFamily: 'Outfit',
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Text(
@@ -494,18 +548,22 @@ class _CartPageState extends State<CartPage> {
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                         fontFamily: 'Outfit',
-                        color: price == 'Miễn phí' ? const Color(0xFF28B79B) : const Color(0xFF1E293B),
+                        color: price == 'Miễn phí'
+                            ? const Color(0xFF28B79B)
+                            : const Color(0xFF1E293B),
                       ),
-                    )
+                    ),
                   ],
                 ),
               ),
               const SizedBox(width: 16),
               Builder(
                 builder: (context) {
-                  final isEnrolled = _enrolledCourseIds.contains(course.id.toString());
+                  final isEnrolled = _enrolledCourseIds.contains(
+                    course.id.toString(),
+                  );
                   final isFree = course.price <= 0;
-                  
+
                   if (isEnrolled) {
                     return const SizedBox.shrink();
                   } else if (isFree) {
@@ -515,13 +573,23 @@ class _CartPageState extends State<CartPage> {
                     return ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF28B79B),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
                       ),
                       onPressed: () => _enrollFreeCourse(course),
                       child: Text(
                         isVi ? 'Đăng ký học' : 'Enroll',
-                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Outfit',
+                        ),
                       ),
                     );
                   } else {
@@ -532,10 +600,13 @@ class _CartPageState extends State<CartPage> {
               const SizedBox(width: 8),
               // Delete Button
               IconButton(
-                icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)),
+                icon: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: Color(0xFFEF4444),
+                ),
                 onPressed: () => _removeItem(course.id),
                 tooltip: isVi ? 'Xóa khỏi giỏ hàng' : 'Remove from cart',
-              )
+              ),
             ],
           ),
         );
@@ -555,7 +626,7 @@ class _CartPageState extends State<CartPage> {
             color: Colors.black.withOpacity(0.02),
             blurRadius: 16,
             offset: const Offset(0, 4),
-          )
+          ),
         ],
       ),
       child: Column(
@@ -575,7 +646,9 @@ class _CartPageState extends State<CartPage> {
           // Detailed Price breakdown
           _buildSummaryRow(
             isVi ? 'Số lượng khóa học' : 'Total Items',
-            isVi ? '${_cartCourses.length} khóa học' : '${_cartCourses.length} items',
+            isVi
+                ? '${_cartCourses.length} khóa học'
+                : '${_cartCourses.length} items',
           ),
           const SizedBox(height: 12),
           _buildSummaryRow(
@@ -604,7 +677,9 @@ class _CartPageState extends State<CartPage> {
               backgroundColor: const Color(0xFFF05A22),
               foregroundColor: Colors.white,
               minimumSize: const Size(double.infinity, 50),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               elevation: 2,
             ),
             onPressed: _canEnroll ? _checkoutCart : null,
@@ -629,13 +704,17 @@ class _CartPageState extends State<CartPage> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF64748B)),
+                const Icon(
+                  Icons.info_outline_rounded,
+                  size: 16,
+                  color: Color(0xFF64748B),
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    isVi 
-                      ? 'Nút trên sẽ tự động mở VietQR PayOS để quét mã thanh toán các khóa học.'
-                      : 'Button above will automatically open VietQR PayOS for your checkout.',
+                    isVi
+                        ? 'Nút trên sẽ tự động mở VietQR PayOS để quét mã thanh toán các khóa học.'
+                        : 'Button above will automatically open VietQR PayOS for your checkout.',
                     style: const TextStyle(
                       color: Color(0xFF64748B),
                       fontSize: 12,
@@ -652,7 +731,13 @@ class _CartPageState extends State<CartPage> {
     );
   }
 
-  Widget _buildSummaryRow(String label, String value, {bool isBold = false, double fontSize = 13.5, Color valueColor = const Color(0xFF1E293B)}) {
+  Widget _buildSummaryRow(
+    String label,
+    String value, {
+    bool isBold = false,
+    double fontSize = 13.5,
+    Color valueColor = const Color(0xFF1E293B),
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [

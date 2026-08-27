@@ -5,7 +5,7 @@ import com.hango.hango_backend.dto.ExamMatrixDTO;
 import com.hango.hango_backend.repository.QuestionRepository;
 import com.hango.hango_backend.repository.UserRepository;
 import com.hango.hango_backend.entity.User;
-import com.hango.hango_backend.service.CourseManagerExamMatrixService;
+import com.hango.hango_backend.service.ExamMatrixService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,7 +21,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class TrainerExamMatrixController {
 
-    private final CourseManagerExamMatrixService matrixService;
+    private final ExamMatrixService matrixService;
     private final QuestionRepository questionRepository;
     private final UserRepository userRepository;
 

@@ -23,6 +23,7 @@ class _CreateTicketModalState extends State<CreateTicketModal> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _ticketService = TicketService();
+  final _keyboardFocusNode = FocusNode();
 
   String _category = 'GENERAL_ENQUIRY';
   bool _isLoading = false;
@@ -41,10 +42,12 @@ class _CreateTicketModalState extends State<CreateTicketModal> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
+    _keyboardFocusNode.dispose();
     super.dispose();
   }
 
   void _submit() async {
+    if (_isLoading) return;
     if (!_formKey.currentState!.validate()) return;
 
     final title = _titleController.text.trim();
@@ -94,10 +97,12 @@ class _CreateTicketModalState extends State<CreateTicketModal> {
     final isEdit = widget.existingTicket != null;
     final codeText = isEdit ? widget.existingTicket!.ticketCode : '';
 
-    return RawKeyboardListener(
-      focusNode: FocusNode(),
-      onKey: (event) {
-        if (event.isControlPressed && event.logicalKey == LogicalKeyboardKey.enter) {
+    return KeyboardListener(
+      focusNode: _keyboardFocusNode,
+      onKeyEvent: (event) {
+        if (event is KeyDownEvent &&
+            HardwareKeyboard.instance.isControlPressed &&
+            event.logicalKey == LogicalKeyboardKey.enter) {
           _submit();
         }
       },
@@ -143,7 +148,10 @@ class _CreateTicketModalState extends State<CreateTicketModal> {
                               ),
                               const SizedBox(width: 8),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFFEF3C7),
                                   borderRadius: BorderRadius.circular(6),
@@ -172,22 +180,28 @@ class _CreateTicketModalState extends State<CreateTicketModal> {
                 const Divider(color: Color(0xFFE2E8F0)),
                 const SizedBox(height: 16),
 
-
-
                 // Title Input
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
                       'Title *',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155), fontFamily: 'Outfit'),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: Color(0xFF334155),
+                        fontFamily: 'Outfit',
+                      ),
                     ),
                     ValueListenableBuilder<TextEditingValue>(
                       valueListenable: _titleController,
                       builder: (context, value, _) {
                         return Text(
                           '${value.text.length} / 200',
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF94A3B8),
+                          ),
                         );
                       },
                     ),
@@ -200,16 +214,21 @@ class _CreateTicketModalState extends State<CreateTicketModal> {
                   decoration: InputDecoration(
                     counterText: '',
                     hintText: 'Brief summary of your issue (<= 200 chars)',
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     fillColor: const Color(0xFFF8FAFC),
                     filled: true,
                   ),
                   validator: (v) => (v == null || v.trim().isEmpty)
                       ? 'Title is required.'
                       : (v.trim().length < 5)
-                          ? 'Title must be at least 5 characters.'
-                          : null,
+                      ? 'Title must be at least 5 characters.'
+                      : null,
                 ),
                 const SizedBox(height: 16),
 
@@ -219,14 +238,22 @@ class _CreateTicketModalState extends State<CreateTicketModal> {
                   children: [
                     const Text(
                       'Description / Content *',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155), fontFamily: 'Outfit'),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: Color(0xFF334155),
+                        fontFamily: 'Outfit',
+                      ),
                     ),
                     ValueListenableBuilder<TextEditingValue>(
                       valueListenable: _descriptionController,
                       builder: (context, value, _) {
                         return Text(
                           '${value.text.length} / 4000',
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF94A3B8),
+                          ),
                         );
                       },
                     ),
@@ -240,25 +267,25 @@ class _CreateTicketModalState extends State<CreateTicketModal> {
                   decoration: InputDecoration(
                     counterText: '',
                     hintText: 'Describe your issue in detail...',
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     fillColor: const Color(0xFFF8FAFC),
                     filled: true,
                   ),
                   validator: (v) => (v == null || v.trim().isEmpty)
                       ? 'Description is required.'
                       : (v.trim().length < 10)
-                          ? 'Description must be at least 10 characters.'
-                          : null,
+                      ? 'Description must be at least 10 characters.'
+                      : null,
                 ),
                 const SizedBox(height: 12),
 
-                // Shortcut tip
-                const Text(
-                  'Tip: Press Ctrl + Enter to save quickly',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontStyle: FontStyle.italic),
-                ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 8),
 
                 // Actions Footer
                 Row(
@@ -267,11 +294,19 @@ class _CreateTicketModalState extends State<CreateTicketModal> {
                     OutlinedButton(
                       onPressed: () => Navigator.pop(context),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                         side: const BorderSide(color: Color(0xFFCBD5E1)),
                       ),
-                      child: const Text('Cancel', style: TextStyle(color: Color(0xFF475569))),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(color: Color(0xFF475569)),
+                      ),
                     ),
                     const SizedBox(width: 12),
                     ElevatedButton(
@@ -279,14 +314,22 @@ class _CreateTicketModalState extends State<CreateTicketModal> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF28B79B),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                       child: _isLoading
                           ? const SizedBox(
                               width: 18,
                               height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
                             )
                           : Text(isEdit ? 'Save Changes' : 'Submit Ticket'),
                     ),

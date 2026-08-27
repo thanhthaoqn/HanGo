@@ -5,7 +5,7 @@ import com.hango.hango_backend.dto.ExamMatrixCreateRequestDTO;
 
 import java.util.List;
 
-public interface CourseManagerExamMatrixService {
+public interface ExamMatrixService {
     List<ExamMatrixDTO> getAllExamMatrices();
     List<ExamMatrixDTO> getAllMatricesForManager();
     void createExamMatrix(String email, ExamMatrixCreateRequestDTO request);

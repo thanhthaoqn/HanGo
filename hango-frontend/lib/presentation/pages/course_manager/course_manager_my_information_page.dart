@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:hango/presentation/widgets/image_cropper_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
+import '../../../utils/language_manager.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/file_picker_helper.dart';
 import '../../../utils/toast_helper.dart';
@@ -675,7 +677,16 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
   Future<void> _pickAndUploadAvatar() async {
     try {
       final pickedFile = await pickImage();
-      if (pickedFile == null) return;
+      if (pickedFile == null || pickedFile.bytes.isEmpty) return;
+
+      final croppedBytes = await ImageCropperDialog.show(
+        context,
+        imageBytes: Uint8List.fromList(pickedFile.bytes),
+        title: LanguageManager.isVi
+            ? 'Chỉnh sửa ảnh đại diện'
+            : 'Adjust Avatar Photo',
+      );
+      if (croppedBytes == null) return;
 
       setState(() {
         _isUploading = true;
@@ -686,8 +697,8 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
         ..fields['upload_preset'] = 'hango_preset'
         ..files.add(http.MultipartFile.fromBytes(
           'file',
-          pickedFile.bytes,
-          filename: pickedFile.name,
+          croppedBytes,
+          filename: 'avatar_${DateTime.now().millisecondsSinceEpoch}.png',
         ));
 
       final response = await request.send();

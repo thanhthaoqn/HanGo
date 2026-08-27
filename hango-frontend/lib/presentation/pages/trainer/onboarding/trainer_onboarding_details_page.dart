@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:hango/presentation/widgets/internal_app_header.dart';
+import 'package:hango/presentation/widgets/image_cropper_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../data/services/auth_service.dart';
 import '../../../../data/services/trainer_onboarding_service.dart';
@@ -233,19 +235,37 @@ class _TrainerOnboardingDetailsPageState
         return null;
       }
 
+      Uint8List bytesToUpload = Uint8List.fromList(picked.bytes);
+      String fileNameToUpload = picked.name;
+
+      if (!allowPdf) {
+        final croppedBytes = await ImageCropperDialog.show(
+          context,
+          imageBytes: bytesToUpload,
+          title: LanguageManager.isVi
+              ? 'Chỉnh sửa ảnh đại diện'
+              : 'Adjust Avatar Photo',
+        );
+        if (croppedBytes == null) {
+          return null;
+        }
+        bytesToUpload = croppedBytes;
+        fileNameToUpload = 'avatar_${DateTime.now().millisecondsSinceEpoch}.png';
+      }
+
       final result = allowPdf
           ? await _onboardingService.uploadTrainerDocument(
-              bytes: picked.bytes,
-              fileName: picked.name,
+              bytes: bytesToUpload,
+              fileName: fileNameToUpload,
             )
           : await _onboardingService.uploadTrainerAvatar(
-              bytes: picked.bytes,
-              fileName: picked.name,
+              bytes: bytesToUpload,
+              fileName: fileNameToUpload,
             );
       if (result['success'] == true) {
         return {
           'url': result['data']['url'].toString(),
-          'fileName': picked.name,
+          'fileName': fileNameToUpload,
         };
       }
       onError(result['message'] ?? 'File upload failed. Please try again.');

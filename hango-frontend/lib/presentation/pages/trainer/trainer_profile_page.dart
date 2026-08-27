@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:hango/presentation/widgets/internal_app_header.dart';
+import 'package:hango/presentation/widgets/image_cropper_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../../../../data/services/auth_service.dart';
@@ -175,7 +177,16 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
   void _pickAndUploadAvatar() async {
     try {
       final picked = await pickImage();
-      if (picked == null) return;
+      if (picked == null || picked.bytes.isEmpty) return;
+
+      final croppedBytes = await ImageCropperDialog.show(
+        context,
+        imageBytes: Uint8List.fromList(picked.bytes),
+        title: LanguageManager.isVi
+            ? 'Chỉnh sửa ảnh đại diện'
+            : 'Adjust Avatar Photo',
+      );
+      if (croppedBytes == null) return;
 
       setState(() {
         _isUploadingAvatar = true;
@@ -189,8 +200,8 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
         ..files.add(
           http.MultipartFile.fromBytes(
             'file',
-            picked.bytes,
-            filename: picked.name,
+            croppedBytes,
+            filename: 'avatar_${DateTime.now().millisecondsSinceEpoch}.png',
           ),
         );
 

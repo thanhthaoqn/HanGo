@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../../data/services/course_manager_api.dart';
-import '../../../utils/toast_helper.dart';
+import '../../../../data/services/course_manager_api.dart';
+import '../../../../utils/toast_helper.dart';
 import 'package:hango/presentation/widgets/internal_app_header.dart';
-import '../../widgets/course_manager_sidebar.dart';
+import '../../../widgets/course_manager_sidebar.dart';
 import 'course_manager_matrix_builder_page.dart';
 
 class CourseManagerMatrixManagementPage extends StatefulWidget {
