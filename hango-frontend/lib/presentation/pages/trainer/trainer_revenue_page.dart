@@ -610,88 +610,97 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
               ),
             )
           else
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
-                columns: [
-                  DataColumn(label: Text(isVi ? 'Mã Báo cáo' : 'Statement Code', style: _headerStyle)),
-                  DataColumn(label: Text(isVi ? 'Kỳ Tháng' : 'Period', style: _headerStyle)),
-                  DataColumn(label: Text(isVi ? 'Số đơn' : 'Orders', style: _headerStyle)),
-                  DataColumn(label: Text(isVi ? 'Tổng bán' : 'Gross Amount', style: _headerStyle)),
-                  DataColumn(label: Text(isVi ? 'Thuế TNCN (10%)' : 'PIT Tax (10%)', style: _headerStyle)),
-                  DataColumn(label: Text(isVi ? 'Thực nhận (Net)' : 'Net Payout', style: _headerStyle)),
-                  DataColumn(label: Text(isVi ? 'Trạng thái' : 'Status', style: _headerStyle)),
-                  DataColumn(label: Text(isVi ? 'Thao tác' : 'Action', style: _headerStyle)),
-                ],
-                rows: _statements.map((s) {
-                  final status = s['status']?.toString() ?? 'PENDING_TRAINER_CONFIRM';
-                  final net = s['netPayoutAmount'] ?? 0;
-                  final gross = s['totalGrossAmount'] ?? 0;
-                  final tax = s['pitTaxAmount'] ?? 0;
-                  final id = (s['id'] ?? 0) as int;
+            LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                    child: DataTable(
+                      headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
+                      horizontalMargin: 20,
+                      columnSpacing: 28,
+                      columns: [
+                        DataColumn(label: Text(isVi ? 'Mã Báo cáo' : 'Statement Code', style: _headerStyle)),
+                        DataColumn(label: Text(isVi ? 'Kỳ Tháng' : 'Period', style: _headerStyle)),
+                        DataColumn(label: Text(isVi ? 'Số đơn' : 'Orders', style: _headerStyle)),
+                        DataColumn(label: Text(isVi ? 'Tổng bán' : 'Gross Amount', style: _headerStyle)),
+                        DataColumn(label: Text(isVi ? 'Thuế TNCN (10%)' : 'PIT Tax (10%)', style: _headerStyle)),
+                        DataColumn(label: Text(isVi ? 'Thực nhận (Net)' : 'Net Payout', style: _headerStyle)),
+                        DataColumn(label: Text(isVi ? 'Trạng thái' : 'Status', style: _headerStyle)),
+                        DataColumn(label: Text(isVi ? 'Thao tác' : 'Action', style: _headerStyle)),
+                      ],
+                      rows: _statements.map((s) {
+                        final status = s['status']?.toString() ?? 'PENDING_TRAINER_CONFIRM';
+                        final net = s['netPayoutAmount'] ?? 0;
+                        final gross = s['totalGrossAmount'] ?? 0;
+                        final tax = s['pitTaxAmount'] ?? 0;
+                        final id = (s['id'] ?? 0) as int;
 
-                  return DataRow(
-                    cells: [
-                      DataCell(Text(s['statementCode']?.toString() ?? 'N/A', style: const TextStyle(fontWeight: FontWeight.bold))),
-                      DataCell(Text(s['periodMonth']?.toString() ?? 'N/A')),
-                      DataCell(Text('${s['totalOrders'] ?? 0}')),
-                      DataCell(Text(_formatVND(gross))),
-                      DataCell(Text(_formatVND(tax), style: const TextStyle(color: Colors.redAccent))),
-                      DataCell(Text(_formatVND(net), style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF28B79B)))),
-                      DataCell(_buildStatusBadge(status, isVi)),
-                      DataCell(
-                        status == 'PENDING_TRAINER_CONFIRM'
-                            ? Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  ElevatedButton(
-                                    onPressed: () => _confirmStatement(id),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF28B79B),
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    ),
-                                    child: Text(
-                                      isVi ? 'Xác nhận' : 'Confirm',
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  OutlinedButton(
-                                    onPressed: () => _rejectStatement(id),
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: Colors.redAccent,
-                                      side: const BorderSide(color: Colors.redAccent),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    ),
-                                    child: Text(
-                                      isVi ? 'Từ chối' : 'Reject',
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : (status == 'PAID' && s['payoutReceiptUrl'] != null && s['payoutReceiptUrl'].toString().isNotEmpty)
-                                ? OutlinedButton.icon(
-                                    onPressed: () => _openImagePreview(s['payoutReceiptUrl'].toString()),
-                                    icon: const Icon(Icons.receipt_long, size: 14),
-                                    label: Text(isVi ? 'Xem Bill chuyển tiền' : 'View Receipt', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: const Color(0xFF28B79B),
-                                      side: const BorderSide(color: Color(0xFF28B79B)),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    ),
-                                  )
-                                : const Text('-', style: TextStyle(color: Color(0xFF94A3B8))),
-                      ),
-                    ],
-                  );
-                }).toList(),
-              ),
+                        return DataRow(
+                          cells: [
+                            DataCell(Text(s['statementCode']?.toString() ?? 'N/A', style: const TextStyle(fontWeight: FontWeight.bold))),
+                            DataCell(Text(s['periodMonth']?.toString() ?? 'N/A')),
+                            DataCell(Text('${s['totalOrders'] ?? 0}')),
+                            DataCell(Text(_formatVND(gross))),
+                            DataCell(Text(_formatVND(tax), style: const TextStyle(color: Colors.redAccent))),
+                            DataCell(Text(_formatVND(net), style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF28B79B)))),
+                            DataCell(_buildStatusBadge(status, isVi)),
+                            DataCell(
+                              status == 'PENDING_TRAINER_CONFIRM'
+                                  ? Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        ElevatedButton(
+                                          onPressed: () => _confirmStatement(id),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFF28B79B),
+                                            foregroundColor: Colors.white,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                          ),
+                                          child: Text(
+                                            isVi ? 'Xác nhận' : 'Confirm',
+                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        OutlinedButton(
+                                          onPressed: () => _rejectStatement(id),
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: Colors.redAccent,
+                                            side: const BorderSide(color: Colors.redAccent),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                          ),
+                                          child: Text(
+                                            isVi ? 'Từ chối' : 'Reject',
+                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  : (status == 'PAID' && s['payoutReceiptUrl'] != null && s['payoutReceiptUrl'].toString().isNotEmpty)
+                                      ? OutlinedButton.icon(
+                                          onPressed: () => _openImagePreview(s['payoutReceiptUrl'].toString()),
+                                          icon: const Icon(Icons.receipt_long, size: 14),
+                                          label: Text(isVi ? 'Xem Bill chuyển tiền' : 'View Receipt', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: const Color(0xFF28B79B),
+                                            side: const BorderSide(color: Color(0xFF28B79B)),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                          ),
+                                        )
+                                      : const Text('-', style: TextStyle(color: Color(0xFF94A3B8))),
+                            ),
+                          ],
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                );
+              },
             ),
         ],
       ),
