@@ -35,12 +35,28 @@ public class CloudinaryService {
 
     @PostConstruct
     public void init() {
+        String cleanCloudName = cleanConfigValue(cloudName);
+        String cleanApiKey = cleanConfigValue(apiKey);
+        String cleanApiSecret = cleanConfigValue(apiSecret);
+
         cloudinary = new Cloudinary(ObjectUtils.asMap(
-                "cloud_name", cloudName,
-                "api_key", apiKey,
-                "api_secret", apiSecret,
+                "cloud_name", cleanCloudName,
+                "api_key", cleanApiKey,
+                "api_secret", cleanApiSecret,
                 "secure", true
         ));
+    }
+
+    private String cleanConfigValue(String val) {
+        if (val == null) {
+            return "";
+        }
+        val = val.trim();
+        if ((val.startsWith("\"") && val.endsWith("\"") && val.length() >= 2)
+                || (val.startsWith("'") && val.endsWith("'") && val.length() >= 2)) {
+            val = val.substring(1, val.length() - 1).trim();
+        }
+        return val;
     }
 
     @SuppressWarnings("rawtypes")
