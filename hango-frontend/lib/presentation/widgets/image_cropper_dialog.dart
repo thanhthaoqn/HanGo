@@ -158,14 +158,6 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
     setState(() {});
   }
 
-  void _rotateQuarterTurn() {
-    if (_decodedImage == null) return;
-    setState(() {
-      _rotationQuarterTurns = (_rotationQuarterTurns + 1) % 4;
-    });
-    _resetTransform();
-  }
-
   Future<void> _applyCropAndConfirm() async {
     if (_decodedImage == null || _isProcessingCrop) return;
 
@@ -454,7 +446,7 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
               ),
               const SizedBox(height: 14),
 
-              // Zoom & Control Tools
+              // Zoom Slider Controls
               Row(
                 children: [
                   const Icon(Icons.zoom_out, color: Color(0xFF64748B), size: 18),
@@ -481,52 +473,6 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
                     ),
                   ),
                   const Icon(Icons.zoom_in, color: Color(0xFF64748B), size: 18),
-                  const SizedBox(width: 8),
-
-                  // Rotate Button
-                  Tooltip(
-                    message: isVi ? 'Xoay ảnh 90°' : 'Rotate 90°',
-                    child: InkWell(
-                      onTap: _decodedImage != null ? _rotateQuarterTurn : null,
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFCBD5E1)),
-                        ),
-                        child: const Icon(
-                          Icons.rotate_90_degrees_cw_rounded,
-                          size: 18,
-                          color: Color(0xFF334155),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-
-                  // Reset Button
-                  Tooltip(
-                    message: isVi ? 'Căn giữa lại' : 'Reset view',
-                    child: InkWell(
-                      onTap: _decodedImage != null ? _resetTransform : null,
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFCBD5E1)),
-                        ),
-                        child: const Icon(
-                          Icons.center_focus_strong_rounded,
-                          size: 18,
-                          color: Color(0xFF334155),
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
               ),
               const SizedBox(height: 16),
