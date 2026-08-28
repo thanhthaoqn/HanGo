@@ -233,12 +233,8 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
                 trainerGrossSum = trainerGrossSum.add(tEarn);
             }
 
-            // Theo Khoản 1 Điều 25 Thông tư 111/2013/TT-BTC: Chỉ khấu trừ 10% Thuế TNCN khi tổng thu nhập từ 2.000.000 VNĐ trở lên
             BigDecimal pitTax = BigDecimal.ZERO;
-            if (trainerGrossSum.compareTo(new BigDecimal("2000000")) >= 0) {
-                pitTax = trainerGrossSum.multiply(BigDecimal.valueOf(0.10)).setScale(2, RoundingMode.HALF_UP);
-            }
-            BigDecimal netPayout = trainerGrossSum.subtract(pitTax);
+            BigDecimal netPayout = trainerGrossSum;
 
             String finalPeriodMonth = periodMonth;
             MonthlyStatement statement = statementRepository.findByTrainerIdAndPeriodMonth(trainer.getId(), periodMonth)
@@ -422,10 +418,7 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
         }
 
         BigDecimal pitTax = BigDecimal.ZERO;
-        if (trainerGrossSum.compareTo(new BigDecimal("2000000")) >= 0) {
-            pitTax = trainerGrossSum.multiply(BigDecimal.valueOf(0.10)).setScale(2, RoundingMode.HALF_UP);
-        }
-        BigDecimal netPayout = trainerGrossSum.subtract(pitTax);
+        BigDecimal netPayout = trainerGrossSum;
 
         statement.setTotalOrders(totalOrders);
         statement.setTotalGrossAmount(grossSum);
@@ -511,8 +504,8 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
             String[] columns = {
                     "STT", "Code", "Period", "Trainer Name", "Trainer Email", "Trainer Type",
                     "Bank Name", "Bank Account", "Account Name", "Total Orders",
-                    "Gross Amount (VND)", "Platform Fee (VND)", "Trainer Gross (VND)",
-                    "PIT Tax 10% (VND)", "Net Payout (VND)", "Status", "Paid At", "Bank Txn Ref"
+                    "Gross Amount (VND)", "Platform Fee (VND)", "Trainer Gross / Net Payout (VND)",
+                    "Status", "Paid At", "Bank Txn Ref"
             };
 
             org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(0);
@@ -537,12 +530,10 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
                 row.createCell(9).setCellValue(dto.getTotalOrders() != null ? dto.getTotalOrders() : 0);
                 row.createCell(10).setCellValue(dto.getTotalGrossAmount() != null ? dto.getTotalGrossAmount().doubleValue() : 0);
                 row.createCell(11).setCellValue(dto.getTotalPlatformFee() != null ? dto.getTotalPlatformFee().doubleValue() : 0);
-                row.createCell(12).setCellValue(dto.getTotalTrainerGross() != null ? dto.getTotalTrainerGross().doubleValue() : 0);
-                row.createCell(13).setCellValue(dto.getPitTaxAmount() != null ? dto.getPitTaxAmount().doubleValue() : 0);
-                row.createCell(14).setCellValue(dto.getNetPayoutAmount() != null ? dto.getNetPayoutAmount().doubleValue() : 0);
-                row.createCell(15).setCellValue(dto.getStatus() != null ? dto.getStatus() : "");
-                row.createCell(16).setCellValue(dto.getPaidAt() != null ? dto.getPaidAt().toString() : "");
-                row.createCell(17).setCellValue(dto.getBankTxnRef() != null ? dto.getBankTxnRef() : "");
+                row.createCell(12).setCellValue(dto.getNetPayoutAmount() != null ? dto.getNetPayoutAmount().doubleValue() : (dto.getTotalTrainerGross() != null ? dto.getTotalTrainerGross().doubleValue() : 0));
+                row.createCell(13).setCellValue(dto.getStatus() != null ? dto.getStatus() : "");
+                row.createCell(14).setCellValue(dto.getPaidAt() != null ? dto.getPaidAt().toString() : "");
+                row.createCell(15).setCellValue(dto.getBankTxnRef() != null ? dto.getBankTxnRef() : "");
             }
 
             for (int i = 0; i < columns.length; i++) {

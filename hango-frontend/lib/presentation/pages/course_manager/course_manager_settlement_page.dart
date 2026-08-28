@@ -748,16 +748,12 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                               : '(-) Platform Service Fee (${trainerType == 'PEER_TUTOR' ? '40%' : '30%'}):',
                           '- ${_formatVND(pFee)}',
                         ),
-                        const Divider(height: 16),
-                        _buildDialogRow(isVi ? '(=) Thu nhập trước thuế (Trainer Gross):' : '(=) Trainer Gross Earnings:', _formatVND(tGross)),
-                        const SizedBox(height: 8),
-                        _buildDialogRow(isVi ? '(-) Thuế TNCN 10% (PIT Tax):' : '(-) Personal Income Tax (PIT 10%):', '- ${_formatVND(tax)}'),
                         const Divider(height: 20),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              isVi ? '(=) Số tiền thực nhận (Net Payout):' : '(=) Final Net Payout Amount:',
+                              isVi ? '(=) Thu nhập thực nhận (Net Payout):' : '(=) Final Net Payout Amount:',
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A)),
                             ),
                             Text(
@@ -1585,7 +1581,6 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                           DataColumn(label: Text(isVi ? 'Loại' : 'Type', style: _headerStyle)),
                           DataColumn(label: Text(isVi ? 'Kỳ Tháng' : 'Period', style: _headerStyle)),
                           DataColumn(label: Text(isVi ? 'Tổng Gross' : 'Gross', style: _headerStyle)),
-                          DataColumn(label: Text(isVi ? 'Thuế 10%' : 'Tax 10%', style: _headerStyle)),
                           DataColumn(label: Text(isVi ? 'Thực nhận (Net)' : 'Net Payout', style: _headerStyle)),
                           DataColumn(label: Text(isVi ? 'Tài khoản Ngân hàng' : 'Bank Account', style: _headerStyle)),
                           DataColumn(label: Text(isVi ? 'Trạng thái' : 'Status', style: _headerStyle)),
@@ -1595,7 +1590,6 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                           final status = s['status']?.toString() ?? 'PENDING_TRAINER_CONFIRM';
                           final net = s['netPayoutAmount'] ?? 0;
                           final gross = s['totalGrossAmount'] ?? 0;
-                          final tax = s['pitTaxAmount'] ?? 0;
                           final trainerName = s['trainerName'] ?? 'N/A';
                           final trainerType = s['trainerType'] ?? 'PROFESSIONAL';
                           final bankName = s['bankName'] ?? '';
@@ -1627,7 +1621,6 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
 
                               DataCell(Text(s['periodMonth']?.toString() ?? 'N/A')),
                               DataCell(Text(_formatVND(gross))),
-                              DataCell(Text(_formatVND(tax), style: const TextStyle(color: Colors.redAccent))),
                               DataCell(Text(_formatVND(net), style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF28B79B)))),
                               DataCell(Column(
                                 mainAxisAlignment: MainAxisAlignment.center,

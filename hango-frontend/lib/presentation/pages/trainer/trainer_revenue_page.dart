@@ -371,16 +371,8 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
                 ),
                 const SizedBox(height: 16),
                 _buildPolicyRow(
-                  icon: Icons.account_balance_outlined,
-                  title: isVi ? '2. Thuế thu nhập cá nhân (10% PIT Tax)' : '2. Personal Income Tax (10% PIT)',
-                  content: isVi
-                      ? '• Khấu trừ 10% Thuế TNCN tại nguồn theo quy định pháp luật (Thông tư 111/2013/TT-BTC).\n• Công thức: Thu nhập thực nhận = Doanh thu thô x (1 - 10%).'
-                      : '• Mandatory 10% Personal Income Tax deducted at source per VN Tax Laws.\n• Formula: Net Payout = Gross Earnings x 90%.',
-                ),
-                const SizedBox(height: 16),
-                _buildPolicyRow(
                   icon: Icons.hourglass_top_rounded,
-                  title: isVi ? '3. Thời gian giữ tiền bảo hành 7 ngày' : '3. 7-Day Pending Hold Warranty',
+                  title: isVi ? '2. Thời gian giữ tiền bảo hành 7 ngày' : '2. 7-Day Pending Hold Warranty',
                   content: isVi
                       ? '• Doanh thu khóa học mới mua sẽ giữ ở trạng thái Tạm giữ trong 7 ngày để phục vụ chính sách hoàn tiền cho học viên.\n• Sau 7 ngày, tiền tự động chuyển sang Số dư khả dụng.'
                       : '• Course sales are held in Pending Hold for 7 days to cover student refund warranties.\n• After 7 days, funds automatically transfer to Available Balance.',
@@ -388,7 +380,7 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
                 const SizedBox(height: 16),
                 _buildPolicyRow(
                   icon: Icons.calendar_month_rounded,
-                  title: isVi ? '4. Chốt sổ & Thanh toán hàng tháng' : '4. Monthly Cutoff & Settlement',
+                  title: isVi ? '3. Chốt sổ & Thanh toán hàng tháng' : '3. Monthly Cutoff & Settlement',
                   content: isVi
                       ? '• Quản lý đào tạo thực hiện chốt sổ báo cáo doanh thu hàng tháng.\n• Tiền được chuyển khoản thẳng vào tài khoản ngân hàng đã liên kết của Trainer.'
                       : '• Monthly statements are cut off at the end of each billing cycle.\n• Net earnings are wired directly to your registered bank account upon confirmation.',
@@ -625,7 +617,6 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
                         DataColumn(label: Text(isVi ? 'Kỳ Tháng' : 'Period', style: _headerStyle)),
                         DataColumn(label: Text(isVi ? 'Số đơn' : 'Orders', style: _headerStyle)),
                         DataColumn(label: Text(isVi ? 'Tổng bán' : 'Gross Amount', style: _headerStyle)),
-                        DataColumn(label: Text(isVi ? 'Thuế TNCN (10%)' : 'PIT Tax (10%)', style: _headerStyle)),
                         DataColumn(label: Text(isVi ? 'Thực nhận (Net)' : 'Net Payout', style: _headerStyle)),
                         DataColumn(label: Text(isVi ? 'Trạng thái' : 'Status', style: _headerStyle)),
                         DataColumn(label: Text(isVi ? 'Thao tác' : 'Action', style: _headerStyle)),
@@ -634,7 +625,6 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
                         final status = s['status']?.toString() ?? 'PENDING_TRAINER_CONFIRM';
                         final net = s['netPayoutAmount'] ?? 0;
                         final gross = s['totalGrossAmount'] ?? 0;
-                        final tax = s['pitTaxAmount'] ?? 0;
                         final id = (s['id'] ?? 0) as int;
 
                         return DataRow(
@@ -643,7 +633,6 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
                             DataCell(Text(s['periodMonth']?.toString() ?? 'N/A')),
                             DataCell(Text('${s['totalOrders'] ?? 0}')),
                             DataCell(Text(_formatVND(gross))),
-                            DataCell(Text(_formatVND(tax), style: const TextStyle(color: Colors.redAccent))),
                             DataCell(Text(_formatVND(net), style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF28B79B)))),
                             DataCell(_buildStatusBadge(status, isVi)),
                             DataCell(

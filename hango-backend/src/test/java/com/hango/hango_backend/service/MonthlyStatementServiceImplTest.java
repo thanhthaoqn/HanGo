@@ -260,9 +260,8 @@ class MonthlyStatementServiceImplTest {
         assertEquals(2, dto.getTotalOrders());
         // p1 gross 7000000 + p2 fallback gross (5000000 * 0.70 = 3500000) = 10500000 trainer gross
         assertEquals(new BigDecimal("10500000.00"), dto.getTotalTrainerGross());
-        // trainer gross >= 2,000,000 -> PIT tax = 10% of trainer gross = 1050000; net payout = 9450000
-        assertEquals(new BigDecimal("1050000.00"), dto.getPitTaxAmount());
-        assertEquals(new BigDecimal("9450000.00"), dto.getNetPayoutAmount());
+        assertEquals(BigDecimal.ZERO, dto.getPitTaxAmount());
+        assertEquals(new BigDecimal("10500000.00"), dto.getNetPayoutAmount());
 
         verify(notificationService).notifyUser(eq(creator), eq(NotificationService.TYPE_STATEMENT_READY), any(), any(), any());
         verify(paymentRepository, times(2)).save(any());
