@@ -28,6 +28,10 @@ class CourseManagerShellPage extends StatefulWidget {
 
   const CourseManagerShellPage({super.key, this.initialIndex = 0});
 
+  static CourseManagerShellPageState? of(BuildContext context) {
+    return context.findAncestorStateOfType<CourseManagerShellPageState>();
+  }
+
   @override
   State<CourseManagerShellPage> createState() => CourseManagerShellPageState();
 }

@@ -28,12 +28,15 @@ public interface ExamRepository extends JpaRepository<Exam, Long> {
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"createdBy"})
     List<Exam> findByStatusInAndDeletedAtIsNullOrderByCreatedAtDesc(List<String> statuses);
 
-    @Query("SELECT e.id, e.title, e.createdAt, e.expectedQuestionCount, e.durationMinutes, e.status, e.visibility, e.thumbnailUrl, e.description, e.passingScore, u.id, u.fullName " +
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"createdBy"})
+    List<Exam> findByIsEntryExamTrueAndStatusAndDeletedAtIsNull(String status);
+
+    @Query("SELECT e.id, e.title, e.createdAt, e.expectedQuestionCount, e.durationMinutes, e.status, e.visibility, e.thumbnailUrl, e.description, e.passingScore, u.id, u.fullName, e.rejectionReason " +
            "FROM Exam e LEFT JOIN e.createdBy u WHERE e.deletedAt IS NULL AND (u.id = :trainerId OR UPPER(e.status) != 'DRAFT') " +
            "ORDER BY e.createdAt DESC")
     List<Object[]> findTrainerExamsForManager(@Param("trainerId") Long trainerId);
 
-    @Query("SELECT e.id, e.title, e.createdAt, e.expectedQuestionCount, e.durationMinutes, e.status, e.visibility, e.thumbnailUrl, e.description, e.passingScore, u.id, u.fullName " +
+    @Query("SELECT e.id, e.title, e.createdAt, e.expectedQuestionCount, e.durationMinutes, e.status, e.visibility, e.thumbnailUrl, e.description, e.passingScore, u.id, u.fullName, e.rejectionReason " +
            "FROM Exam e LEFT JOIN e.createdBy u WHERE e.deletedAt IS NULL AND u.id = :trainerId " +
            "ORDER BY e.createdAt DESC")
     List<Object[]> findTrainerExamsForTrainer(@Param("trainerId") Long trainerId);

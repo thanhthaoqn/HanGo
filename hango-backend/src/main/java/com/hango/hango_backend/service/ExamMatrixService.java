@@ -2,6 +2,7 @@ package com.hango.hango_backend.service;
 
 import com.hango.hango_backend.dto.ExamMatrixDTO;
 import com.hango.hango_backend.dto.ExamMatrixCreateRequestDTO;
+import com.hango.hango_backend.dto.ExamMatrixSufficiencyDTO;
 
 import java.util.List;
 
@@ -12,4 +13,5 @@ public interface ExamMatrixService {
     void updateExamMatrix(Long id, ExamMatrixCreateRequestDTO request);
     void toggleMatrixStatus(Long id);
     Long generateExamFromMatrix(Long matrixId, String examTitle, String description, Integer expectedQuestionCount, Double passingScore, Integer durationMinutes, Integer questionSourceType, String email);
+    ExamMatrixSufficiencyDTO checkMatrixSufficiency(Long matrixId, Integer questionSourceType, String email);
 }

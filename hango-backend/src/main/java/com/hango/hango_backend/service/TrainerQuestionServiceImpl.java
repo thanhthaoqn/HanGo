@@ -202,10 +202,12 @@ public class TrainerQuestionServiceImpl implements TrainerQuestionService {
             Timestamp createdTimestamp = rs.getTimestamp("created_at");
             Timestamp updatedTimestamp = rs.getTimestamp("updated_at");
 
-            LocalDateTime createdAt = createdTimestamp != null ? createdTimestamp.toLocalDateTime()
-                    : LocalDateTime.now();
-            LocalDateTime updatedAt = updatedTimestamp != null ? updatedTimestamp.toLocalDateTime()
-                    : LocalDateTime.now();
+            // Leave these null when the DB value is missing (legacy rows imported
+            // without a timestamp) instead of synthesizing "now" - that fallback used
+            // to make every fetch recompute a fresh "Created Date" for those rows,
+            // making an edit look like it had rewritten the original creation time.
+            LocalDateTime createdAt = createdTimestamp != null ? createdTimestamp.toLocalDateTime() : null;
+            LocalDateTime updatedAt = updatedTimestamp != null ? updatedTimestamp.toLocalDateTime() : null;
 
             String usageStr = rs.getString("usage_type");
             Integer parsedUsageType = 1;

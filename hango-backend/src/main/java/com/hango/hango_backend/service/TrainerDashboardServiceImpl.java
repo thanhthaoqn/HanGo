@@ -991,6 +991,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             Double passingScore = (Double) exam[9];
             Long creatorId = (Long) exam[10];
             String creatorName = (String) exam[11];
+            String rejectionReason = (String) exam[12];
 
             int questionCount = questionCounts.getOrDefault(id, 0);
             return com.hango.hango_backend.dto.TrainerExamResponseDTO.builder()
@@ -1007,6 +1008,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                     .thumbnailUrl(thumbnailUrl)
                     .creatorId(creatorId)
                     .creatorName(creatorName != null ? creatorName : "Unknown")
+                    .rejectionReason(rejectionReason)
                     .build();
         }).collect(Collectors.toList());
     }

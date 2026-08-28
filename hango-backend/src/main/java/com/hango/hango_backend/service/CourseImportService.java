@@ -20,6 +20,7 @@ import com.hango.hango_backend.repository.TrainerProfileRepository;
 import com.hango.hango_backend.repository.UserRepository;
 import com.hango.hango_backend.repository.QuestionGroupRepository;
 import com.hango.hango_backend.entity.TrainerProfile;
+import com.hango.hango_backend.exception.CourseImportValidationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import java.math.BigDecimal;
@@ -82,37 +83,91 @@ public class CourseImportService {
         TrainerProfile trainerProfile = trainerProfileRepository.findById(trainer.getId()).orElse(null);
 
         WorkbookData workbook = readWorkbook(file);
-        List<Map<String, String>> courseRowsRaw = workbook.rowsBySheet.getOrDefault("COURSE", List.of());
-        List<Map<String, String>> syllabusRows = workbook.rowsBySheet.getOrDefault("SYLLABUS", List.of());
-        List<Map<String, String>> questionRows = workbook.rowsBySheet.getOrDefault("QUESTIONS", List.of());
+        List<SheetRow> courseRowsRaw = workbook.rowsBySheet.getOrDefault("COURSE", List.of());
+        List<SheetRow> syllabusRows = workbook.rowsBySheet.getOrDefault("SYLLABUS", List.of());
+        List<SheetRow> questionRows = workbook.rowsBySheet.getOrDefault("QUESTIONS", List.of());
 
-        if (courseRowsRaw.isEmpty()) {
-            throw new IllegalArgumentException("COURSE sheet must contain at least one row");
-        }
+        List<Map<String, Object>> errors = new ArrayList<>();
+        List<String> warnings = new ArrayList<>();
+
+        // --- PHASE 1: VALIDATE every sheet up front (read-only, no DB writes) so
+        // every problem in the file is reported in one pass instead of forcing the
+        // trainer to fix-and-reupload once per error (mirrors ExamImportController).
 
         Map<String, String> courseData = new java.util.HashMap<>();
-        for (Map<String, String> row : courseRowsRaw) {
-            String field = valueOrDefault(row, "Information Field", "").trim();
-            String data = valueOrDefault(row, "Fill Data", "").trim();
-            if (!field.isEmpty()) {
-                courseData.put(field, data);
+        if (courseRowsRaw.isEmpty()) {
+            addError(errors, "COURSE", null, null, "MISSING_DATA", null, "COURSE sheet must contain at least one row");
+        } else {
+            for (SheetRow r : courseRowsRaw) {
+                String field = valueOrDefault(r.data(), "Information Field", "").trim();
+                String data = valueOrDefault(r.data(), "Fill Data", "").trim();
+                if (!field.isEmpty()) {
+                    courseData.put(field, data);
+                }
             }
         }
 
         String courseTitle = courseData.get("Title");
         if (courseTitle == null || courseTitle.isBlank()) {
-            throw new IllegalArgumentException("COURSE sheet is missing required value: Title");
-        }
-
-        List<String> warnings = new ArrayList<>();
-        if (courseRepository.existsByTitleIgnoreCaseAndDeletedAtIsNull(courseTitle)) {
-            throw new IllegalArgumentException("Course with title '" + courseTitle + "' already exists.");
+            addError(errors, "COURSE", null, "Title", "MISSING_FIELD", courseTitle,
+                    "COURSE sheet is missing required value: Title");
+        } else if (courseRepository.existsByTitleIgnoreCaseAndDeletedAtIsNull(courseTitle)) {
+            addError(errors, "COURSE", null, "Title", "DUPLICATE_VALUE", courseTitle,
+                    "Course with title '" + courseTitle + "' already exists.");
         }
 
         String courseCodeRaw = courseData.get("Course Code");
         if (courseCodeRaw == null || courseCodeRaw.isBlank()) {
-            throw new IllegalArgumentException("COURSE sheet is missing required value: Course Code");
+            addError(errors, "COURSE", null, "Course Code", "MISSING_FIELD", courseCodeRaw,
+                    "COURSE sheet is missing required value: Course Code");
         }
+
+        Set<String> knownSectionTitlesCheck = new java.util.HashSet<>();
+        Set<String> knownLessonTitlesCheck = new java.util.HashSet<>();
+        boolean sawSectionCheck = false;
+        for (SheetRow sr : syllabusRows) {
+            Map<String, String> row = sr.data();
+            String type = valueOrDefault(row, "Type", "").trim().toLowerCase(Locale.ROOT);
+            String title = valueOrDefault(row, "Title", "").trim();
+            if (type.isEmpty() || title.isEmpty()) {
+                continue;
+            }
+            if (type.equals("section")) {
+                if (!knownSectionTitlesCheck.add(title.toLowerCase(Locale.ROOT))) {
+                    addError(errors, "SYLLABUS", sr.rowNumber(), "Title", "DUPLICATE_VALUE", title,
+                            "Duplicate Section Title in syllabus: " + title);
+                }
+                sawSectionCheck = true;
+            } else if (isLessonType(type)) {
+                if (!sawSectionCheck) {
+                    addError(errors, "SYLLABUS", sr.rowNumber(), "Type", "INVALID_ORDER", type,
+                            "Found a lesson before any section in SYLLABUS sheet: " + title);
+                }
+                if (!knownLessonTitlesCheck.add(title.toLowerCase(Locale.ROOT))) {
+                    addError(errors, "SYLLABUS", sr.rowNumber(), "Title", "DUPLICATE_VALUE", title,
+                            "Duplicate Lesson Title in syllabus: " + title);
+                }
+            }
+        }
+
+        for (SheetRow qr : questionRows) {
+            Map<String, String> row = qr.data();
+            String questionText = valueOrDefault(row, "Question Text", "");
+            if (questionText.isBlank()) {
+                continue;
+            }
+            String skillType = valueOrDefault(row, "Skill Type", "");
+            if (skillType.isBlank()) {
+                addError(errors, "QUESTIONS", qr.rowNumber(), "Skill Type", "MISSING_FIELD", skillType,
+                        "Question row is missing required value: Skill Type");
+            }
+        }
+
+        if (!errors.isEmpty()) {
+            throw new CourseImportValidationException((String) errors.get(0).get("message"), errors);
+        }
+
+        // --- PHASE 2: INSERT (only reached when validation found zero errors) ---
 
         Set<String> reservedPersistedCourseCodes = new java.util.HashSet<>();
         String persistedCourseCode = resolveUniqueCourseCode(courseCodeRaw, reservedPersistedCourseCodes, warnings);
@@ -136,7 +191,8 @@ public class CourseImportService {
 
         int lessonCount = 0;
         int durationMinutes = 0;
-        for (Map<String, String> row : syllabusRows) {
+        for (SheetRow sr : syllabusRows) {
+            Map<String, String> row = sr.data();
             String type = valueOrDefault(row, "Type", "").trim().toLowerCase(Locale.ROOT);
             if (type.equals("video") || type.equals("text") || type.equals("quiz") || type.equals("pdf")) {
                 lessonCount++;
@@ -179,11 +235,9 @@ public class CourseImportService {
 
         Section currentSection = null;
         Map<String, Lesson> lessonsByTitle = new java.util.HashMap<>();
-        Set<String> knownSectionTitles = new java.util.HashSet<>();
-        Set<String> knownLessonTitles = new java.util.HashSet<>();
 
-        for (int i = 0; i < syllabusRows.size(); i++) {
-            Map<String, String> row = syllabusRows.get(i);
+        for (SheetRow sr : syllabusRows) {
+            Map<String, String> row = sr.data();
             String type = valueOrDefault(row, "Type", "").trim().toLowerCase(Locale.ROOT);
             String title = valueOrDefault(row, "Title", "").trim();
             if (type.isEmpty() || title.isEmpty()) {
@@ -191,9 +245,6 @@ public class CourseImportService {
             }
 
             if (type.equals("section")) {
-                if (!knownSectionTitles.add(title.toLowerCase(Locale.ROOT))) {
-                    throw new IllegalArgumentException("Duplicate Section Title in syllabus: " + title);
-                }
                 Section section = Section.builder()
                         .course(savedCourse)
                         .code(persistedCourseCode + "_S" + (importedSections + 1))
@@ -204,14 +255,10 @@ public class CourseImportService {
                         .build();
                 currentSection = sectionRepository.save(section);
                 importedSections++;
-            } else if (type.equals("video") || type.equals("text") || type.equals("quiz") || type.equals("pdf")) {
-                if (currentSection == null) {
-                    throw new IllegalArgumentException("Found a lesson before any section in SYLLABUS sheet: " + title);
-                }
-                if (!knownLessonTitles.add(title.toLowerCase(Locale.ROOT))) {
-                    throw new IllegalArgumentException("Duplicate Lesson Title in syllabus: " + title);
-                }
-
+            } else if (isLessonType(type)) {
+                // Order/duplicate-title validity was already confirmed in Phase 1
+                // (no errors reached this point), so currentSection is guaranteed
+                // non-null here.
                 String lessonType = normalizeLessonType(type);
                 String contentUrl = valueOrDefault(row, "Content / Media URL", "");
 
@@ -252,7 +299,8 @@ public class CourseImportService {
 
         Map<String, com.hango.hango_backend.entity.QuestionGroup> questionGroupsByPassage = new java.util.HashMap<>();
 
-        for (Map<String, String> questionRow : questionRows) {
+        for (SheetRow qr : questionRows) {
+            Map<String, String> questionRow = qr.data();
             String questionText = valueOrDefault(questionRow, "Question Text", "");
             if (questionText.isBlank()) {
                 continue;
@@ -354,7 +402,7 @@ public class CourseImportService {
         List<String> sharedStrings = readSharedStrings(entries.get("xl/sharedStrings.xml"));
         Map<String, String> relTargets = readRelationshipTargets(relsXml);
 
-        Map<String, List<Map<String, String>>> rowsBySheet = new HashMap<>();
+        Map<String, List<SheetRow>> rowsBySheet = new HashMap<>();
         NodeList sheetNodes = workbookXml.getElementsByTagNameNS("*", "sheet");
         for (int i = 0; i < sheetNodes.getLength(); i++) {
             Element sheet = (Element) sheetNodes.item(i);
@@ -483,11 +531,11 @@ public class CourseImportService {
         return "xl/worksheets/" + normalized;
     }
 
-    private List<Map<String, String>> readSheetRows(Document worksheetXml, List<String> sharedStrings) {
+    private List<SheetRow> readSheetRows(Document worksheetXml, List<String> sharedStrings) {
         NodeList rowNodes = worksheetXml.getElementsByTagNameNS("*", "row");
         Map<Integer, String> headers = new LinkedHashMap<>();
         int headerRow = 2;
-        List<Map<String, String>> rows = new ArrayList<>();
+        List<SheetRow> rows = new ArrayList<>();
 
         for (int i = 0; i < rowNodes.getLength(); i++) {
             Element row = (Element) rowNodes.item(i);
@@ -515,7 +563,7 @@ public class CourseImportService {
                 }
             }
             if (hasValue) {
-                rows.add(mappedRow);
+                rows.add(new SheetRow(rowNumber, mappedRow));
             }
         }
         return rows;
@@ -777,6 +825,23 @@ public class CourseImportService {
         return key;
     }
 
+    /** Whether a SYLLABUS row's (lowercased) Type is one of the supported lesson content types. */
+    private boolean isLessonType(String type) {
+        return type.equals("video") || type.equals("text") || type.equals("quiz") || type.equals("pdf");
+    }
+
+    private void addError(List<Map<String, Object>> errors, String sheet, Integer row, String field,
+            String errorType, String value, String message) {
+        Map<String, Object> err = new LinkedHashMap<>();
+        err.put("sheet", sheet);
+        err.put("row", row);
+        err.put("field", field);
+        err.put("errorType", errorType);
+        err.put("value", value);
+        err.put("message", message);
+        errors.add(err);
+    }
+
     private String normalizeLessonType(String lessonType) {
         String normalized = normalizeParameterKey(lessonType);
         if ("VIDEO".equals(normalized)) {
@@ -948,6 +1013,10 @@ public class CourseImportService {
         return result;
     }
 
-    private record WorkbookData(Map<String, List<Map<String, String>>> rowsBySheet) {
+    private record WorkbookData(Map<String, List<SheetRow>> rowsBySheet) {
+    }
+
+    /** One data row from a sheet, paired with its original Excel row number (1-indexed) for error reporting. */
+    private record SheetRow(int rowNumber, Map<String, String> data) {
     }
 }

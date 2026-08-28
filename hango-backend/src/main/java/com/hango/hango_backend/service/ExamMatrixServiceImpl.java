@@ -3,6 +3,7 @@ package com.hango.hango_backend.service;
 import com.hango.hango_backend.dto.ExamMatrixCreateRequestDTO;
 import com.hango.hango_backend.dto.ExamMatrixDTO;
 import com.hango.hango_backend.dto.ExamMatrixDetailDTO;
+import com.hango.hango_backend.dto.ExamMatrixSufficiencyDTO;
 import com.hango.hango_backend.entity.Exam;
 import com.hango.hango_backend.entity.ExamMatrix;
 import com.hango.hango_backend.entity.ExamMatrixDetail;
@@ -216,6 +217,50 @@ public class ExamMatrixServiceImpl implements ExamMatrixService {
         }
 
         return savedExam.getId();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ExamMatrixSufficiencyDTO checkMatrixSufficiency(Long matrixId, Integer questionSourceType, String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+
+        List<ExamMatrixDetail> details = examMatrixDetailRepository.findByMatrixId(matrixId);
+
+        List<ExamMatrixSufficiencyDTO.Shortfall> shortfalls = new java.util.ArrayList<>();
+        for (ExamMatrixDetail detail : details) {
+            int requiredQty = detail.getQuantity();
+            if (requiredQty <= 0) {
+                continue;
+            }
+
+            // Same filters (skill/difficulty/group type/question source, scoped to
+            // this user) that generateExamFromMatrix uses to actually pull questions -
+            // reusing them here guarantees "sufficient" matches what generation would find.
+            Long groupTypeId = detail.getGroupTypeParam() != null ? detail.getGroupTypeParam().getId() : null;
+            long available = questionRepository.countQuestionsByCriteria(
+                    detail.getSkillParam().getId(),
+                    detail.getDifficultyParam().getId(),
+                    groupTypeId,
+                    user.getId(),
+                    questionSourceType);
+
+            if (available < requiredQty) {
+                shortfalls.add(ExamMatrixSufficiencyDTO.Shortfall.builder()
+                        .detailId(detail.getId())
+                        .skillName(detail.getSkillParam().getParamValue())
+                        .difficultyName(detail.getDifficultyParam().getParamValue())
+                        .groupTypeName(detail.getGroupTypeParam() != null ? detail.getGroupTypeParam().getParamValue() : null)
+                        .required(requiredQty)
+                        .available(available)
+                        .build());
+            }
+        }
+
+        return ExamMatrixSufficiencyDTO.builder()
+                .sufficient(shortfalls.isEmpty())
+                .shortfalls(shortfalls)
+                .build();
     }
 
     @Override

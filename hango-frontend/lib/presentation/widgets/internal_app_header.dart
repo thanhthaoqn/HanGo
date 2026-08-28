@@ -6,6 +6,7 @@ import '../../../data/repositories/notification_repository.dart';
 import '../pages/login_page.dart';
 import '../pages/learner/learner_home_page.dart';
 import '../pages/trainer/trainer_profile_page.dart';
+import '../pages/trainer/trainer_shell_page.dart';
 import '../pages/course_manager/course_manager_my_information_page.dart';
 import '../pages/trainer/onboarding/trainer_onboarding_shell_page.dart';
 import '../pages/trainer/onboarding/trainer_onboarding_details_page.dart';
@@ -263,10 +264,15 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
       }
 
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const TrainerProfilePage()),
-        );
+        final shell = TrainerShellPage.of(context);
+        if (shell != null) {
+          shell.selectTab(5);
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const TrainerProfilePage()),
+          );
+        }
       }
     }
   }
