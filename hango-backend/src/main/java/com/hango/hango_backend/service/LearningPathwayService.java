@@ -533,8 +533,13 @@ public class LearningPathwayService {
             if ("COMPLETED".equalsIgnoreCase(node.getStatus())) {
                 estimatedHoursPerNode.add(0); // Completed nodes consume no forward capacity
             } else {
-                long totalLessons = lessonRepository.countByCourseId(node.getCourse().getId());
-                estimatedHoursPerNode.add(totalLessons == 0 ? 3 : (int) (totalLessons * 2));
+                Integer estDuration = node.getCourse().getEstimatedDuration();
+                if (estDuration != null && estDuration > 0) {
+                    estimatedHoursPerNode.add(estDuration);
+                } else {
+                    long totalLessons = lessonRepository.countByCourseId(node.getCourse().getId());
+                    estimatedHoursPerNode.add(totalLessons == 0 ? 3 : (int) (totalLessons * 2));
+                }
             }
         }
 
