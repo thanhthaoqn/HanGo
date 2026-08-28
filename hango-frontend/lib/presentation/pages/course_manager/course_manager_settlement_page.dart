@@ -666,7 +666,6 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
     final gross = statement['totalGrossAmount'] ?? 0;
     final pFee = statement['totalPlatformFee'] ?? 0;
     final tGross = statement['totalTrainerGross'] ?? 0;
-    final tax = statement['pitTaxAmount'] ?? 0;
     final net = statement['netPayoutAmount'] ?? 0;
     final bankName = statement['bankName'] ?? 'N/A';
     final bankAccount = statement['bankAccount'] ?? 'N/A';
