@@ -151,7 +151,7 @@ public class LearningPathwayService {
                 %s
                 Core rules:
                 1. Only choose course_id values from [AVAILABLE_COURSES]. Never invent a course.
-                2. Prioritize foundations first, then harder reading or advanced skills.
+                2. COURSE DIFFICULTY MUST MATCH THE LEARNER'S CURRENT SCORE (latest_score or score_avg). DO NOT RECOMMEND "Advanced" or "Hard" courses in early steps if the learner's score is below 7.0, even if their goal is high. Prioritize foundations first.
                 3. ƯU TIÊN chọn các khóa học khắc phục trực tiếp các "weak_skills" trong phần phân tích và hướng tới MỤC TIÊU CỦA NGƯỜI HỌC. Đưa ra "reason_why" giải thích rõ tại sao khóa học này lại giúp cải thiện điểm yếu hoặc giúp đạt mục tiêu đó. "reason_why" phải giải thích cụ thể "Khóa này giải quyết lỗi vừa mắc" hay "Khóa này củng cố điểm yếu kinh niên".
                 4. "mentor_summary" PHẢI LÀ LỜI CHÀO VÀ TÓM TẮT THÔNG MINH, MẶC ĐỊNH SỬ DỤNG TIẾNG VIỆT (có thể dùng tiếng Anh nếu người dùng hỏi bằng tiếng Anh). Bạn PHẢI so sánh điểm số bài thi gần nhất (latest_score) với điểm trung bình lịch sử (lấy từ "score_avg" trong knowledge_gaps_json). Ví dụ: "Dựa trên lịch sử làm bài, điểm trung bình của bạn đang là [score_avg]/10. Tuy nhiên, trong bài thi vừa rồi (được [latest_score]/10 điểm), bạn đang gặp khó khăn ở phần [X]. Đồng thời, [Y] vẫn là điểm yếu kinh niên cần khắc phục...". TUYỆT ĐỐI KHÔNG trộn lẫn ngôn ngữ (nửa Anh nửa Việt) trong một câu.
                 5. Return valid JSON only, without markdown fences.
