@@ -194,7 +194,7 @@ public class LessonServiceImpl implements LessonService {
             return LessonQuizAttemptDTO.builder()
                     .attemptNumber(a.getAttemptNumber())
                     .state(a.getState())
-                    .grade(String.format("%.1f / 10.0", a.getScore()))
+                    .grade(String.format(java.util.Locale.US, "%.1f / 10.0", a.getScore()))
                     .submittedTime(a.getSubmittedAt().toString().replace("T", " ").substring(0, 16))
                     .answers(answers)
                     .build();
@@ -258,7 +258,7 @@ public class LessonServiceImpl implements LessonService {
         return LessonQuizAttemptDTO.builder()
                 .attemptNumber(saved.getAttemptNumber())
                 .state(saved.getState())
-                .grade(String.format("%.1f / 10.0", saved.getScore()))
+                .grade(String.format(java.util.Locale.US, "%.1f / 10.0", saved.getScore()))
                 .submittedTime(saved.getSubmittedAt().toString().replace("T", " ").substring(0, 16))
                 .answers(request.getAnswers())
                 .build();
