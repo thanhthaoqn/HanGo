@@ -177,7 +177,7 @@ public class EmailService {
             subtitle = "Hi <strong style=\"color: #e11d48 !important;\">" + safeName
                     + "</strong>, thank you for applying to become a Trainer on HanGo. After evaluating your profile and documents, your application was not approved at this time.";
             ctaText = "Update and Resubmit Application &rarr;";
-                ctaUrl = "https://hangog92.online/login";
+            ctaUrl = "https://hangog92.online/login";
             ctaColor = "#0f172a";
 
             detailsHtml = "<div style=\"background-color: #fff1f2; border: 1px solid #fecdd3; border-left: 4px solid #e11d48; border-radius: 12px; padding: 18px 20px; margin-bottom: 24px; text-align: left;\">"
@@ -417,9 +417,11 @@ public class EmailService {
 
     public void sendSettlementPaidEmail(String toEmail, String trainerName, String periodMonth, String netPayoutText,
             String bankTxnRef, String receiptUrl) {
-        final String safeName = (trainerName != null && !trainerName.trim().isEmpty()) ? trainerName.trim() : "Giáo viên";
+        final String safeName = (trainerName != null && !trainerName.trim().isEmpty()) ? trainerName.trim()
+                : "Giáo viên";
         final String safePeriod = (periodMonth != null && !periodMonth.trim().isEmpty()) ? periodMonth.trim() : "N/A";
-        final String safePayout = (netPayoutText != null && !netPayoutText.trim().isEmpty()) ? netPayoutText.trim() : "0 VND";
+        final String safePayout = (netPayoutText != null && !netPayoutText.trim().isEmpty()) ? netPayoutText.trim()
+                : "0 VND";
         final String safeTxnRef = (bankTxnRef != null && !bankTxnRef.trim().isEmpty()) ? bankTxnRef.trim() : "N/A";
         final boolean hasReceipt = (receiptUrl != null && !receiptUrl.trim().isEmpty());
 
@@ -454,7 +456,9 @@ public class EmailService {
                 + "                <tr>"
                 + "                  <td align=\"center\" style=\"padding-bottom: 24px;\">"
                 + "                    <p style=\"margin: 0; color: #334155 !important; font-size: 15px; line-height: 1.6; text-align: center;\">"
-                + "                      Xin chào <strong style=\"color: #0d9488 !important;\">" + safeName + "</strong>, báo cáo doanh thu giảng dạy kỳ <strong>" + safePeriod + "</strong> của bạn đã được đối soát và chốt sổ thành công."
+                + "                      Xin chào <strong style=\"color: #0d9488 !important;\">" + safeName
+                + "</strong>, báo cáo doanh thu giảng dạy kỳ <strong>" + safePeriod
+                + "</strong> của bạn đã được đối soát và chốt sổ thành công."
                 + "                    </p>"
                 + "                  </td>"
                 + "                </tr>"
@@ -465,11 +469,13 @@ public class EmailService {
                 + "                    <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">"
                 + "                      <tr>"
                 + "                        <td style=\"color: #64748b !important; font-size: 14px; font-weight: 600; padding: 8px 0;\">Kỳ đối soát:</td>"
-                + "                        <td align=\"right\" style=\"color: #0f172a !important; font-size: 14px; font-weight: 700; padding: 8px 0;\">" + safePeriod + "</td>"
+                + "                        <td align=\"right\" style=\"color: #0f172a !important; font-size: 14px; font-weight: 700; padding: 8px 0;\">"
+                + safePeriod + "</td>"
                 + "                      </tr>"
                 + "                      <tr>"
                 + "                        <td style=\"color: #64748b !important; font-size: 14px; font-weight: 600; padding: 8px 0;\">Mã bảng kê:</td>"
-                + "                        <td align=\"right\" style=\"color: #0f172a !important; font-size: 13px; font-family: monospace; font-weight: 600; padding: 8px 0;\">" + safeTxnRef + "</td>"
+                + "                        <td align=\"right\" style=\"color: #0f172a !important; font-size: 13px; font-family: monospace; font-weight: 600; padding: 8px 0;\">"
+                + safeTxnRef + "</td>"
                 + "                      </tr>"
                 + "                      <tr>"
                 + "                        <td style=\"color: #64748b !important; font-size: 14px; font-weight: 600; padding: 8px 0;\">Trạng thái:</td>"
@@ -477,25 +483,29 @@ public class EmailService {
                 + "                      </tr>"
                 + "                      <tr style=\"border-top: 1px dashed #cbd5e1;\">"
                 + "                        <td style=\"color: #0f172a !important; font-size: 16px; font-weight: 700; padding: 14px 0 6px 0;\">Số tiền thực nhận (Net):</td>"
-                + "                        <td align=\"right\" style=\"color: #059669 !important; font-size: 20px; font-weight: 800; padding: 14px 0 6px 0;\">" + safePayout + "</td>"
+                + "                        <td align=\"right\" style=\"color: #059669 !important; font-size: 20px; font-weight: 800; padding: 14px 0 6px 0;\">"
+                + safePayout + "</td>"
                 + "                      </tr>"
                 + "                    </table>"
                 + "                  </td>"
                 + "                </tr>"
                 + "              </table>"
-                + (hasReceipt ? "              <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"margin-bottom: 24px;\">"
-                + "                <tr>"
-                + "                  <td align=\"center\">"
-                + "                    <a href=\"" + receiptUrl.trim() + "\" target=\"_blank\" style=\"background-color: #ffffff; color: #0284c7 !important; border: 1px solid #bae6fd; text-decoration: none; font-size: 14px; font-weight: 600; padding: 10px 24px; border-radius: 8px; display: inline-block;\">"
-                + "                      📄 Xem ảnh chứng từ chuyển tiền (Bill) &rarr;"
-                + "                    </a>"
-                + "                  </td>"
-                + "                </tr>"
-                + "              </table>" : "")
+                + (hasReceipt
+                        ? "              <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"margin-bottom: 24px;\">"
+                                + "                <tr>"
+                                + "                  <td align=\"center\">"
+                                + "                    <a href=\"" + receiptUrl.trim()
+                                + "\" target=\"_blank\" style=\"background-color: #ffffff; color: #0284c7 !important; border: 1px solid #bae6fd; text-decoration: none; font-size: 14px; font-weight: 600; padding: 10px 24px; border-radius: 8px; display: inline-block;\">"
+                                + "                      📄 Xem ảnh chứng từ chuyển tiền (Bill) &rarr;"
+                                + "                    </a>"
+                                + "                  </td>"
+                                + "                </tr>"
+                                + "              </table>"
+                        : "")
                 + "              <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"margin-bottom: 24px;\">"
                 + "                <tr>"
                 + "                  <td align=\"center\">"
-                + "                    <a href=\"https://hangog92.online/trainer/revenue\" target=\"_blank\" style=\"background-color: #28b79b; color: #ffffff !important; text-decoration: none; font-size: 15px; font-weight: 700; padding: 14px 32px; border-radius: 10px; display: inline-block; box-shadow: 0 4px 14px rgba(40, 183, 155, 0.35);\">"
+                + "                    <a href=\"https://hangog92.online\" target=\"_blank\" style=\"background-color: #28b79b; color: #ffffff !important; text-decoration: none; font-size: 15px; font-weight: 700; padding: 14px 32px; border-radius: 10px; display: inline-block; box-shadow: 0 4px 14px rgba(40, 183, 155, 0.35);\">"
                 + "                      Xem Báo cáo Doanh thu &rarr;"
                 + "                    </a>"
                 + "                  </td>"
