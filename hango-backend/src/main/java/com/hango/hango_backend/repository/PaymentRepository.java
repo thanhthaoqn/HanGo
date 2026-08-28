@@ -89,7 +89,7 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
            "     OR LOWER(u.fullName) LIKE :search " +
            "     OR LOWER(u.email) LIKE :search " +
            "     OR LOWER(c.title) LIKE :search) " +
-           "ORDER BY p.createdAt DESC",
+           "ORDER BY COALESCE(p.paidAt, p.createdAt) DESC, p.id DESC",
            countQuery = "SELECT COUNT(p) FROM Payment p LEFT JOIN p.user u LEFT JOIN p.course c " +
            "WHERE (:status IS NULL OR :status = '' OR UPPER(p.status) = UPPER(:status)) " +
            "AND (:settlementStatus IS NULL OR :settlementStatus = '' " +
@@ -101,7 +101,7 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
            "     OR LOWER(u.fullName) LIKE :search " +
            "     OR LOWER(u.email) LIKE :search " +
            "     OR LOWER(c.title) LIKE :search) " +
-           "ORDER BY p.createdAt DESC, p.id DESC")
+           "ORDER BY COALESCE(p.paidAt, p.createdAt) DESC, p.id DESC")
     Page<Payment> findAllForManager(@Param("status") String status,
                                      @Param("settlementStatus") String settlementStatus,
                                      @Param("search") String search,
@@ -118,7 +118,7 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
            "     OR LOWER(u.fullName) LIKE :search " +
            "     OR LOWER(u.email) LIKE :search " +
            "     OR LOWER(c.title) LIKE :search) " +
-           "ORDER BY p.createdAt DESC")
+           "ORDER BY COALESCE(p.paidAt, p.createdAt) DESC, p.id DESC")
     List<Payment> findAllForManagerList(@Param("status") String status,
                                          @Param("settlementStatus") String settlementStatus,
                                          @Param("search") String search);
