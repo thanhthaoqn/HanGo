@@ -168,7 +168,7 @@ class PathwayRepository {
   }
 
   /// Nop bai mastery - server tu cham va tra lai pathway da cap nhat.
-  Future<LearningPathway> submitMasteryAnswers({
+  Future<Map<String, dynamic>> submitMasteryAnswers({
     required int pathwayId,
     required int nodeId,
     required Map<int, dynamic> answers,
@@ -202,7 +202,10 @@ class PathwayRepository {
     }
 
     final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
-    return LearningPathway.fromJson(data);
+    return {
+      'pathway': LearningPathway.fromJson(data['pathway'] as Map<String, dynamic>),
+      'evaluations': data['evaluations'] as List<dynamic>,
+    };
   }
 
   Future<LearningPathway> _putRequest(String urlStr) async {

@@ -118,7 +118,7 @@ public class LearningPathwayService {
         ExamResultAnalysisDTO examAnalysis = examResultAnalyzerService.analyzeLearnerAttempts(studentId,
                 recentAttempts);
         if (examAnalysis == null) {
-            // Fallback Ä‘á»ƒ trÃ¡nh phÃ¡ flow (Ä‘áº·c biá»‡t trong unit tests khi mock chÆ°a set
+            // Fallback để tránh phá flow (đặc biệt trong unit tests khi mock chưa set
             // returns).
             examAnalysis = examResultAnalyzerService.analyzeLatestExamAttempt(examAttempt);
         }
@@ -139,21 +139,21 @@ public class LearningPathwayService {
         }
 
         String goalText = (requestDTO.getGoalName() != null && !requestDTO.getGoalName().isBlank())
-                ? "Má»¤C TIÃŠU Cá»¦A NGÆ¯á»œI Há»ŒC: " + requestDTO.getGoalName() + "\n"
+? "MỤC TIÊU CỦA NGƯỜI HỌC: " + requestDTO.getGoalName() + "\n"
                 : "";
 
         String systemPrompt = """
 
                 .
-                Báº¡n lÃ  Trá»£ lÃ½ láº­p lá»™ trÃ¬nh há»c táº­p.
-                Nhiá»‡m vá»¥: dá»±a trÃªn JSON bÃ i thi má»›i nháº¥t cá»§a learner (answersJson) vÃ  pháº§n phÃ¢n tÃ­ch do tool cung cáº¥p Ä‘á»ƒ Ä‘á» xuáº¥t lá»™ trÃ¬nh cÃ¡ nhÃ¢n hÃ³a.
+                Bạn là Trợ lý lập lộ trình học tập.
+                Nhiệm vụ: dựa trên JSON bài thi mới nhất của learner (answersJson) và phần phân tích do tool cung cấp để đề xuất lộ trình cá nhân hóa.
 
                 %s
                 Core rules:
                 1. Only choose course_id values from [AVAILABLE_COURSES]. Never invent a course.
                 2. Prioritize foundations first, then harder reading or advanced skills.
-                3. Æ¯U TIÃŠN chá»n cÃ¡c khÃ³a há»c kháº¯c phá»¥c trá»±c tiáº¿p cÃ¡c "weak_skills" trong pháº§n phÃ¢n tÃ­ch vÃ  hÆ°á»›ng tá»›i Má»¤C TIÃŠU Cá»¦A NGÆ¯á»œI Há»ŒC. ÄÆ°a ra "reason_why" giáº£i thÃ­ch rÃµ táº¡i sao khÃ³a há»c nÃ y láº¡i giÃºp cáº£i thiá»‡n Ä‘iá»ƒm yáº¿u hoáº·c giÃºp Ä‘áº¡t má»¥c tiÃªu Ä‘Ã³. "reason_why" pháº£i giáº£i thÃ­ch cá»¥ thá»ƒ "KhÃ³a nÃ y giáº£i quyáº¿t lá»—i vá»«a máº¯c" hay "KhÃ³a nÃ y cá»§ng cá»‘ Ä‘iá»ƒm yáº¿u kinh niÃªn".
-                4. "mentor_summary" PHáº¢I LÃ€ Lá»œI CHÃ€O VÃ€ TÃ“M Táº®T THÃ”NG MINH, Máº¶C Äá»ŠNH Sá»¬ Dá»¤NG TIáº¾NG VIá»†T (cÃ³ thá»ƒ dÃ¹ng tiáº¿ng Anh náº¿u ngÆ°á»i dÃ¹ng há»i báº±ng tiáº¿ng Anh). Báº¡n PHáº¢I so sÃ¡nh Ä‘iá»ƒm sá»‘ bÃ i thi gáº§n nháº¥t (latest_score) vá»›i Ä‘iá»ƒm trung bÃ¬nh lá»‹ch sá»­ (láº¥y tá»« "score_avg" trong knowledge_gaps_json). VÃ­ dá»¥: "Dá»±a trÃªn lá»‹ch sá»­ lÃ m bÃ i, Ä‘iá»ƒm trung bÃ¬nh cá»§a báº¡n Ä‘ang lÃ  [score_avg]/10. Tuy nhiÃªn, trong bÃ i thi vá»«a rá»“i (Ä‘Æ°á»£c [latest_score]/10 Ä‘iá»ƒm), báº¡n Ä‘ang gáº·p khÃ³ khÄƒn á»Ÿ pháº§n [X]. Äá»“ng thá»i, [Y] váº«n lÃ  Ä‘iá»ƒm yáº¿u kinh niÃªn cáº§n kháº¯c phá»¥c...". TUYá»†T Äá»I KHÃ”NG trá»™n láº«n ngÃ´n ngá»¯ (ná»­a Anh ná»­a Viá»‡t) trong má»™t cÃ¢u.
+                3. ƯU TIÊN chọn các khóa học khắc phục trực tiếp các "weak_skills" trong phần phân tích và hướng tới MỤC TIÊU CỦA NGƯỜI HỌC. Đưa ra "reason_why" giải thích rõ tại sao khóa học này lại giúp cải thiện điểm yếu hoặc giúp đạt mục tiêu đó. "reason_why" phải giải thích cụ thể "Khóa này giải quyết lỗi vừa mắc" hay "Khóa này củng cố điểm yếu kinh niên".
+                4. "mentor_summary" PHẢI LÀ LỜI CHÀO VÀ TÓM TẮT THÔNG MINH, MẶC ĐỊNH SỬ DỤNG TIẾNG VIỆT (có thể dùng tiếng Anh nếu người dùng hỏi bằng tiếng Anh). Bạn PHẢI so sánh điểm số bài thi gần nhất (latest_score) với điểm trung bình lịch sử (lấy từ "score_avg" trong knowledge_gaps_json). Ví dụ: "Dựa trên lịch sử làm bài, điểm trung bình của bạn đang là [score_avg]/10. Tuy nhiên, trong bài thi vừa rồi (được [latest_score]/10 điểm), bạn đang gặp khó khăn ở phần [X]. Đồng thời, [Y] vẫn là điểm yếu kinh niên cần khắc phục...". TUYỆT ĐỐI KHÔNG trộn lẫn ngôn ngữ (nửa Anh nửa Việt) trong một câu.
                 5. Return valid JSON only, without markdown fences.
                 6. PATHWAY PRIORITY ORDER:
                    - First courses should address the learner's LATEST exam weaknesses (most recent failures). Include EXACT tag "#New Vulnerability".
@@ -171,10 +171,10 @@ public class LearningPathwayService {
                 JSON format:
                 {
                   "roadmap_id": "AUTO_GEN",
-                  "mentor_summary": "Dá»±a trÃªn lá»‹ch sá»­ lÃ m bÃ i, Ä‘iá»ƒm trung bÃ¬nh cá»§a báº¡n Ä‘ang lÃ  7.6/10. Tuy nhiÃªn, trong bÃ i thi vá»«a rá»“i (Ä‘Æ°á»£c 5.6/10 Ä‘iá»ƒm), báº¡n Ä‘ang gáº·p khÃ³ khÄƒn á»Ÿ pháº§n Reading Comprehension. Äá»“ng thá»i, Grammar váº«n lÃ  Ä‘iá»ƒm yáº¿u kinh niÃªn...",
+                        "mentor_summary": "Dựa trên lịch sử làm bài, điểm trung bình của bạn đang là 7.6/10. Tuy nhiên, trong bài thi vừa rồi (được 5.6/10 điểm), bạn đang gặp khó khăn ở phần Reading Comprehension. Đồng thời, Grammar vẫn là điểm yếu kinh niên...",
                   "nodes": [
-                    { "step": 1, "course_id": 1, "reason_why": "KhÃ³a há»c nÃ y giáº£i quyáº¿t lá»—i vá»«a máº¯c á»Ÿ pháº§n Äá»c hiá»ƒu...", "status": "IN_PROGRESS", "tags": ["#New Vulnerability", "#Reading"] },
-                    { "step": 2, "course_id": 2, "reason_why": "KhÃ³a nÃ y cá»§ng cá»‘ Ä‘iá»ƒm yáº¿u kinh niÃªn vá» Ngá»¯ phÃ¡p...", "status": "LOCKED", "tags": ["#Chronic Weakness", "#Grammar"] }
+                        { "step": 1, "course_id": 1, "reason_why": "Khóa học này giải quyết lỗi vừa mắc ở phần Đọc hiểu...", "status": "IN_PROGRESS", "tags": ["#New Vulnerability", "#Reading"] },
+                        { "step": 2, "course_id": 2, "reason_why": "Khóa này củng cố điểm yếu kinh niên về Ngữ pháp...", "status": "LOCKED", "tags": ["#Chronic Weakness", "#Grammar"] }
                   ]
                 }
                 """
@@ -218,7 +218,7 @@ public class LearningPathwayService {
                 .examAttempt(examAttempt)
                 .mentorSummary(responseDto.getMentorSummary() != null
                         ? responseDto.getMentorSummary()
-                        : "TÃ´i Ä‘Ã£ xÃ¢y dá»±ng má»™t lá»™ trÃ¬nh tá»« káº¿t quáº£ bÃ i kiá»ƒm tra cá»§a báº¡n báº±ng cÃ¡ch sá»­ dá»¥ng cÃ¡c khÃ³a há»c hiá»‡n cÃ³ trong HanGo.")
+                                        : "Tôi đã xây dựng một lộ trình từ kết quả bài kiểm tra của bạn bằng cách sử dụng các khóa học hiện có trong HanGo.")
                 .status("ACTIVE")
                 .goalName(requestDTO.getGoalName())
                 .targetDate(requestDTO.getTargetDate())
@@ -288,8 +288,8 @@ public class LearningPathwayService {
 
         final int finalScore = effectiveScore;
         pathway.setMentorSummary(finalScore < 60
-                ? "Há»‡ thá»‘ng Ä‘Ã£ tá»± Ä‘á»™ng thay Ä‘á»•i lá»™ trÃ¬nh há»c táº­p do Ä‘iá»ƒm bÃ i kiá»ƒm tra gáº§n nháº¥t cá»§a báº¡n hÆ¡i tháº¥p. TÃ´i Ä‘ang táº­p trung Ä‘iá»u chá»‰nh láº¡i lá»™ trÃ¬nh vÃ o cÃ¡c ká»¹ nÄƒng ná»n táº£ng mÃ  báº¡n cáº§n náº¯m vá»¯ng trÆ°á»›c tiÃªn."
-                : "Hiá»‡u suáº¥t bÃ i kiá»ƒm tra gáº§n Ä‘Ã¢y cá»§a báº¡n lÃ  cháº¥p nháº­n Ä‘Æ°á»£c, vÃ¬ váº­y lá»™ trÃ¬nh hiá»‡n táº¡i váº«n lÃ  lá»±a chá»n tá»‘t nháº¥t.");
+                        ? "Hệ thống đã tự động thay đổi lộ trình học tập do điểm bài kiểm tra gần nhất của bạn hơi thấp. Tôi đang tập trung điều chỉnh lại lộ trình vào các kỹ năng nền tảng mà bạn cần nắm vững trước tiên."
+                        : "Hiệu suất bài kiểm tra gần đây của bạn là chấp nhận được, vì vậy lộ trình hiện tại vẫn là lựa chọn tốt nhất.");
 
         if (pathway.getNodes() != null) {
             boolean firstNodeSeen = false;
@@ -364,10 +364,10 @@ public class LearningPathwayService {
                                     }
                                 });
                     }
-                    pathway.setMentorSummary("âœ… ÄÃ£ bá» qua khÃ³a há»c '" + currentNode.getCourse().getTitle()
-                            + "' vÃ  má»Ÿ khÃ³a bÆ°á»›c tiáº¿p theo cho báº¡n.");
+                pathway.setMentorSummary("✅ Đã bỏ qua khóa học '" + currentNode.getCourse().getTitle()
+                            + "' và mở khóa bước tiếp theo cho bạn.");
                 } else {
-                    pathway.setMentorSummary("KhÃ´ng tÃ¬m tháº¥y khÃ³a há»c nÃ o Ä‘ang há»c Ä‘á»ƒ bá» qua.");
+                pathway.setMentorSummary("Không tìm thấy khóa học nào đang học để bỏ qua.");
                 }
             }
             case "ADJUST_SCHEDULE" -> {
@@ -383,13 +383,13 @@ public class LearningPathwayService {
                         && pathway.getHoursPerWeek() > 0) {
                     applyTimeboxing(pathway, pathway.getTargetDate(), pathway.getHoursPerWeek(), null);
                     pathway.setScheduleStatus("ON_TRACK");
-                    pathway.setMentorSummary("ðŸ“… Lá»‹ch trÃ¬nh Ä‘Ã£ Ä‘Æ°á»£c tÃ­nh toÃ¡n láº¡i" +
-                            (newHours != null ? " vá»›i " + newHours + " giá»/tuáº§n." : ".") +
-                            " HÃ£y cá»‘ gáº¯ng theo Ä‘Ãºng tiáº¿n Ä‘á»™ nhÃ©!");
+                    pathway.setMentorSummary("📅 Lịch trình đã được tính toán lại" +
+                        (newHours != null ? " với " + newHours + " giờ/tuần." : ".") +
+                            " Hãy cố gắng theo đúng tiến độ nhé!");
                 } else {
                     pathway.setScheduleStatus("AT_RISK");
                     pathway.setMentorSummary(
-                            "âš ï¸ Lá»‹ch trÃ¬nh chÆ°a thá»ƒ tÃ­nh láº¡i vÃ¬ chÆ°a cÃ³ ngÃ y má»¥c tiÃªu hoáº·c sá»‘ giá»/tuáº§n. HÃ£y cáº­p nháº­t má»¥c tiÃªu cá»§a báº¡n.");
+                                "⚠️ Lịch trình chưa thể tính lại vì chưa có ngày mục tiêu hoặc số giờ/tuần. Hãy cập nhật mục tiêu của bạn.");
                 }
             }
             case "TAKE_QUIZ" -> {
@@ -400,28 +400,28 @@ public class LearningPathwayService {
             }
             case "WHAT_WILL_I_LEARN" -> {
                 // Build personalized overview from actual pathway data
-                StringBuilder overview = new StringBuilder("ðŸ“š **Tá»•ng quan lá»™ trÃ¬nh cá»§a báº¡n:**\n\n");
+                StringBuilder overview = new StringBuilder("📚 **Tổng quan lộ trình của bạn:**\n\n");
                 if (pathway.getGoalName() != null) {
-                    overview.append("ðŸŽ¯ Má»¥c tiÃªu: ").append(pathway.getGoalName()).append("\n");
+                    overview.append("🎯 Mục tiêu: ").append(pathway.getGoalName()).append("\n");
                 }
                 int total = pathway.getNodes() != null ? pathway.getNodes().size() : 0;
                 long completed = pathway.getNodes() != null
                         ? pathway.getNodes().stream().filter(n -> "COMPLETED".equalsIgnoreCase(n.getStatus())).count()
                         : 0;
-                overview.append("ðŸ“Š Tiáº¿n Ä‘á»™: ").append(completed).append("/").append(total)
-                        .append(" bÆ°á»›c hoÃ n thÃ nh\n\n");
-                overview.append("CÃ¡c ká»¹ nÄƒng sáº½ Ä‘Æ°á»£c cáº£i thiá»‡n:\n");
+                overview.append("📊 Tiến độ: ").append(completed).append("/").append(total)
+                        .append(" bước hoàn thành\n\n");
+                overview.append("Các kỹ năng sẽ được cải thiện:\n");
                 if (pathway.getNodes() != null) {
                     for (PathwayNode node : pathway.getNodes()) {
                         String status = switch (node.getStatus().toUpperCase()) {
-                            case "COMPLETED" -> "âœ…";
-                            case "IN_PROGRESS" -> "ðŸ”„";
-                            default -> "ðŸ”’";
+                            case "COMPLETED" -> "✅";
+                            case "IN_PROGRESS" -> "🔄";
+                            default -> "🔒";
                         };
                         String skill = node.getCourse().getCategory() != null
                                 ? node.getCourse().getCategory().getParamValue()
                                 : "General";
-                        overview.append(status).append(" BÆ°á»›c ").append(node.getStepOrder())
+                        overview.append(status).append(" Bước ").append(node.getStepOrder())
                                 .append(": ").append(node.getCourse().getTitle())
                                 .append(" (").append(skill).append(")\n");
                     }
@@ -429,8 +429,8 @@ public class LearningPathwayService {
                 pathway.setMentorSummary(overview.toString());
             }
             default -> {
-                pathway.setMentorSummary("TÃ´i Ä‘Ã£ nháº­n Ä‘Æ°á»£c yÃªu cáº§u cá»§a báº¡n (" + actionType
-                        + "), nhÆ°ng chÆ°a biáº¿t cÃ¡ch xá»­ lÃ½ nÃ³ lÃºc nÃ y.");
+                pathway.setMentorSummary("Tôi đã nhận được yêu cầu của bạn (" + actionType
+                        + "), nhưng chưa biết cách xử lý nó lúc này.");
             }
         }
 
@@ -449,7 +449,7 @@ public class LearningPathwayService {
 
     private String generateMiniQuiz(PathwayNode currentNode) {
         if (currentNode == null) {
-            return "ðŸ“ KhÃ´ng tÃ¬m tháº¥y khÃ³a há»c Ä‘ang há»c Ä‘á»ƒ táº¡o mini-quiz. HÃ£y báº¯t Ä‘áº§u má»™t khÃ³a há»c trÆ°á»›c.";
+            return "📝 Không tìm thấy khóa học đang học để tạo mini-quiz. Hãy bắt đầu một khóa học trước.";
         }
         try {
             String courseName = currentNode.getCourse().getTitle();
@@ -458,16 +458,16 @@ public class LearningPathwayService {
                     : "General English";
 
             String prompt = """
-                    Táº¡o 3 cÃ¢u há»i tráº¯c nghiá»‡m (má»—i cÃ¢u 4 lá»±a chá»n A/B/C/D) vá» chá»§ Ä‘á» "%s" (%s) cho há»c sinh luyá»‡n thi THPT Quá»‘c gia Tiáº¿ng Anh.
-                    Format má»—i cÃ¢u:
-                    **CÃ¢u X:** [cÃ¢u há»i]
-                    A. [lá»±a chá»n]
-                    B. [lá»±a chá»n]
-                    C. [lá»±a chá»n]
-                    D. [lá»±a chá»n]
-                    âœ… ÄÃ¡p Ã¡n: [Ä‘Ã¡p Ã¡n Ä‘Ãºng]
+                Tạo 3 câu hỏi trắc nghiệm (mỗi câu 4 lựa chọn A/B/C/D) về chủ đề "%s" (%s) cho học sinh luyện thi THPT Quốc gia Tiếng Anh.
+                Format mỗi câu:
+                **Câu X:** [câu hỏi]
+                A. [lựa chọn]
+                B. [lựa chọn]
+                C. [lựa chọn]
+                D. [lựa chọn]
+                ✅ Đáp án: [đáp án đúng]
 
-                    Chá»‰ tráº£ vá» Ä‘Ãºng 3 cÃ¢u há»i, khÃ´ng thÃªm gÃ¬ khÃ¡c.
+                Chỉ trả về đúng 3 câu hỏi, không thêm gì khác.
                     """
                     .formatted(courseName, category);
 
@@ -479,11 +479,11 @@ public class LearningPathwayService {
                             .build());
 
             String quizText = geminiClientService.generateChatResponse(
-                    "Báº¡n lÃ  giÃ¡o viÃªn Tiáº¿ng Anh THPT. Táº¡o cÃ¢u há»i tráº¯c nghiá»‡m cháº¥t lÆ°á»£ng.", history);
-            return "ðŸ“ **Mini-Quiz: " + courseName + "**\n\n" + quizText;
+                "Bạn là giáo viên Tiếng Anh THPT. Tạo câu hỏi trắc nghiệm chất lượng.", history);
+        return "📝 **Mini-Quiz: " + courseName + "**\n\n" + quizText;
         } catch (Exception e) {
             log.warn("Failed to generate mini-quiz: {}", e.getMessage());
-            return "ðŸ“ TÃ´i Ä‘ang gáº·p sá»± cá»‘ khi táº¡o mini-quiz. Vui lÃ²ng thá»­ láº¡i sau.";
+        return "📝 Tôi đang gặp sự cố khi tạo mini-quiz. Vui lòng thử lại sau.";
         }
     }
 
@@ -683,7 +683,7 @@ public class LearningPathwayService {
             // Pathway is fully completed
             suggestedActions.add("TAKE_NEW_EXAM");
             pathway.setMentorSummary(
-                    "ðŸŽ‰ ChÃºc má»«ng báº¡n Ä‘Ã£ hoÃ n thÃ nh xuáº¥t sáº¯c toÃ n bá»™ lá»™ trÃ¬nh hiá»‡n táº¡i! Äá»ƒ tiáº¿p tá»¥c nÃ¢ng cao trÃ¬nh Ä‘á»™, hÃ£y lÃ m má»™t bÃ i kiá»ƒm tra Ä‘Ã¡nh giÃ¡ nÄƒng lá»±c má»›i Ä‘á»ƒ tÃ´i cÃ³ thá»ƒ thiáº¿t káº¿ cho báº¡n má»™t lá»™ trÃ¬nh nÃ¢ng cáº¥p hÆ¡n nhÃ©!");
+                    "🎉 Chúc mừng bạn đã hoàn thành xuất sắc toàn bộ lộ trình hiện tại! Để tiếp tục nâng cao trình độ, hãy làm một bài kiểm tra đánh giá năng lực mới để tôi có thể thiết kế cho bạn một lộ trình nâng cấp hơn nhé!");
         }
 
         if ("BEHIND".equalsIgnoreCase(pathway.getScheduleStatus())
@@ -718,6 +718,7 @@ public class LearningPathwayService {
                 .totalSteps(totalSteps)
                 .completedSteps(completedSteps)
                 .weakSkills(weakSkills)
+                .analyzedAttempts(recentAttempts.size())
                 .goalName(pathway.getGoalName())
                 .targetDate(pathway.getTargetDate() != null ? pathway.getTargetDate().toString() : null)
                 .hoursPerWeek(pathway.getHoursPerWeek())
@@ -734,7 +735,7 @@ public class LearningPathwayService {
      * Question
      * Bank theo category. KHONG tra dap an ve FE.
      */
-    // LearningPathwayService.getMasteryQuestions - thÃªm null-check
+    // LearningPathwayService.getMasteryQuestions - thêm null-check
     @Transactional(readOnly = true)
     public List<MasteryQuestionDTO> getMasteryQuestions(Long pathwayId, Long nodeId, Long studentId) {
         LearningPathway pathway = learningPathwayRepository.findById(pathwayId)
@@ -774,7 +775,8 @@ public class LearningPathwayService {
         List<Long> quizLessonIds = resolveQuizLessonIds(courseId);
 
         if (!quizLessonIds.isEmpty()) {
-            List<MasteryQuestionDTO> questions = loadQuestionsFromLessonQuizzes(quizLessonIds, 10);
+            List<Long> targetLessonId = List.of(quizLessonIds.get(0));
+            List<MasteryQuestionDTO> questions = loadQuestionsFromLessonQuizzes(targetLessonId, 1000);
             if (!questions.isEmpty()) {
                 return questions;
             }
@@ -794,7 +796,7 @@ public class LearningPathwayService {
      * cua node va tra lai pathway da cap nhat.
      */
     @Transactional
-    public LearningPathwayResponseDTO submitMasteryAnswers(
+    public com.hango.hango_backend.dto.MasterySubmitResponseDTO submitMasteryAnswers(
             Long pathwayId, Long nodeId, Long studentId,
             com.hango.hango_backend.dto.MasterySubmitRequestDTO request) {
         LearningPathway pathway = learningPathwayRepository.findById(pathwayId)
@@ -831,6 +833,7 @@ public class LearningPathwayService {
         // Cham tung cau: dung bang question_options de xac dinh dap an dung
         int correct = 0;
         List<Map<String, Object>> answerRecords = new ArrayList<>();
+        List<com.hango.hango_backend.dto.MasteryQuestionEvaluationDTO> evaluations = new ArrayList<>();
         for (Map.Entry<Long, List<Integer>> entry : answers.entrySet()) {
             Long questionId = entry.getKey();
             List<Integer> selectedList = entry.getValue();
@@ -838,12 +841,15 @@ public class LearningPathwayService {
                     "SELECT qo.is_correct FROM question_options qo WHERE qo.question_id = ? ORDER BY id ASC",
                     Boolean.class, questionId);
             boolean ok = true;
+            List<Integer> correctOptionsList = new ArrayList<>();
             for (int i = 0; i < flags.size(); i++) {
                 boolean isOptionCorrect = Boolean.TRUE.equals(flags.get(i));
                 boolean isOptionSelected = selectedList.contains(i);
+                if (isOptionCorrect) {
+                    correctOptionsList.add(i);
+                }
                 if (isOptionCorrect != isOptionSelected) {
                     ok = false;
-                    break;
                 }
             }
             if (ok)
@@ -853,6 +859,16 @@ public class LearningPathwayService {
             rec.put("selectedOption", selectedList);
             rec.put("isCorrect", ok);
             answerRecords.add(rec);
+
+            String explanation = jdbcTemplate.queryForObject(
+                    "SELECT explanation FROM questions WHERE id = ?", String.class, questionId);
+            evaluations.add(com.hango.hango_backend.dto.MasteryQuestionEvaluationDTO.builder()
+                    .questionId(questionId)
+                    .selectedOptions(selectedList)
+                    .correctOptions(correctOptionsList)
+                    .isCorrect(ok)
+                    .explanation(explanation)
+                    .build());
         }
 
         int score = (int) Math.round(100.0 * correct / answers.size());
@@ -888,7 +904,10 @@ public class LearningPathwayService {
 
         applyMasteryResult(node, score);
         learningPathwayRepository.save(pathway);
-        return toResponseDto(pathway, studentId);
+        return com.hango.hango_backend.dto.MasterySubmitResponseDTO.builder()
+                .pathway(toResponseDto(pathway, studentId))
+                .evaluations(evaluations)
+                .build();
     }
 
     /**
@@ -1122,8 +1141,8 @@ public class LearningPathwayService {
         return LearningPathwayResponseDTO.builder()
                 .roadmapId("AUTO_GEN")
                 .mentorSummary(usingExistingCoursesFallback
-                        ? "TÃ´i Ä‘Ã£ táº¡o má»™t lá»™ trÃ¬nh khá»Ÿi Ä‘áº§u tá»« cÃ¡c khÃ³a há»c hiá»‡n cÃ³ trong HanGo. Vui lÃ²ng Ä‘Äƒng táº£i thÃªm khÃ³a há»c Ä‘á»ƒ cÃ³ Ä‘Æ°á»£c nhá»¯ng gá»£i Ã½ chÃ­nh xÃ¡c hÆ¡n."
-                        : "TÃ´i Ä‘Ã£ táº¡o má»™t lá»™ trÃ¬nh khá»Ÿi Ä‘áº§u táº­p trung vÃ o cÃ¡c Ä‘iá»ƒm yáº¿u cá»§a báº¡n tá»« bÃ i kiá»ƒm tra gáº§n nháº¥t.")
+                ? "Tôi đã tạo một lộ trình khởi đầu từ các khóa học hiện có trong HanGo. Vui lòng đăng tải thêm khóa học để có được những gợi ý chính xác hơn."
+                        : "Tôi đã tạo một lộ trình khởi đầu tập trung vào các điểm yếu của bạn từ bài kiểm tra gần nhất.")
                 .nodes(selectedCourses.stream()
                         .limit(4)
                         .map(course -> {
@@ -1171,10 +1190,10 @@ public class LearningPathwayService {
 
     private String defaultReasonForCourse(Course course, ExamAttempt examAttempt) {
         String scoreText = examAttempt.getScore() != null
-                ? " Äiá»ƒm sá»‘ cá»§a báº¡n gáº§n Ä‘Ã¢y nháº¥t lÃ  " + examAttempt.getScore() + "."
+                ? " Điểm số của bạn gần đây nhất là " + examAttempt.getScore() + "."
                 : "";
         String category = course.getCategory() != null ? course.getCategory().getParamValue() : "this topic";
-        return "KhÃ³a há»c nÃ y giÃºp báº¡n cá»§ng cá»‘ thÃªm vá» " + category + " dá»±a trÃªn káº¿t quáº£ gáº§n Ä‘Ã¢y nháº¥t cá»§a báº¡n."
+        return "Khóa học này giúp bạn củng cố thêm về " + category + " dựa trên kết quả gần đây nhất của bạn."
                 + scoreText;
     }
 

@@ -10,7 +10,7 @@ import '../../widgets/course_manager_sidebar.dart';
 import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'course_manager_exam_import_excel_page.dart';
 import 'course_manager_exam_ai_generate_page.dart';
-import 'course_manager_exam_matrix_page.dart';
+import 'exam_matrix/course_manager_exam_matrix_page.dart';
 import 'course_manager_edit_exam_page.dart';
 import '../../../domain/model/trainer_ai_exam_models.dart';
 import '../../../services/hango_api.dart';
@@ -260,20 +260,14 @@ class _CourseManagerCreateExamPageState
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: InternalAppHeader(isMobile: !isDesktop),
       drawer: !isDesktop
-          ? const Drawer(
-              child: CourseManagerSidebar(
-                currentRoute: 'exams',
-              ),
-            )
+          ? const Drawer(child: CourseManagerSidebar(currentRoute: 'exams'))
           : null,
       body: Row(
         children: [
           if (isDesktop)
             const SizedBox(
               width: 240,
-              child: CourseManagerSidebar(
-                currentRoute: 'exams',
-              ),
+              child: CourseManagerSidebar(currentRoute: 'exams'),
             ),
           Expanded(child: content),
         ],
@@ -500,12 +494,8 @@ class _CourseManagerCreateExamPageState
             Row(
               children: [
                 IconButton(
-                  icon: const Icon(
-                    Icons.arrow_back,
-                    color: Color(0xFF64748B),
-                  ),
-                  onPressed: () =>
-                      setState(() => _currentView = 'selection'),
+                  icon: const Icon(Icons.arrow_back, color: Color(0xFF64748B)),
+                  onPressed: () => setState(() => _currentView = 'selection'),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                 ),

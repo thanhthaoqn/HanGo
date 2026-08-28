@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class CourseManagerExamMatrixServiceImpl implements CourseManagerExamMatrixService {
+public class ExamMatrixServiceImpl implements ExamMatrixService {
 
     private final ExamMatrixRepository examMatrixRepository;
     private final ExamMatrixDetailRepository examMatrixDetailRepository;

@@ -84,7 +84,8 @@ class CourseManagerDashboardServiceTest {
         when(courseRepository.countByStatusAndDeletedAtIsNull("DRAFT")).thenReturn(5L);
         when(courseRepository.countByStatusAndDeletedAtIsNull("ARCHIVED")).thenReturn(3L);
         when(courseRepository.countByStatusAndDeletedAtIsNull("HIDDEN")).thenReturn(2L);
-        when(courseRepository.countByStatusAndDeletedAtIsNull("PENDING")).thenReturn(0L);
+        when(courseRepository.countByStatusAndDeletedAtIsNull("PENDING_APPROVAL")).thenReturn(0L);
+        when(courseRepository.countByStatusAndDeletedAtIsNull("REJECTED")).thenReturn(0L);
         when(examRepository.count()).thenReturn(40L);
 
         CourseManagerDashboardSummaryDTO result = service.getDashboardSummary();
