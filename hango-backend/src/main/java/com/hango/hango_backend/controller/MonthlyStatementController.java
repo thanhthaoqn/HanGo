@@ -108,7 +108,7 @@ public class MonthlyStatementController {
     }
 
     @GetMapping("/course-manager/statements/{id}/items")
-    @PreAuthorize("hasAnyAuthority('TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR', 'ROLE_TRAINER_LEAD', 'ROLE_COURSE_MANAGER', 'ROLE_ADMINISTRATOR', 'TRAINER', 'ROLE_TRAINER', 'TEACHER', 'ROLE_TEACHER')")
+    @PreAuthorize("hasAnyAuthority('VIEW_OWN_REVENUE', 'TRAINER_LEAD', 'COURSE_MANAGER', 'ADMINISTRATOR', 'ROLE_TRAINER_LEAD', 'ROLE_COURSE_MANAGER', 'ROLE_ADMINISTRATOR', 'TRAINER', 'ROLE_TRAINER', 'TEACHER', 'ROLE_TEACHER', 'INSTRUCTOR', 'ROLE_INSTRUCTOR', 'PEER_TUTOR', 'ROLE_PEER_TUTOR')")
     public ResponseEntity<List<com.hango.hango_backend.dto.ManagerPaymentDTO>> getStatementPayments(
             @PathVariable("id") Long id) {
         List<com.hango.hango_backend.dto.ManagerPaymentDTO> items = statementService.getStatementPayments(id);

@@ -255,11 +255,6 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
                 fontFamily: 'Outfit',
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              isVi ? 'Theo dõi thu nhập, chính sách phân chia và các kỳ đối soát hàng tháng.' : 'Track your earnings, revenue split policies, and monthly settlements.',
-              style: const TextStyle(fontSize: 14, color: Color(0xFF64748B), fontFamily: 'Outfit'),
-            ),
           ],
         ),
         Row(
@@ -629,29 +624,46 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
 
                         return DataRow(
                           cells: [
-                            DataCell(Text(s['statementCode']?.toString() ?? 'N/A', style: const TextStyle(fontWeight: FontWeight.bold))),
+                            DataCell(
+                              InkWell(
+                                onTap: () => _showStatementDetailDialog(s as Map<String, dynamic>),
+                                borderRadius: BorderRadius.circular(4),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        s['statementCode']?.toString() ?? 'N/A',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF2563EB),
+                                          decoration: TextDecoration.underline,
+                                          fontFamily: 'Outfit',
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      const Icon(Icons.open_in_new_rounded, size: 13, color: Color(0xFF2563EB)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
                             DataCell(Text(s['periodMonth']?.toString() ?? 'N/A')),
                             DataCell(Text('${s['totalOrders'] ?? 0}')),
                             DataCell(Text(_formatVND(gross))),
                             DataCell(Text(_formatVND(net), style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF28B79B)))),
                             DataCell(_buildStatusBadge(status, isVi)),
                             DataCell(
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFE6F7F2),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.check_circle_rounded, size: 14, color: Color(0xFF28B79B)),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      isVi ? 'Đã quyết toán' : 'Settled',
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF28B79B), fontFamily: 'Outfit'),
-                                    ),
-                                  ],
+                              OutlinedButton.icon(
+                                onPressed: () => _showStatementDetailDialog(s as Map<String, dynamic>),
+                                icon: const Icon(Icons.visibility_outlined, size: 14),
+                                label: Text(isVi ? 'Xem Chi tiết' : 'View Details', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF28B79B),
+                                  side: const BorderSide(color: Color(0xFF28B79B)),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                 ),
                               ),
                             ),
@@ -709,6 +721,259 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
         text,
         style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: fg, fontFamily: 'Outfit'),
       ),
+    );
+  }
+
+  void _showStatementDetailDialog(Map<String, dynamic> statement) {
+    final isVi = LanguageManager.isVi;
+    final statementId = (statement['id'] ?? 0) as int;
+    final code = statement['statementCode']?.toString() ?? 'N/A';
+    final trainerName = statement['trainerName'] ?? _trainerName;
+    final trainerType = _summaryData?['trainerType'] ?? statement['trainerType'] ?? 'PROFESSIONAL';
+    final period = statement['periodMonth'] ?? 'N/A';
+    final gross = statement['totalGrossAmount'] ?? 0;
+    final pFee = statement['totalPlatformFee'] ?? 0;
+    final net = statement['netPayoutAmount'] ?? 0;
+    final status = statement['status']?.toString() ?? 'PAID';
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          contentPadding: const EdgeInsets.all(24),
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                isVi ? 'Chi tiết Bảng kê ($code)' : 'Statement Breakdown ($code)',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, fontFamily: 'Outfit'),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          content: Container(
+            width: 800,
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Top Row: Header info & Status
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(trainerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          const SizedBox(height: 4),
+                          Text(
+                            isVi
+                                ? 'Kỳ tháng: $period | Loại: ${trainerType == 'PEER_TUTOR' ? 'Gia sư (60/40)' : 'Giáo viên (70/30)'}'
+                                : 'Period: $period | Type: ${trainerType == 'PEER_TUTOR' ? 'Tutor (60/40)' : 'Teacher (70/30)'}',
+                            style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                          ),
+                        ],
+                      ),
+                      _buildStatusBadge(status, isVi),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  // Financial Calculation Breakdown Card
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isVi ? 'Bảng Tính Doanh thu & Khấu trừ' : 'Revenue Calculation Breakdown',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A), fontFamily: 'Outfit'),
+                        ),
+                        const SizedBox(height: 12),
+                        _buildDialogRow(isVi ? 'Tổng doanh thu gộp (Gross Sales):' : 'Total Gross Sales:', _formatVND(gross)),
+                        const SizedBox(height: 8),
+                        _buildDialogRow(
+                          isVi
+                              ? '(-) Phí sàn HanGo (${trainerType == 'PEER_TUTOR' ? '40%' : '30%'}):'
+                              : '(-) Platform Service Fee (${trainerType == 'PEER_TUTOR' ? '40%' : '30%'}):',
+                          '- ${_formatVND(pFee)}',
+                        ),
+                        const Divider(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              isVi ? '(=) Thu nhập thực nhận (Net Payout):' : '(=) Final Net Payout Amount:',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A)),
+                            ),
+                            Text(
+                              _formatVND(net),
+                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF28B79B)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    isVi ? 'Tổng quan Số liệu Tính toán theo Khóa học' : 'Course Revenue Calculation Breakdown',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A), fontFamily: 'Outfit'),
+                  ),
+                  const SizedBox(height: 10),
+                  // Calculated Course Metrics Summary Table
+                  FutureBuilder<List<dynamic>>(
+                    future: _revenueService.getStatementPayments(statementId),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Padding(
+                          padding: EdgeInsets.all(20),
+                          child: Center(child: CircularProgressIndicator(color: Color(0xFF28B79B))),
+                        );
+                      }
+                      final items = snapshot.data ?? [];
+                      if (items.isEmpty) {
+                        return Container(
+                          padding: const EdgeInsets.all(16),
+                          alignment: Alignment.center,
+                          child: Text(
+                            isVi ? 'Không có dữ liệu khóa học trong kỳ.' : 'No course breakdown data found.',
+                            style: const TextStyle(color: Color(0xFF64748B)),
+                          ),
+                        );
+                      }
+
+                      // Aggregate orders by Course Title
+                      Map<String, Map<String, dynamic>> courseMetrics = {};
+                      for (var item in items) {
+                        String cTitle = item['courseTitle']?.toString() ?? (isVi ? 'Khóa học chưa đặt tên' : 'Untitled Course');
+                        double amt = (item['amount'] as num?)?.toDouble() ?? 0.0;
+                        double platformFee = (item['platformFee'] as num?)?.toDouble() ?? (amt * (trainerType == 'PEER_TUTOR' ? 0.40 : 0.30));
+                        double trainerEarn = (item['trainerEarnings'] as num?)?.toDouble() ?? (amt - platformFee);
+
+                        if (!courseMetrics.containsKey(cTitle)) {
+                          courseMetrics[cTitle] = {
+                            'title': cTitle,
+                            'orderCount': 0,
+                            'gross': 0.0,
+                            'pFee': 0.0,
+                            'tEarn': 0.0,
+                          };
+                        }
+                        courseMetrics[cTitle]!['orderCount'] = (courseMetrics[cTitle]!['orderCount'] as int) + 1;
+                        courseMetrics[cTitle]!['gross'] = (courseMetrics[cTitle]!['gross'] as double) + amt;
+                        courseMetrics[cTitle]!['pFee'] = (courseMetrics[cTitle]!['pFee'] as double) + platformFee;
+                        courseMetrics[cTitle]!['tEarn'] = (courseMetrics[cTitle]!['tEarn'] as double) + trainerEarn;
+                      }
+
+                      final courseList = courseMetrics.values.toList();
+                      int totalOrders = courseList.fold<int>(0, (sum, c) => sum + (c['orderCount'] as int));
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Summary metrics box
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                Column(
+                                  children: [
+                                    Text(isVi ? 'Số khóa học bán ra' : 'Courses Sold', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                                    const SizedBox(height: 2),
+                                    Text('${courseList.length}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                                  ],
+                                ),
+                                Container(width: 1, height: 28, color: const Color(0xFFCBD5E1)),
+                                Column(
+                                  children: [
+                                    Text(isVi ? 'Tổng lượt đăng ký' : 'Total Enrollments', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                                    const SizedBox(height: 2),
+                                    Text('$totalOrders', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                                  ],
+                                ),
+                                Container(width: 1, height: 28, color: const Color(0xFFCBD5E1)),
+                                Column(
+                                  children: [
+                                    Text(isVi ? 'Giá trị đơn TB' : 'Avg Order Value', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      _formatVND(totalOrders > 0 ? (gross / totalOrders) : 0),
+                                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Calculated Metrics Table
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: DataTable(
+                              headingRowHeight: 40,
+                              dataRowHeight: 44,
+                              headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
+                              columns: [
+                                DataColumn(label: Text(isVi ? 'Khóa học' : 'Course Title', style: _headerStyle)),
+                                DataColumn(label: Text(isVi ? 'Số đơn' : 'Orders', style: _headerStyle)),
+                                DataColumn(label: Text(isVi ? 'Doanh thu Gộp' : 'Gross Sales', style: _headerStyle)),
+                                DataColumn(label: Text(isVi ? 'Phí Sàn' : 'Platform Fee', style: _headerStyle)),
+                                DataColumn(label: Text(isVi ? 'Thu nhập GV' : 'Trainer Earnings', style: _headerStyle)),
+                              ],
+                              rows: courseList.map((c) {
+                                return DataRow(cells: [
+                                  DataCell(Text(c['title'].toString(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                                  DataCell(Text('${c['orderCount']}', style: const TextStyle(fontSize: 12))),
+                                  DataCell(Text(_formatVND(c['gross']), style: const TextStyle(fontSize: 12))),
+                                  DataCell(Text('- ${_formatVND(c['pFee'])}', style: const TextStyle(fontSize: 12, color: Color(0xFFDC2626)))),
+                                  DataCell(Text(_formatVND(c['tEarn']), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF28B79B)))),
+                                ]);
+                              }).toList(),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(isVi ? 'Đóng' : 'Close', style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildDialogRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A), fontSize: 13)),
+      ],
     );
   }
 

@@ -665,15 +665,8 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
     final period = statement['periodMonth'] ?? 'N/A';
     final gross = statement['totalGrossAmount'] ?? 0;
     final pFee = statement['totalPlatformFee'] ?? 0;
-    final tGross = statement['totalTrainerGross'] ?? 0;
     final net = statement['netPayoutAmount'] ?? 0;
-    final bankName = statement['bankName'] ?? 'N/A';
-    final bankAccount = statement['bankAccount'] ?? 'N/A';
-    final bankAccountName = statement['bankAccountName'] ?? 'N/A';
-    final status = statement['status']?.toString() ?? 'PENDING_TRAINER_CONFIRM';
-    final bankTxnRef = statement['bankTxnRef'];
-    final notes = statement['adminNotes'];
-    final receiptUrl = statement['payoutReceiptUrl']?.toString();
+    final status = statement['status']?.toString() ?? 'PAID';
 
     showDialog(
       context: context,
@@ -764,141 +757,7 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  // Bank Details & Dynamic VietQR Payment Card
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFCBD5E1)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              isVi ? 'Thông tin Chuyển khoản Ngân hàng' : 'Bank Payout & Transfer Details',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A), fontFamily: 'Outfit'),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE6FDF9),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: const Color(0xFF28B79B)),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.qr_code_2_rounded, size: 14, color: Color(0xFF28B79B)),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    isVi ? 'VietQR Tự Động (Napas247)' : 'VietQR Auto (Napas247)',
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF28B79B), fontFamily: 'Outfit'),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (bankAccount.toString().trim().isNotEmpty) ...[
-                              InkWell(
-                                onTap: () => _openImagePreview(
-                                  _generateVietQrUrl(
-                                    bankName: bankName.toString(),
-                                    accountNo: bankAccount.toString(),
-                                    accountName: bankAccountName.toString(),
-                                    amount: net,
-                                    memo: 'HANGO PAYOUT $period $trainerName',
-                                  ),
-                                ),
-                                child: Container(
-                                  width: 130,
-                                  height: 130,
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: const Color(0xFFCBD5E1)),
-                                  ),
-                                  child: Image.network(
-                                    _generateVietQrUrl(
-                                      bankName: bankName.toString(),
-                                      accountNo: bankAccount.toString(),
-                                      accountName: bankAccountName.toString(),
-                                      amount: net,
-                                      memo: 'HANGO PAYOUT $period $trainerName',
-                                    ),
-                                    fit: BoxFit.contain,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return const Center(
-                                        child: Icon(Icons.qr_code_2_rounded, size: 40, color: Color(0xFF94A3B8)),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                            ],
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    bankAccountName.toString().toUpperCase(),
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A), fontFamily: 'Outfit'),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '$bankName - $bankAccount',
-                                    style: const TextStyle(fontSize: 13, color: Color(0xFF334155), fontWeight: FontWeight.w600, fontFamily: 'Outfit'),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    isVi
-                                        ? 'Số tiền: ${_formatVND(net)}\nCú pháp: HANGO PAYOUT $period $trainerName'
-                                        : 'Payout: ${_formatVND(net)}\nMemo: HANGO PAYOUT $period $trainerName',
-                                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.4, fontFamily: 'Outfit'),
-                                  ),
-                                  if (receiptUrl != null && receiptUrl.isNotEmpty) ...[
-                                    const SizedBox(height: 8),
-                                    InkWell(
-                                      onTap: () => _openImagePreview(receiptUrl),
-                                      child: Text(
-                                        isVi ? 'Xem Bill đính kèm' : 'View Receipt Proof',
-                                        style: const TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold, decoration: TextDecoration.underline, fontSize: 12),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (bankTxnRef != null && bankTxnRef.toString().isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(isVi ? 'Mã GD Ngân hàng:' : 'Bank Txn Ref:', style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-                              Text(bankTxnRef.toString(), style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF16A34A), fontSize: 13)),
-                            ],
-                          ),
-                        ],
-                        if (notes != null && notes.toString().isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          Text(isVi ? 'Ghi chú: $notes' : 'Notes: $notes', style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Color(0xFF475569))),
-                        ],
-                      ],
-                    ),
-                  ),
+
                   const SizedBox(height: 20),
                   Text(
                     isVi ? 'Tổng quan Số liệu Tính toán theo Khóa học' : 'Course Revenue Calculation Breakdown',
