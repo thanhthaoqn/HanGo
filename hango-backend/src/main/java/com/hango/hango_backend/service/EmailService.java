@@ -177,7 +177,7 @@ public class EmailService {
             subtitle = "Hi <strong style=\"color: #e11d48 !important;\">" + safeName
                     + "</strong>, thank you for applying to become a Trainer on HanGo. After evaluating your profile and documents, your application was not approved at this time.";
             ctaText = "Update and Resubmit Application &rarr;";
-            ctaUrl = "https://hangog92.online/login";
+            ctaUrl = "https://hangog92.online";
             ctaColor = "#0f172a";
 
             detailsHtml = "<div style=\"background-color: #fff1f2; border: 1px solid #fecdd3; border-left: 4px solid #e11d48; border-radius: 12px; padding: 18px 20px; margin-bottom: 24px; text-align: left;\">"
