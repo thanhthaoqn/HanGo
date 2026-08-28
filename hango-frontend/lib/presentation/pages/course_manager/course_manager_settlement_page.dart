@@ -1428,7 +1428,6 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                           DataColumn(label: Text(isVi ? 'Thực nhận (Net)' : 'Net Payout', style: _headerStyle)),
                           DataColumn(label: Text(isVi ? 'Tài khoản Ngân hàng' : 'Bank Account', style: _headerStyle)),
                           DataColumn(label: Text(isVi ? 'Trạng thái' : 'Status', style: _headerStyle)),
-                          DataColumn(label: Text(isVi ? 'Thao tác' : 'Action', style: _headerStyle)),
                         ],
                         rows: paginatedList.map((s) {
                           final status = s['status']?.toString() ?? 'PENDING_TRAINER_CONFIRM';
@@ -1445,9 +1444,20 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                               DataCell(
                                 InkWell(
                                   onTap: () => _showStatementDetailDialog(s as Map<String, dynamic>),
-                                  child: Text(
-                                    s['statementCode']?.toString() ?? 'N/A',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2563EB), decoration: TextDecoration.underline),
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 4),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          s['statementCode']?.toString() ?? 'N/A',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2563EB), decoration: TextDecoration.underline),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        const Icon(Icons.open_in_new_rounded, size: 13, color: Color(0xFF2563EB)),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
@@ -1475,19 +1485,6 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                                 ],
                               )),
                               DataCell(_buildStatusBadge(status, isVi)),
-                              DataCell(
-                                OutlinedButton.icon(
-                                  onPressed: () => _showStatementDetailDialog(s as Map<String, dynamic>),
-                                  icon: const Icon(Icons.visibility_outlined, size: 14),
-                                  label: Text(isVi ? 'Xem Chi tiết' : 'View Details', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: const Color(0xFF28B79B),
-                                    side: const BorderSide(color: Color(0xFF28B79B)),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  ),
-                                ),
-                              ),
                             ],
                           );
                         }).toList(),
