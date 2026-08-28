@@ -1461,7 +1461,7 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                                   ),
                                 ),
                               ),
-                              DataCell(Text(_formatDateTime(s['createdAt'] ?? s['paidAt'] ?? s['trainerConfirmedAt']), style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)))),
+                              DataCell(Text(_formatDateTime(s['paidAt'] ?? s['createdAt'] ?? s['trainerConfirmedAt']), style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)))),
                               DataCell(
                                 InkWell(
                                   onTap: () => _showStatementDetailDialog(s as Map<String, dynamic>),
@@ -1789,7 +1789,7 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                       return DataRow(
                         cells: [
                           DataCell(Text('${_paymentsPage * _paymentsPageSize + idx + 1}')),
-                          DataCell(Text(_formatDateTime(p['createdAt'] ?? p['paidAt']), style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)))),
+                          DataCell(Text(_formatDateTime(p['paidAt'] ?? p['createdAt']), style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)))),
                           DataCell(Text(txnRef, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
                           DataCell(Column(
                             mainAxisAlignment: MainAxisAlignment.center,
