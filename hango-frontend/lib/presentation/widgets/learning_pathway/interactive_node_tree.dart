@@ -270,6 +270,12 @@ class _NodeCard extends StatelessWidget {
                   status: node.status,
                   isDarkMode: isDarkMode,
                 ),
+              if (node.difficulty != null && node.difficulty != 'N/A' && node.difficulty!.isNotEmpty)
+                _SkillTag(
+                  label: '#${node.difficulty}',
+                  status: node.status,
+                  isDarkMode: isDarkMode,
+                ),
             ],
           ),
           if (node.reasonWhy.isNotEmpty) ...[
@@ -586,6 +592,10 @@ class _SkillTag extends StatelessWidget {
       borderColor = color.withOpacity(0.4);
     } else if (label == "#LongTerm" || label == "#KinhNiên" || label == "#Kinh Niên" || label == "#Chronic Weakness") {
       color = const Color(0xFF8B5CF6); // Purple for long-term mastery
+      bgColor = color.withOpacity(isDarkMode ? 0.2 : 0.12);
+      borderColor = color.withOpacity(0.4);
+    } else if (label == "#Easy" || label == "#Medium" || label == "#Hard") {
+      color = const Color(0xFFEAB308); // Yellow/Orange for difficulty
       bgColor = color.withOpacity(isDarkMode ? 0.2 : 0.12);
       borderColor = color.withOpacity(0.4);
     }

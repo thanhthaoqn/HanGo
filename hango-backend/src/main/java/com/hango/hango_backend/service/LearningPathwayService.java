@@ -610,12 +610,13 @@ public class LearningPathwayService {
                 resolvedStatus = "IN_PROGRESS";
             }
 
-            return PathwayNodeDTO.builder()
-                    .id(node.getId())
-                    .step(node.getStepOrder())
-                    .courseId(node.getCourse().getId())
-                    .courseTitle(node.getCourse().getTitle())
-                    .status(resolvedStatus)
+                    return PathwayNodeDTO.builder()
+                            .id(node.getId())
+                            .step(node.getStepOrder())
+                            .courseId(node.getCourse().getId())
+                            .courseTitle(node.getCourse().getTitle())
+                            .difficulty(node.getCourse().getDifficulty() != null ? node.getCourse().getDifficulty().getParamValue() : "N/A")
+                            .status(resolvedStatus)
                     .reasonWhy(node.getReasonWhy())
                     .progressPercent(realProgress)
                     .skillType(skillType)
@@ -1151,6 +1152,7 @@ public class LearningPathwayService {
                                     .step(currentStep)
                                     .courseId(course.getId())
                                     .courseTitle(course.getTitle())
+                                    .difficulty(course.getDifficulty() != null ? course.getDifficulty().getParamValue() : "N/A")
                                     .status(currentStep == 1 ? "IN_PROGRESS" : "LOCKED")
                                     .reasonWhy(defaultReasonForCourse(course, examAttempt))
                                     .progressPercent(0)

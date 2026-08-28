@@ -22,6 +22,9 @@ public class PathwayNodeDTO {
     @JsonProperty("course_title")
     private String courseTitle;
 
+    @JsonProperty("difficulty")
+    private String difficulty;
+
     private List<String> tags;
 
     private String status;
