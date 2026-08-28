@@ -122,8 +122,8 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
         ToastHelper.showSuccess(
           context,
           isVi
-              ? 'Đã tạo kỳ quyết toán mới cho ${generated.length} giáo viên!'
-              : 'Generated monthly cutoff statements for ${generated.length} trainers!',
+              ? 'Đã chốt sổ thành công và gửi thông báo/email cho ${generated.length} giáo viên!'
+              : 'Cutoff completed and emails/notifications sent to ${generated.length} trainers!',
         );
         _fetchStatements();
         _fetchPayments();
@@ -1030,23 +1030,9 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
             ),
           ),
           actions: [
-            if (status != 'PAID')
-              ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _showSettleDialog(statement);
-                },
-                icon: const Icon(Icons.check_circle_outline, size: 16),
-                label: Text(isVi ? 'Xác nhận Đã trả' : 'Mark as Paid', style: const TextStyle(fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF28B79B),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-              ),
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text(isVi ? 'Đóng' : 'Close', style: const TextStyle(color: Color(0xFF64748B))),
+              child: Text(isVi ? 'Đóng' : 'Close', style: const TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
             ),
           ],
         );
@@ -1631,41 +1617,17 @@ class _CourseManagerSettlementPageState extends State<CourseManagerSettlementPag
                               )),
                               DataCell(_buildStatusBadge(status, isVi)),
                               DataCell(
-                                status == 'PAID'
-                                    ? OutlinedButton.icon(
-                                        onPressed: () => _showSettleDialog(s as Map<String, dynamic>, isReadOnly: true),
-                                        icon: const Icon(Icons.receipt_long_outlined, size: 14),
-                                        label: Text(isVi ? 'Xem Chứng từ' : 'View Transfer Record', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                        style: OutlinedButton.styleFrom(
-                                          foregroundColor: const Color(0xFF28B79B),
-                                          side: const BorderSide(color: Color(0xFF28B79B)),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                        ),
-                                      )
-                                    : (status == 'REJECTED' || status == 'CANCELLED')
-                                        ? ElevatedButton.icon(
-                                            onPressed: () => _showRegenerateDialog(s as Map<String, dynamic>),
-                                            icon: const Icon(Icons.sync, size: 14),
-                                            label: Text(isVi ? 'Tính toán & Chốt lại' : 'Recalculate & Resubmit', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: const Color(0xFFD97706),
-                                              foregroundColor: Colors.white,
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                            ),
-                                          )
-                                        : ElevatedButton.icon(
-                                            onPressed: () => _showSettleDialog(s as Map<String, dynamic>, isReadOnly: false),
-                                            icon: const Icon(Icons.check_circle_outline, size: 14),
-                                            label: Text(isVi ? 'Xác nhận Đã trả' : 'Mark Paid', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: const Color(0xFF28B79B),
-                                              foregroundColor: Colors.white,
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                            ),
-                                          ),
+                                OutlinedButton.icon(
+                                  onPressed: () => _showStatementDetailDialog(s as Map<String, dynamic>),
+                                  icon: const Icon(Icons.visibility_outlined, size: 14),
+                                  label: Text(isVi ? 'Xem Chi tiết' : 'View Details', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFF28B79B),
+                                    side: const BorderSide(color: Color(0xFF28B79B)),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  ),
+                                ),
                               ),
                             ],
                           );

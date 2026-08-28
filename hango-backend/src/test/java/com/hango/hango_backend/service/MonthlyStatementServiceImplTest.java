@@ -285,7 +285,7 @@ class MonthlyStatementServiceImplTest {
 
         ArgumentCaptor<Payment> captor = ArgumentCaptor.forClass(Payment.class);
         verify(paymentRepository).save(captor.capture());
-        assertEquals("IN_STATEMENT", captor.getValue().getSettlementStatus());
+        assertEquals("SETTLED", captor.getValue().getSettlementStatus());
         assertEquals(200L, captor.getValue().getStatementId());
     }
 
@@ -459,7 +459,7 @@ class MonthlyStatementServiceImplTest {
 
         MonthlyStatementDTO result = statementService.regenerateStatement(1L);
 
-        assertEquals("PENDING_TRAINER_CONFIRM", result.getStatus());
+        assertEquals("PAID", result.getStatus());
         assertEquals(1, result.getTotalOrders());
         assertEquals(new BigDecimal("70000.00"), result.getTotalTrainerGross());
         verify(notificationService).notifyUser(eq(owner), eq(NotificationService.TYPE_STATEMENT_READY), any(), any(), any());

@@ -380,10 +380,10 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
                 const SizedBox(height: 16),
                 _buildPolicyRow(
                   icon: Icons.calendar_month_rounded,
-                  title: isVi ? '3. Chốt sổ & Thanh toán hàng tháng' : '3. Monthly Cutoff & Settlement',
+                  title: isVi ? '3. Chốt sổ doanh thu hàng tháng' : '3. Monthly Revenue Settlement',
                   content: isVi
-                      ? '• Quản lý đào tạo thực hiện chốt sổ báo cáo doanh thu hàng tháng.\n• Tiền được chuyển khoản thẳng vào tài khoản ngân hàng đã liên kết của Trainer.'
-                      : '• Monthly statements are cut off at the end of each billing cycle.\n• Net earnings are wired directly to your registered bank account upon confirmation.',
+                      ? '• Quản lý đào tạo thực hiện chốt sổ báo cáo doanh thu định kỳ hàng tháng.\n• Báo cáo chi tiết và xác nhận quyết toán được gửi trực tiếp đến Email và chuông thông báo hệ thống của bạn.'
+                      : '• Monthly revenue statements are cut off at the end of each billing cycle.\n• Summary notices and reports are dispatched directly to your Email and In-App notifications.',
                 ),
                 const SizedBox(height: 24),
                 Align(
@@ -636,52 +636,24 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
                             DataCell(Text(_formatVND(net), style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF28B79B)))),
                             DataCell(_buildStatusBadge(status, isVi)),
                             DataCell(
-                              status == 'PENDING_TRAINER_CONFIRM'
-                                  ? Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        ElevatedButton(
-                                          onPressed: () => _confirmStatement(id),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: const Color(0xFF28B79B),
-                                            foregroundColor: Colors.white,
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                          ),
-                                          child: Text(
-                                            isVi ? 'Xác nhận' : 'Confirm',
-                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 6),
-                                        OutlinedButton(
-                                          onPressed: () => _rejectStatement(id),
-                                          style: OutlinedButton.styleFrom(
-                                            foregroundColor: Colors.redAccent,
-                                            side: const BorderSide(color: Colors.redAccent),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                          ),
-                                          child: Text(
-                                            isVi ? 'Từ chối' : 'Reject',
-                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                                          ),
-                                        ),
-                                      ],
-                                    )
-                                  : (status == 'PAID' && s['payoutReceiptUrl'] != null && s['payoutReceiptUrl'].toString().isNotEmpty)
-                                      ? OutlinedButton.icon(
-                                          onPressed: () => _openImagePreview(s['payoutReceiptUrl'].toString()),
-                                          icon: const Icon(Icons.receipt_long, size: 14),
-                                          label: Text(isVi ? 'Xem Bill chuyển tiền' : 'View Receipt', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                          style: OutlinedButton.styleFrom(
-                                            foregroundColor: const Color(0xFF28B79B),
-                                            side: const BorderSide(color: Color(0xFF28B79B)),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                          ),
-                                        )
-                                      : const Text('-', style: TextStyle(color: Color(0xFF94A3B8))),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE6F7F2),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.check_circle_rounded, size: 14, color: Color(0xFF28B79B)),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      isVi ? 'Đã quyết toán' : 'Settled',
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF28B79B), fontFamily: 'Outfit'),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ],
                         );
