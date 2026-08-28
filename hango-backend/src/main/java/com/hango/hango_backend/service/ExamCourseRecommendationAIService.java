@@ -112,8 +112,6 @@ public class ExamCourseRecommendationAIService {
                   ]
                 }
                 """.formatted(
-
-                courseList,
                 courseList,
                 analysis.getHints() != null && analysis.getHints().get("score_avg") != null ? analysis.getHints().get("score_avg").toString() : "0",
                 analysis.getKnowledgeGapsJson() == null ? "{}" : analysis.getKnowledgeGapsJson(),

@@ -221,7 +221,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Fast-track Course'),
-        content: const Text('You are about to skip this course in your learning pathway. Are you sure you want to proceed?'),
+        content: const Text('To fast-track this course, you must take the Mastery Quiz to prove your knowledge. Are you ready?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -232,7 +232,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFFF59E0B),
             ),
-            child: const Text('Yes, Fast-track'),
+            child: const Text('Take Mastery Quiz'),
           ),
         ],
       ),
@@ -240,35 +240,8 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
     
     if (confirm != true) return;
     
-    if (_pathway == null) return;
-    try {
-      // Gui action FAST_TRACK den backend: node dang hoc -> COMPLETED, mo khoa node ke tiep
-      final updatedPathway = await _repository.sendMentorAction(
-        pathwayId: _pathway!.pathwayId,
-        actionType: 'FAST_TRACK',
-      );
-      setState(() {
-        _pathway = _preparePathwayForDisplay(updatedPathway);
-        _selectedNode = _initialSelectedNode(updatedPathway.nodes);
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Course fast-tracked successfully!'),
-            backgroundColor: Color(0xFF28B79B),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to fast-track: ${e.toString()}'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
-    }
+    // Redirect to Mastery Quiz instead of skipping via backend API
+    await _openMasteryQuiz(node);
   }
 
   Future<void> _showRegenerateFreeWarningDialog() async {
@@ -359,6 +332,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
               pathway: _pathway!,
               selectedNode: _selectedNode,
               onPathwayUpdated: _handlePathwayUpdated,
+              onRegenerateFree: _showRegenerateFreeWarningDialog,
               isDarkMode: _isDarkMode,
             ) : const SizedBox(),
           ),
@@ -440,6 +414,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
                     pathway: _pathway!,
                     selectedNode: _selectedNode,
                     onPathwayUpdated: _handlePathwayUpdated,
+                    onRegenerateFree: _showRegenerateFreeWarningDialog,
                     isDarkMode: _isDarkMode,
                   ),
                 ),

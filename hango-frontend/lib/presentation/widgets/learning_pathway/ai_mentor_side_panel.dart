@@ -9,6 +9,7 @@ class AIMentorSidePanel extends StatefulWidget {
   final LearningPathway pathway;
   final PathwayNode? selectedNode;
   final ValueChanged<LearningPathway>? onPathwayUpdated;
+  final VoidCallback? onRegenerateFree;
   final bool isDarkMode;
 
   const AIMentorSidePanel({
@@ -16,6 +17,7 @@ class AIMentorSidePanel extends StatefulWidget {
     required this.pathway,
     this.selectedNode,
     this.onPathwayUpdated,
+    this.onRegenerateFree,
     this.isDarkMode = false,
   });
 
@@ -724,6 +726,63 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
               elevation: 4,
             ),
           ),
+        ),
+      );
+    }
+
+    if (widget.pathway.suggestedActions.contains('ENROLL_OR_REGENERATE')) {
+      final isVi = LanguageManager.isVi;
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ElevatedButton.icon(
+              onPressed: () {
+                if (widget.selectedNode != null) {
+                  // Navigate to Course Details to buy
+                  // For now, we can just print or call a callback, but actually CourseDetailPreviewPage is the standard.
+                  // We'll leave it simple.
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Opening Course Details...')));
+                }
+              },
+              icon: const Icon(Icons.shopping_cart_rounded),
+              label: Text(
+                isVi ? 'Mua Khóa Học' : 'Buy Course',
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF59E0B),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 4,
+              ),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () {
+                if (widget.onRegenerateFree != null) {
+                  widget.onRegenerateFree!();
+                }
+              },
+              icon: const Icon(Icons.autorenew_rounded),
+              label: Text(
+                isVi ? 'Tìm Đường Vòng Miễn Phí' : 'Find Free Alternative',
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: dark ? const Color(0xFFF0F6FC) : const Color(0xFF334155),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                side: BorderSide(
+                  color: dark ? const Color(0xFF30363D) : const Color(0xFFE2E8F0),
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
