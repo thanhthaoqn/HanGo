@@ -29,7 +29,6 @@ class _CourseManagerSettlementPageState
   int _statementCurrentPage = 1;
   final int _statementItemsPerPage = 10;
   String _periodMonthFilter = '';
-  String _statusFilter = '';
   final Set<String> _knownPeriods = {
     DateTime.now().toIso8601String().substring(0, 7),
   };
@@ -72,7 +71,6 @@ class _CourseManagerSettlementPageState
     });
     final data = await _revenueService.getCourseManagerStatements(
       periodMonth: _periodMonthFilter,
-      status: _statusFilter,
     );
     if (mounted) {
       setState(() {
@@ -147,7 +145,6 @@ class _CourseManagerSettlementPageState
     setState(() => _isLoading = true);
     final bytes = await _revenueService.exportStatementsExcel(
       periodMonth: _periodMonthFilter,
-      status: _statusFilter,
     );
     if (mounted) {
       setState(() => _isLoading = false);
@@ -221,7 +218,6 @@ class _CourseManagerSettlementPageState
     final gross = statement['totalGrossAmount'] ?? 0;
     final pFee = statement['totalPlatformFee'] ?? 0;
     final net = statement['netPayoutAmount'] ?? 0;
-    final status = statement['status']?.toString() ?? 'PAID';
 
     showDialog(
       context: context,
@@ -286,7 +282,6 @@ class _CourseManagerSettlementPageState
                           ),
                         ],
                       ),
-                      _buildStatusBadge(status, isVi),
                     ],
                   ),
                   const SizedBox(height: 20),
@@ -991,98 +986,7 @@ class _CourseManagerSettlementPageState
                   ),
                 ),
               ),
-              // Status Filter Dropdown
-              PopupMenuButton<String>(
-                position: PopupMenuPosition.under,
-                offset: const Offset(0, 6),
-                color: Colors.white,
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: const BorderSide(color: Color(0xFFE2E8F0)),
-                ),
-                onSelected: (val) {
-                  setState(() {
-                    _statusFilter = val == 'ALL' ? '' : val;
-                  });
-                  _fetchStatements();
-                },
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    value: 'ALL',
-                    child: Text(isVi ? 'Tất cả trạng thái' : 'All Statuses'),
-                  ),
-                  PopupMenuItem(
-                    value: 'PENDING_TRAINER_CONFIRM',
-                    child: Text(
-                      isVi ? 'Chờ Giáo viên xác nhận' : 'Pending Trainer',
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 'TRAINER_CONFIRMED',
-                    child: Text(
-                      isVi ? 'Giáo viên đã xác nhận' : 'Trainer Confirmed',
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 'PAID',
-                    child: Text(isVi ? 'Đã thanh toán' : 'Paid'),
-                  ),
-                  PopupMenuItem(
-                    value: 'REJECTED',
-                    child: Text(isVi ? 'Đã từ chối' : 'Rejected'),
-                  ),
-                ],
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _statusFilter.isEmpty
-                            ? (isVi ? 'Tất cả trạng thái' : 'All Statuses')
-                            : (_statusFilter == 'PENDING_TRAINER_CONFIRM'
-                                  ? (isVi
-                                        ? 'Chờ Giáo viên xác nhận'
-                                        : 'Pending Trainer')
-                                  : (_statusFilter == 'TRAINER_CONFIRMED'
-                                        ? (isVi
-                                              ? 'Giáo viên đã xác nhận'
-                                              : 'Trainer Confirmed')
-                                        : (_statusFilter == 'PAID'
-                                              ? (isVi
-                                                    ? 'Đã thanh toán'
-                                                    : 'Paid')
-                                              : (_statusFilter == 'REJECTED'
-                                                    ? (isVi
-                                                          ? 'Đã từ chối'
-                                                          : 'Rejected')
-                                                    : _statusFilter)))),
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF0F172A),
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Icon(
-                        Icons.arrow_drop_down_rounded,
-                        color: Color(0xFF64748B),
-                        size: 24,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+
               // Period Month Filter Dropdown (Dynamic Periods)
               Builder(
                 builder: (context) {
@@ -1339,17 +1243,8 @@ class _CourseManagerSettlementPageState
                               style: _headerStyle,
                             ),
                           ),
-                          DataColumn(
-                            label: Text(
-                              isVi ? 'Trạng thái' : 'Status',
-                              style: _headerStyle,
-                            ),
-                          ),
                         ],
                         rows: paginatedList.map((s) {
-                          final status =
-                              s['status']?.toString() ??
-                              'PENDING_TRAINER_CONFIRM';
                           final net = s['netPayoutAmount'] ?? 0;
                           final gross = s['totalGrossAmount'] ?? 0;
                           final trainerName = s['trainerName'] ?? 'N/A';
@@ -1465,7 +1360,6 @@ class _CourseManagerSettlementPageState
                                   ],
                                 ),
                               ),
-                              DataCell(_buildStatusBadge(status, isVi)),
                             ],
                           );
                         }).toList(),
@@ -2224,50 +2118,7 @@ class _CourseManagerSettlementPageState
     fontFamily: 'Outfit',
   );
 
-  Widget _buildStatusBadge(String status, bool isVi) {
-    String text = status;
-    Color bg = const Color(0xFFF1F5F9);
-    Color fg = const Color(0xFF475569);
 
-    if (status == 'PENDING_TRAINER_CONFIRM') {
-      text = isVi ? 'Chờ GV xác nhận' : 'Pending Confirm';
-      bg = const Color(0xFFFEF3C7);
-      fg = const Color(0xFFD97706);
-    } else if (status == 'TRAINER_CONFIRMED') {
-      text = isVi ? 'GV Đã xác nhận' : 'Trainer Confirmed';
-      bg = const Color(0xFFE0F2FE);
-      fg = const Color(0xFF0369A1);
-    } else if (status == 'PAID') {
-      text = isVi ? 'Đã thanh toán' : 'Paid';
-      bg = const Color(0xFFDCFCE7);
-      fg = const Color(0xFF15803D);
-    } else if (status == 'REJECTED') {
-      text = isVi ? 'GV Từ chối' : 'Rejected';
-      bg = const Color(0xFFFEE2E2);
-      fg = const Color(0xFFB91C1C);
-    } else if (status == 'CANCELLED') {
-      text = isVi ? 'Đã hủy' : 'Cancelled';
-      bg = const Color(0xFFF1F5F9);
-      fg = const Color(0xFF64748B);
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-          color: fg,
-          fontFamily: 'Outfit',
-        ),
-      ),
-    );
-  }
 
   Widget _buildPaymentStatusBadge(String status, bool isVi) {
     String text = status;

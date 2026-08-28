@@ -3,7 +3,6 @@ import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/revenue_settlement_service.dart';
 import '../../../utils/language_manager.dart';
-import '../../../utils/toast_helper.dart';
 import '../../widgets/trainer/trainer_sidebar.dart';
 
 class TrainerRevenuePage extends StatefulWidget {
@@ -19,8 +18,6 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
 
   bool _isLoading = true;
   String _trainerName = '';
-  String _trainerInitials = 'T';
-  String _trainerAvatarUrl = '';
 
   Map<String, dynamic>? _summaryData;
   List<dynamic> _statements = [];
@@ -35,18 +32,8 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
   Future<void> _loadHeaderInfo() async {
     final prefs = await SharedPreferences.getInstance();
     final fullName = prefs.getString('user_fullname') ?? 'Trainer';
-    final avatarUrl = prefs.getString('user_avatar_url') ?? '';
-    String initials = 'T';
-    if (fullName.trim().isNotEmpty) {
-      final parts = fullName.trim().split(' ');
-      if (parts.isNotEmpty) {
-        initials = parts.last[0].toUpperCase();
-      }
-    }
     setState(() {
       _trainerName = fullName;
-      _trainerInitials = initials;
-      _trainerAvatarUrl = avatarUrl;
     });
   }
 
@@ -60,122 +47,6 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
         _isLoading = false;
       });
     }
-  }
-  void _confirmStatement(int id) async {
-    final isVi = LanguageManager.isVi;
-    final success = await _revenueService.confirmTrainerStatement(id);
-    if (success) {
-      if (mounted) {
-        ToastHelper.showSuccess(
-          context,
-          isVi ? 'Đã xác nhận báo cáo doanh thu thành công.' : 'Revenue statement confirmed successfully.',
-        );
-        _fetchRevenueData();
-      }
-    } else {
-      if (mounted) {
-        ToastHelper.showError(
-          context,
-          isVi ? 'Không thể xác nhận báo cáo. Vui lòng thử lại.' : 'Failed to confirm statement. Please try again.',
-        );
-      }
-    }
-  }
-
-  void _rejectStatement(int id) async {
-    final isVi = LanguageManager.isVi;
-    final reasonController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(isVi ? 'Từ chối Báo cáo Doanh thu' : 'Reject Revenue Statement'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(isVi ? 'Vui lòng nhập lý do từ chối để Quản lý khóa học xử lý lại:' : 'Please enter a reason for rejection:'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: reasonController,
-              decoration: InputDecoration(
-                hintText: isVi ? 'Lý do từ chối...' : 'Rejection reason...',
-                border: const OutlineInputBorder(),
-              ),
-              maxLines: 3,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(isVi ? 'Hủy' : 'Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final reason = reasonController.text.trim();
-              if (reason.isEmpty) {
-                ToastHelper.showError(context, isVi ? 'Vui lòng nhập lý do.' : 'Please enter a reason.');
-                return;
-              }
-              Navigator.pop(context);
-              final success = await _revenueService.rejectStatement(id, reason);
-              if (mounted) {
-                if (success) {
-                  ToastHelper.showSuccess(
-                    context,
-                    isVi ? 'Đã phản hồi từ chối báo cáo thành công.' : 'Statement rejected successfully.',
-                  );
-                  _fetchRevenueData();
-                } else {
-                  ToastHelper.showError(
-                    context,
-                    isVi ? 'Không thể phản hồi từ chối. Vui lòng thử lại.' : 'Failed to reject statement.',
-                  );
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-            child: Text(isVi ? 'Từ chối' : 'Reject'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _openImagePreview(String imageUrl) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        child: Stack(
-          alignment: Alignment.topRight,
-          children: [
-            InteractiveViewer(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.network(
-                  imageUrl,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => Container(
-                    padding: const EdgeInsets.all(20),
-                    color: Colors.white,
-                    child: Text(
-                      LanguageManager.isVi ? 'Không thể tải ảnh bill chứng từ' : 'Cannot load receipt image',
-                      style: const TextStyle(color: Colors.redAccent),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.close, color: Colors.white, size: 28),
-              onPressed: () => Navigator.pop(context),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   String _formatVND(dynamic amount) {
@@ -613,13 +484,10 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
                         DataColumn(label: Text(isVi ? 'Số đơn' : 'Orders', style: _headerStyle)),
                         DataColumn(label: Text(isVi ? 'Tổng bán' : 'Gross Amount', style: _headerStyle)),
                         DataColumn(label: Text(isVi ? 'Thực nhận (Net)' : 'Net Payout', style: _headerStyle)),
-                        DataColumn(label: Text(isVi ? 'Trạng thái' : 'Status', style: _headerStyle)),
                       ],
                       rows: _statements.map((s) {
-                        final status = s['status']?.toString() ?? 'PENDING_TRAINER_CONFIRM';
                         final net = s['netPayoutAmount'] ?? 0;
                         final gross = s['totalGrossAmount'] ?? 0;
-                        final id = (s['id'] ?? 0) as int;
 
                         return DataRow(
                           cells: [
@@ -652,7 +520,6 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
                             DataCell(Text('${s['totalOrders'] ?? 0}')),
                             DataCell(Text(_formatVND(gross))),
                             DataCell(Text(_formatVND(net), style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF28B79B)))),
-                            DataCell(_buildStatusBadge(status, isVi)),
                           ],
                         );
                       }).toList(),
@@ -673,42 +540,7 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
         fontFamily: 'Outfit',
       );
 
-  Widget _buildStatusBadge(String status, bool isVi) {
-    String text = status;
-    Color bg = const Color(0xFFF1F5F9);
-    Color fg = const Color(0xFF475569);
 
-    if (status == 'PENDING_TRAINER_CONFIRM') {
-      text = isVi ? 'Chờ xác nhận' : 'Pending Confirm';
-      bg = const Color(0xFFFEF3C7);
-      fg = const Color(0xFFD97706);
-    } else if (status == 'TRAINER_CONFIRMED') {
-      text = isVi ? 'Đã xác nhận (Chờ chi)' : 'Confirmed (Awaiting Payout)';
-      bg = const Color(0xFFE0F2FE);
-      fg = const Color(0xFF0369A1);
-    } else if (status == 'PAID') {
-      text = isVi ? 'Đã thanh toán' : 'Paid';
-      bg = const Color(0xFFDCFCE7);
-      fg = const Color(0xFF15803D);
-    } else if (status == 'REJECTED') {
-      text = isVi ? 'Đã từ chối' : 'Rejected';
-      bg = const Color(0xFFFEE2E2);
-      fg = const Color(0xFFB91C1C);
-    } else if (status == 'CANCELLED') {
-      text = isVi ? 'Đã hủy' : 'Cancelled';
-      bg = const Color(0xFFF1F5F9);
-      fg = const Color(0xFF64748B);
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
-      child: Text(
-        text,
-        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: fg, fontFamily: 'Outfit'),
-      ),
-    );
-  }
 
   void _showStatementDetailDialog(Map<String, dynamic> statement) {
     final isVi = LanguageManager.isVi;
@@ -720,7 +552,6 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
     final gross = statement['totalGrossAmount'] ?? 0;
     final pFee = statement['totalPlatformFee'] ?? 0;
     final net = statement['netPayoutAmount'] ?? 0;
-    final status = statement['status']?.toString() ?? 'PAID';
 
     showDialog(
       context: context,
@@ -766,7 +597,6 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
                           ),
                         ],
                       ),
-                      _buildStatusBadge(status, isVi),
                     ],
                   ),
                   const SizedBox(height: 20),
@@ -960,59 +790,6 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
         Text(label, style: const TextStyle(color: Color(0xFF64748B), fontSize: 13)),
         Text(value, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A), fontSize: 13)),
       ],
-    );
-  }
-
-  Widget _unusedLegacyHeader(bool showMenuButton) {
-    return Container(
-      color: Colors.white,
-      height: 70,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Row(
-        children: [
-          if (showMenuButton) ...[
-            IconButton(
-              icon: const Icon(Icons.menu, color: Color(0xFF4B5563)),
-              onPressed: () => Scaffold.of(context).openDrawer(),
-            ),
-            const SizedBox(width: 12),
-          ],
-          Row(
-            children: const [
-              Icon(Icons.chevron_right, size: 16, color: Color(0xFF28B79B)),
-              SizedBox(width: 4),
-              Text(
-                'Revenue & Settlement',
-                style: TextStyle(
-                  color: Color(0xFF28B79B),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  fontFamily: 'Outfit',
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          Text(
-            _trainerName,
-            style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1E293B), fontSize: 14, fontFamily: 'Outfit'),
-          ),
-          const SizedBox(width: 8),
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: const Color(0xFFE2F9F3),
-            backgroundImage: _trainerAvatarUrl.isNotEmpty
-                ? NetworkImage(_trainerAvatarUrl.contains('dicebear.com') && _trainerAvatarUrl.contains('/svg')
-                    ? _trainerAvatarUrl.replaceAll('/svg', '/png')
-                    : _trainerAvatarUrl)
-                : null,
-            onBackgroundImageError: _trainerAvatarUrl.isNotEmpty ? (exception, stackTrace) {} : null,
-            child: _trainerAvatarUrl.isEmpty
-                ? Text(_trainerInitials, style: const TextStyle(color: Color(0xFF28B79B), fontWeight: FontWeight.bold, fontSize: 14))
-                : null,
-          ),
-        ],
-      ),
     );
   }
 }
