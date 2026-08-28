@@ -60,7 +60,7 @@ class _TakeExamPageState extends State<TakeExamPage>
         final processedQ = {
           "id": q['id'],
           "globalIndex": globalQIndex,
-          "content": "Question ${globalQIndex + 1}: ${q['content']}",
+          "content": q['content'],
           "options": (q['options'] as List)
               .map((o) => o['optionText'])
               .toList(),

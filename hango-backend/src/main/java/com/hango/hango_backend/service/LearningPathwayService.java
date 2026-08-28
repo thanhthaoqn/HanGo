@@ -38,6 +38,7 @@ import com.hango.hango_backend.repository.LearningPathwayRepository;
 import com.hango.hango_backend.repository.LessonProgressRepository;
 import com.hango.hango_backend.repository.LessonRepository;
 import com.hango.hango_backend.repository.UserRepository;
+import com.hango.hango_backend.repository.EnrollmentRepository;
 import com.hango.hango_backend.service.SkillCategoryMappingService;
 
 import lombok.RequiredArgsConstructor;
@@ -56,6 +57,7 @@ public class LearningPathwayService {
     private final ExamAttemptRepository examAttemptRepository;
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
+    private final EnrollmentRepository enrollmentRepository;
     private final GeminiClientService geminiClientService;
     private final ObjectMapper objectMapper;
     private final ExamResultAnalyzerService examResultAnalyzerService;
@@ -680,10 +682,18 @@ public class LearningPathwayService {
 
         if (currentNode != null) {
             int progress = calculateCourseProgressPercent(studentId, currentNode.getCourse().getId());
-            suggestedActions.add("FAST_TRACK"); // Unconditionally allow fast-track for current node
+            boolean isFree = currentNode.getCourse().getPrice() == null || currentNode.getCourse().getPrice().compareTo(java.math.BigDecimal.ZERO) == 0;
+            boolean isEnrolled = isFree || enrollmentRepository.existsByUserIdAndCourseId(studentId, currentNode.getCourse().getId());
 
-            if (progress > 0 && progress < 50) {
-                suggestedActions.add("TAKE_QUIZ");
+            if (isEnrolled) {
+                suggestedActions.add("FAST_TRACK"); // Only allow fast-track if enrolled or free
+
+                if (progress > 0 && progress < 50) {
+                    suggestedActions.add("TAKE_QUIZ");
+                }
+            } else {
+                suggestedActions.add("ENROLL_OR_REGENERATE");
+                pathway.setMentorSummary("Đường dẫn này yêu cầu một khóa học Premium. Bạn có thể mua khóa học để tiếp tục, hoặc tôi có thể thiết kế lại một lộ trình thay thế hoàn toàn miễn phí cho bạn.");
             }
         } else if (completedSteps > 0 && completedSteps == totalSteps) {
             // Pathway is fully completed
@@ -908,7 +918,14 @@ public class LearningPathwayService {
                     courseId);
         }
 
-        applyMasteryResult(node, score);
+        int passingScore = MASTERY_PASS_SCORE;
+        if (primaryLessonId != null) {
+            Lesson quizLesson = lessonRepository.findById(primaryLessonId).orElse(null);
+            if (quizLesson != null && quizLesson.getExam() != null && quizLesson.getExam().getPassingScore() != null) {
+                passingScore = (int) Math.round(quizLesson.getExam().getPassingScore());
+            }
+        }
+        applyMasteryResult(node, score, passingScore);
         learningPathwayRepository.save(pathway);
         return com.hango.hango_backend.dto.MasterySubmitResponseDTO.builder()
                 .pathway(toResponseDto(pathway, studentId))
@@ -1019,9 +1036,9 @@ public class LearningPathwayService {
      * Ap ket qua mastery vao node: >=80 thi mastered + tang chu ky on tap
      * 1->3->7->14->30 ngay.
      */
-    private void applyMasteryResult(PathwayNode node, Integer score) {
+    private void applyMasteryResult(PathwayNode node, Integer score, int passingScore) {
         node.setMasteryScore(score);
-        if (score != null && score >= MASTERY_PASS_SCORE) {
+        if (score != null && score >= passingScore) {
             node.setIsMastered(true);
             if (node.getReviewIntervalDays() == null) {
                 node.setReviewIntervalDays(1);
@@ -1062,11 +1079,21 @@ public class LearningPathwayService {
             throw new ApiException("Score must be between 0 and 100", HttpStatus.BAD_REQUEST);
         }
 
-        applyMasteryResult(node, request.getScore());
+        int passingScore = MASTERY_PASS_SCORE;
+        List<Long> quizLessonIds = resolveQuizLessonIds(node.getCourse().getId());
+        Long primaryLessonId = !quizLessonIds.isEmpty() ? quizLessonIds.get(0) : null;
+        if (primaryLessonId != null) {
+            Lesson quizLesson = lessonRepository.findById(primaryLessonId).orElse(null);
+            if (quizLesson != null && quizLesson.getExam() != null && quizLesson.getExam().getPassingScore() != null) {
+                passingScore = (int) Math.round(quizLesson.getExam().getPassingScore());
+            }
+        }
+
+        applyMasteryResult(node, request.getScore(), passingScore);
         pathway.setMentorSummary(Boolean.TRUE.equals(node.getIsMastered())
                 ? "Congratulations on achieving Mastery! This course is scheduled for review in "
                         + node.getReviewIntervalDays() + " days."
-                : "Your score is " + request.getScore() + ". You need " + MASTERY_PASS_SCORE
+                : "Your score is " + request.getScore() + ". You need " + passingScore
                         + " points to Master the course. Keep reviewing!");
 
         return toResponseDto(pathway, studentId);
