@@ -637,7 +637,7 @@ class MonthlyStatementServiceImplTest {
         assertEquals("TXN-123", statement.getBankTxnRef());
         assertEquals("Paid via bank transfer", statement.getAdminNotes());
         assertEquals(true, statement.getPaidAt() != null);
-        verify(emailService).sendSettlementPaidEmail(eq("trainer@example.com"), any(), eq("2026-07"), any(), eq("TXN-123"), eq("https://example.com/receipts/txn-123.png"));
+        verify(emailService).sendSettlementPaidEmail(eq("trainer@example.com"), any(), eq("2026-07"), any(), eq("TXN-123"));
     }
 
     // =================================================================

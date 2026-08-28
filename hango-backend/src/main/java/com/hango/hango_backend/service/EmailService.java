@@ -416,14 +416,13 @@ public class EmailService {
     }
 
     public void sendSettlementPaidEmail(String toEmail, String trainerName, String periodMonth, String netPayoutText,
-            String bankTxnRef, String receiptUrl) {
+            String bankTxnRef) {
         final String safeName = (trainerName != null && !trainerName.trim().isEmpty()) ? trainerName.trim()
                 : "Trainer";
         final String safePeriod = (periodMonth != null && !periodMonth.trim().isEmpty()) ? periodMonth.trim() : "N/A";
         final String safePayout = (netPayoutText != null && !netPayoutText.trim().isEmpty()) ? netPayoutText.trim()
                 : "0 VND";
         final String safeTxnRef = (bankTxnRef != null && !bankTxnRef.trim().isEmpty()) ? bankTxnRef.trim() : "N/A";
-        final boolean hasReceipt = (receiptUrl != null && !receiptUrl.trim().isEmpty());
 
         final String htmlContent = "<!DOCTYPE html>"
                 + "<html>"
@@ -490,22 +489,10 @@ public class EmailService {
                 + "                  </td>"
                 + "                </tr>"
                 + "              </table>"
-                + (hasReceipt
-                        ? "              <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"margin-bottom: 24px;\">"
-                                + "                <tr>"
-                                + "                  <td align=\"center\">"
-                                + "                    <a href=\"" + receiptUrl.trim()
-                                + "\" target=\"_blank\" style=\"background-color: #ffffff; color: #0284c7 !important; border: 1px solid #bae6fd; text-decoration: none; font-size: 14px; font-weight: 600; padding: 10px 24px; border-radius: 8px; display: inline-block;\">"
-                                + "                      📄 View Transfer Receipt Proof &rarr;"
-                                + "                    </a>"
-                                + "                  </td>"
-                                + "                </tr>"
-                                + "              </table>"
-                        : "")
                 + "              <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"margin-bottom: 24px;\">"
                 + "                <tr>"
                 + "                  <td align=\"center\">"
-                + "                    <a href=\"https://hangog92.online/trainer/revenue\" target=\"_blank\" style=\"background-color: #28b79b; color: #ffffff !important; text-decoration: none; font-size: 15px; font-weight: 700; padding: 14px 32px; border-radius: 10px; display: inline-block; box-shadow: 0 4px 14px rgba(40, 183, 155, 0.35);\">"
+                + "                    <a href=\"https://hangog92.online\" target=\"_blank\" style=\"background-color: #28b79b; color: #ffffff !important; text-decoration: none; font-size: 15px; font-weight: 700; padding: 14px 32px; border-radius: 10px; display: inline-block; box-shadow: 0 4px 14px rgba(40, 183, 155, 0.35);\">"
                 + "                      View Revenue Dashboard &rarr;"
                 + "                    </a>"
                 + "                  </td>"

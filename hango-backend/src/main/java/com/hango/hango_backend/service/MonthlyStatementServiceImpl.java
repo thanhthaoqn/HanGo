@@ -285,9 +285,8 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
                         trainer.getEmail(),
                         trainerDisplayName,
                         finalPeriodMonth,
-                        String.format("%,.0f", netPayout) + " VND",
-                        savedStatement.getStatementCode(),
-                        null
+                        String.format(java.util.Locale.US, "%,.0f", netPayout) + " VND",
+                        savedStatement.getStatementCode()
                 );
             } catch (Exception e) {
                 log.warn("Failed to send settlement email to trainer {}: {}", trainer.getEmail(), e.getMessage());
@@ -360,8 +359,7 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
                         statement.getTrainer().getFullName(),
                         statement.getPeriodMonth(),
                         netPayoutText,
-                        bankTxnRef,
-                        payoutReceiptUrl
+                        bankTxnRef
                 );
             }
         } catch (Exception e) {
@@ -470,9 +468,8 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
                         trainer.getEmail(),
                         trainerDisplayName,
                         periodMonth,
-                        String.format("%,.0f", netPayout) + " VND",
-                        statement.getStatementCode(),
-                        null
+                        String.format(java.util.Locale.US, "%,.0f", netPayout) + " VND",
+                        statement.getStatementCode()
                 );
             } catch (Exception e) {
                 log.warn("Failed to send recalculated settlement email to trainer {}: {}", trainer.getEmail(), e.getMessage());
