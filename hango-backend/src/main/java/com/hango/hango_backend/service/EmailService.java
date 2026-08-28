@@ -418,7 +418,7 @@ public class EmailService {
     public void sendSettlementPaidEmail(String toEmail, String trainerName, String periodMonth, String netPayoutText,
             String bankTxnRef, String receiptUrl) {
         final String safeName = (trainerName != null && !trainerName.trim().isEmpty()) ? trainerName.trim()
-                : "Giáo viên";
+                : "Trainer";
         final String safePeriod = (periodMonth != null && !periodMonth.trim().isEmpty()) ? periodMonth.trim() : "N/A";
         final String safePayout = (netPayoutText != null && !netPayoutText.trim().isEmpty()) ? netPayoutText.trim()
                 : "0 VND";
@@ -444,21 +444,21 @@ public class EmailService {
                 + "                <tr>"
                 + "                  <td align=\"center\" style=\"padding-bottom: 16px;\">"
                 + "                    <span style=\"background-color: #ecfdf5; color: #059669 !important; font-size: 13px; font-weight: 700; padding: 8px 20px; border-radius: 20px; border: 1px solid #a7f3d0; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block;\">"
-                + "                      ✓ ĐÃ CHỐT SỔ QUYẾT TOÁN"
+                + "                      ✓ SETTLEMENT FINALIZED"
                 + "                    </span>"
                 + "                  </td>"
                 + "                </tr>"
                 + "                <tr>"
                 + "                  <td align=\"center\" style=\"padding-bottom: 12px;\">"
-                + "                    <h1 style=\"margin: 0; color: #0f172a !important; font-size: 22px; font-weight: 800; text-align: center;\">Thông báo Quyết toán Doanh thu</h1>"
+                + "                    <h1 style=\"margin: 0; color: #0f172a !important; font-size: 22px; font-weight: 800; text-align: center;\">Revenue Settlement Statement</h1>"
                 + "                  </td>"
                 + "                </tr>"
                 + "                <tr>"
                 + "                  <td align=\"center\" style=\"padding-bottom: 24px;\">"
                 + "                    <p style=\"margin: 0; color: #334155 !important; font-size: 15px; line-height: 1.6; text-align: center;\">"
-                + "                      Xin chào <strong style=\"color: #0d9488 !important;\">" + safeName
-                + "</strong>, báo cáo doanh thu giảng dạy kỳ <strong>" + safePeriod
-                + "</strong> của bạn đã được đối soát và chốt sổ thành công."
+                + "                      Hello <strong style=\"color: #0d9488 !important;\">" + safeName
+                + "</strong>, your teaching revenue statement for period <strong>" + safePeriod
+                + "</strong> has been successfully settled and finalized."
                 + "                    </p>"
                 + "                  </td>"
                 + "                </tr>"
@@ -468,21 +468,21 @@ public class EmailService {
                 + "                  <td style=\"padding: 20px 24px;\">"
                 + "                    <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">"
                 + "                      <tr>"
-                + "                        <td style=\"color: #64748b !important; font-size: 14px; font-weight: 600; padding: 8px 0;\">Kỳ đối soát:</td>"
+                + "                        <td style=\"color: #64748b !important; font-size: 14px; font-weight: 600; padding: 8px 0;\">Settlement Period:</td>"
                 + "                        <td align=\"right\" style=\"color: #0f172a !important; font-size: 14px; font-weight: 700; padding: 8px 0;\">"
                 + safePeriod + "</td>"
                 + "                      </tr>"
                 + "                      <tr>"
-                + "                        <td style=\"color: #64748b !important; font-size: 14px; font-weight: 600; padding: 8px 0;\">Mã bảng kê:</td>"
+                + "                        <td style=\"color: #64748b !important; font-size: 14px; font-weight: 600; padding: 8px 0;\">Statement Code:</td>"
                 + "                        <td align=\"right\" style=\"color: #0f172a !important; font-size: 13px; font-family: monospace; font-weight: 600; padding: 8px 0;\">"
                 + safeTxnRef + "</td>"
                 + "                      </tr>"
                 + "                      <tr>"
-                + "                        <td style=\"color: #64748b !important; font-size: 14px; font-weight: 600; padding: 8px 0;\">Trạng thái:</td>"
-                + "                        <td align=\"right\" style=\"padding: 8px 0;\"><span style=\"color: #059669; font-weight: 700; font-size: 13px;\">● Đã hoàn tất (SETTLED)</span></td>"
+                + "                        <td style=\"color: #64748b !important; font-size: 14px; font-weight: 600; padding: 8px 0;\">Status:</td>"
+                + "                        <td align=\"right\" style=\"padding: 8px 0;\"><span style=\"color: #059669; font-weight: 700; font-size: 13px;\">● Settled & Finalized (PAID)</span></td>"
                 + "                      </tr>"
                 + "                      <tr style=\"border-top: 1px dashed #cbd5e1;\">"
-                + "                        <td style=\"color: #0f172a !important; font-size: 16px; font-weight: 700; padding: 14px 0 6px 0;\">Số tiền thực nhận (Net):</td>"
+                + "                        <td style=\"color: #0f172a !important; font-size: 16px; font-weight: 700; padding: 14px 0 6px 0;\">Net Earnings (VND):</td>"
                 + "                        <td align=\"right\" style=\"color: #059669 !important; font-size: 20px; font-weight: 800; padding: 14px 0 6px 0;\">"
                 + safePayout + "</td>"
                 + "                      </tr>"
@@ -496,7 +496,7 @@ public class EmailService {
                                 + "                  <td align=\"center\">"
                                 + "                    <a href=\"" + receiptUrl.trim()
                                 + "\" target=\"_blank\" style=\"background-color: #ffffff; color: #0284c7 !important; border: 1px solid #bae6fd; text-decoration: none; font-size: 14px; font-weight: 600; padding: 10px 24px; border-radius: 8px; display: inline-block;\">"
-                                + "                      📄 Xem ảnh chứng từ chuyển tiền (Bill) &rarr;"
+                                + "                      📄 View Transfer Receipt Proof &rarr;"
                                 + "                    </a>"
                                 + "                  </td>"
                                 + "                </tr>"
@@ -505,15 +505,15 @@ public class EmailService {
                 + "              <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"margin-bottom: 24px;\">"
                 + "                <tr>"
                 + "                  <td align=\"center\">"
-                + "                    <a href=\"https://hangog92.online\" target=\"_blank\" style=\"background-color: #28b79b; color: #ffffff !important; text-decoration: none; font-size: 15px; font-weight: 700; padding: 14px 32px; border-radius: 10px; display: inline-block; box-shadow: 0 4px 14px rgba(40, 183, 155, 0.35);\">"
-                + "                      Xem Báo cáo Doanh thu &rarr;"
+                + "                    <a href=\"https://hangog92.online/trainer/revenue\" target=\"_blank\" style=\"background-color: #28b79b; color: #ffffff !important; text-decoration: none; font-size: 15px; font-weight: 700; padding: 14px 32px; border-radius: 10px; display: inline-block; box-shadow: 0 4px 14px rgba(40, 183, 155, 0.35);\">"
+                + "                      View Revenue Dashboard &rarr;"
                 + "                    </a>"
                 + "                  </td>"
                 + "                </tr>"
                 + "              </table>"
                 + "              <p style=\"margin: 0; color: #64748b !important; font-size: 13px; text-align: center; line-height: 1.5;\">"
-                + "                Cảm ơn bạn đã luôn đồng hành và xây dựng các khóa học chất lượng cùng HanGo!<br>"
-                + "                Mọi thắc mắc vui lòng liên hệ: <a href=\"mailto:hangog92su26@gmail.com\" style=\"color: #28b79b !important; text-decoration: none; font-weight: 600;\">hangog92su26@gmail.com</a>"
+                + "                Thank you for being a valued trainer and creating quality courses on HanGo!<br>"
+                + "                For any inquiries or support, please contact us at: <a href=\"mailto:hangog92su26@gmail.com\" style=\"color: #28b79b !important; text-decoration: none; font-weight: 600;\">hangog92su26@gmail.com</a>"
                 + "              </p>"
                 + "            </td>"
                 + "          </tr>"
@@ -536,7 +536,7 @@ public class EmailService {
                 org.springframework.mail.javamail.MimeMessageHelper helper = new org.springframework.mail.javamail.MimeMessageHelper(
                         mimeMessage, true, "UTF-8");
                 helper.setTo(toEmail);
-                helper.setSubject("HanGo - Xác nhận Quyết toán Doanh thu kỳ " + safePeriod);
+                helper.setSubject("HanGo - Revenue Settlement Statement for Period " + safePeriod);
                 helper.setText(htmlContent, true);
                 mailSender.send(mimeMessage);
                 log.info("Revenue settlement HTML email sent to {}", toEmail);

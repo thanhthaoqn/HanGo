@@ -270,9 +270,10 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
 
             // 1. In-App Notification
             notificationService.notifyUser(trainer, NotificationService.TYPE_STATEMENT_READY,
-                    "Báo cáo quyết toán doanh thu kỳ " + finalPeriodMonth,
-                    "Doanh thu kỳ " + finalPeriodMonth + " của bạn đã được chốt sổ thành công. Số tiền thực nhận: "
-                            + String.format("%,.0f", netPayout) + " VND.",
+                    "Revenue Settlement Statement - Period " + finalPeriodMonth,
+                    "Your teaching revenue for period " + finalPeriodMonth + " (" + savedStatement.getStatementCode()
+                            + ") has been settled and finalized. Net earnings: "
+                            + String.format(java.util.Locale.US, "%,.0f", netPayout) + " VND.",
                     null);
 
             // 2. Email Notification
@@ -455,9 +456,10 @@ public class MonthlyStatementServiceImpl implements MonthlyStatementService {
 
         if (trainer != null) {
             notificationService.notifyUser(trainer, NotificationService.TYPE_STATEMENT_READY,
-                    "Báo cáo quyết toán doanh thu kỳ " + periodMonth,
-                    "Doanh thu kỳ " + periodMonth + " của bạn đã được tính toán lại và chốt sổ thành công. Thực nhận: "
-                            + String.format("%,.0f", netPayout) + " VND.",
+                    "Revenue Settlement Statement - Period " + periodMonth,
+                    "Your teaching revenue for period " + periodMonth + " (" + statement.getStatementCode()
+                            + ") has been recalculated and finalized. Net earnings: "
+                            + String.format(java.util.Locale.US, "%,.0f", netPayout) + " VND.",
                     null);
 
             try {
