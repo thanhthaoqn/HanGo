@@ -78,6 +78,20 @@ public class ExamCourseRecommendationAIService {
                     .append("\n");
         }
 
+        double scoreAvg = 0.0;
+        if (analysis.getHints() != null && analysis.getHints().get("score_avg") != null) {
+            try {
+                scoreAvg = Double.parseDouble(analysis.getHints().get("score_avg").toString());
+            } catch (NumberFormatException ignored) {}
+        }
+        
+        String difficultyHint = "";
+        if (scoreAvg >= 8.0) {
+            difficultyHint = "\n                - [MANDATORY] Điểm học sinh >= 8.0, bắt buộc ưu tiên chọn các khóa học có Difficulty là ADVANCED hoặc UPPER_INTERMEDIATE.";
+        } else {
+            difficultyHint = "\n                - [MANDATORY] Điểm học sinh < 8.0, bắt buộc ưu tiên chọn các khóa học có Difficulty là BEGINNER hoặc INTERMEDIATE.";
+        }
+
         String systemPrompt = """
                 You are a “Duolingo-style study buddy”. Speak friendly English, nói bằng tiếng Anh.
 
@@ -92,7 +106,7 @@ public class ExamCourseRecommendationAIService {
 
                 Ràng buộc bắt buộc:
                 - Chỉ được chọn courseId tồn tại trong [AVAILABLE_COURSES]. Tuyệt đối không bịa courseId.
-                - Chỉ trả về JSON thuần (không markdown), schema đúng như dưới.
+                - Chỉ trả về JSON thuần (không markdown), schema đúng như dưới.%s
 
                 [AVAILABLE_COURSES]
                 %s
@@ -112,6 +126,7 @@ public class ExamCourseRecommendationAIService {
                   ]
                 }
                 """.formatted(
+                difficultyHint,
                 courseList,
                 analysis.getHints() != null && analysis.getHints().get("score_avg") != null ? analysis.getHints().get("score_avg").toString() : "0",
                 analysis.getKnowledgeGapsJson() == null ? "{}" : analysis.getKnowledgeGapsJson(),

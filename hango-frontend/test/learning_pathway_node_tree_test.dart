@@ -103,7 +103,7 @@ void main() {
     },
   );
 
-  testWidgets('InteractiveNodeTree displays schedule range from start date', (
+  testWidgets('InteractiveNodeTree displays estimated duration only', (
     tester,
   ) async {
     final scheduledNode = node(
@@ -120,7 +120,7 @@ void main() {
       treeHarness(nodes: [scheduledNode], onNodeTap: (_) {}),
     );
 
-    expect(find.text('On track | 25/07 - 02/08 | 6h'), findsOneWidget);
+    expect(find.text('6h'), findsOneWidget);
   });
 }
 

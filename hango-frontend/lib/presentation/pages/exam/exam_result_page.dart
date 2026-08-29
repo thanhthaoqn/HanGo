@@ -738,26 +738,51 @@ class _ExamResultPageState extends State<ExamResultPage> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFE0F2FE),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      (category.isNotEmpty
-                                              ? category
-                                              : 'AI Recommended')
-                                          .toUpperCase(),
-                                      style: const TextStyle(
-                                        color: Color(0xFF0369A1),
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.bold,
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFE0F2FE),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          (category.isNotEmpty
+                                                  ? category
+                                                  : 'AI Recommended')
+                                              .toUpperCase(),
+                                          style: const TextStyle(
+                                            color: Color(0xFF0369A1),
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                      if (difficulty.isNotEmpty) ...[
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFF3F4F6),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            difficulty.toUpperCase(),
+                                            style: const TextStyle(
+                                              color: Color(0xFF4B5563),
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
