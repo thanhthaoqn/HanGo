@@ -4,6 +4,7 @@ import '../../../domain/entities/learning_pathway.dart';
 class InteractiveNodeTree extends StatelessWidget {
   final List<PathwayNode> nodes;
   final Function(PathwayNode) onNodeTap;
+  final Function(PathwayNode)? onStartLearningTap;
   final Function(PathwayNode)? onFastTrackTap;
   final Function(PathwayNode)? onMasteryTap; // B4 (spec 20): mo Mastery Quiz that
   final PathwayNode? selectedNode;
@@ -15,6 +16,7 @@ class InteractiveNodeTree extends StatelessWidget {
     super.key,
     required this.nodes,
     required this.onNodeTap,
+    this.onStartLearningTap,
     this.onFastTrackTap,
     this.onMasteryTap,
     this.selectedNode,
@@ -60,6 +62,7 @@ class InteractiveNodeTree extends StatelessWidget {
             isSelected: selectedNode?.step == node.step,
             isDarkMode: isDarkMode,
             onTap: () => onNodeTap(node),
+            onStartLearningTap: onStartLearningTap != null ? () => onStartLearningTap!(node) : null,
             onFastTrackTap: onFastTrackTap != null ? () => onFastTrackTap!(node) : null,
             onMasteryTap: onMasteryTap != null ? () => onMasteryTap!(node) : null,
           ),
@@ -76,6 +79,7 @@ class _NodeRow extends StatelessWidget {
   final bool isSelected;
   final bool isDarkMode;
   final VoidCallback onTap;
+  final VoidCallback? onStartLearningTap;
   final VoidCallback? onFastTrackTap;
   final VoidCallback? onMasteryTap;
 
@@ -86,6 +90,7 @@ class _NodeRow extends StatelessWidget {
     required this.isSelected,
     required this.isDarkMode,
     required this.onTap,
+    this.onStartLearningTap,
     this.onFastTrackTap,
     this.onMasteryTap,
   });
@@ -148,6 +153,7 @@ class _NodeRow extends StatelessWidget {
                         isSelected: isSelected,
                         isDarkMode: isDarkMode,
                         onTap: onTap,
+                        onStartLearningTap: onStartLearningTap,
                         onFastTrackTap: onFastTrackTap,
                         onMasteryTap: onMasteryTap,
                       ),
@@ -169,6 +175,7 @@ class _NodeCard extends StatelessWidget {
   final bool isSelected;
   final bool isDarkMode;
   final VoidCallback onTap;
+  final VoidCallback? onStartLearningTap;
   final VoidCallback? onFastTrackTap;
   final VoidCallback? onMasteryTap;
 
@@ -177,6 +184,7 @@ class _NodeCard extends StatelessWidget {
     required this.isSelected,
     required this.isDarkMode,
     required this.onTap,
+    this.onStartLearningTap,
     this.onFastTrackTap,
     this.onMasteryTap,
   });
@@ -362,7 +370,7 @@ class _NodeCard extends StatelessWidget {
                     (node.status == NodeStatus.completed && !node.isMastered);
                 final handleTap = isMasteryAction && onMasteryTap != null
                     ? onMasteryTap
-                    : onTap;
+                    : (onStartLearningTap ?? onTap);
                 return ElevatedButton.icon(
                   onPressed: handleTap,
                   icon: Icon(

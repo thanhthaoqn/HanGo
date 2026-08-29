@@ -26,6 +26,7 @@ class PathwayRepository {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
       },
     ).timeout(_requestTimeout);
 
