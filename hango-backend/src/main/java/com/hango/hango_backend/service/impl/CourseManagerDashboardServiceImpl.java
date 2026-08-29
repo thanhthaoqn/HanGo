@@ -579,6 +579,7 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                     .thumbnailUrl(exam.getThumbnailUrl())
                     .rejectionReason(exam.getRejectionReason())
                     .createdAt(exam.getCreatedAt())
+                    .isEntryExam(Boolean.TRUE.equals(exam.getIsEntryExam()))
                     .build();
         }).collect(Collectors.toList());
     }
@@ -627,5 +628,29 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                 "Your exam \"" + exam.getTitle() + "\" was rejected"
                         + (reason != null && !reason.isBlank() ? ": " + reason : "."),
                 null);
+    }
+
+    @Override
+    @Transactional
+    public void setEntryExamStatus(Long examId, boolean isEntryExam) {
+        com.hango.hango_backend.entity.Exam exam = examRepository.findById(examId)
+                .filter(e -> e.getDeletedAt() == null)
+                .orElseThrow(() -> new RuntimeException("Exam not found with ID: " + examId));
+
+        // Only a published exam can actually be served to a learner, so only
+        // allow flagging one on - unflagging is always fine regardless of status.
+        if (isEntryExam && !"PUBLISHED".equalsIgnoreCase(exam.getStatus())) {
+            throw new RuntimeException("Only a published exam can be set as an Entry Exam");
+        }
+
+        // The learner-facing Entry Exam feature needs at least one candidate at
+        // all times, so the last remaining flagged exam cannot be unflagged.
+        if (!isEntryExam && Boolean.TRUE.equals(exam.getIsEntryExam())
+                && examRepository.countByIsEntryExamTrueAndDeletedAtIsNull() <= 1) {
+            throw new RuntimeException("At least one exam must be kept as an Entry Exam");
+        }
+
+        exam.setIsEntryExam(isEntryExam);
+        examRepository.save(exam);
     }
 }

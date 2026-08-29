@@ -746,19 +746,51 @@ class _SharedHeaderState extends State<SharedHeader> {
     );
   }
 
+  // Nav links/logo/cart in this header always used to assume a Learner
+  // destination, wiping the whole Navigator stack via pushAndRemoveUntil when
+  // no LearnerShellPage ancestor was found. That's wrong whenever this header
+  // is reached from a Trainer/Course Manager screen (e.g. viewing a course's
+  // detail page) -- it force-switched them to the learner shell and left the
+  // browser Back button with nothing to return to. Prefer popping back to
+  // whichever shell is actually hosting this page.
   void _navigateToLearnerTab(int tabIndex, {int subTab = 0}) {
-    final shellState = LearnerShellPage.of(context);
-    if (shellState != null) {
-      shellState.selectTab(tabIndex, subTab: subTab);
-    } else {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(
-          builder: (context) => LearnerShellPage(initialIndex: tabIndex, initialSubTab: subTab),
-        ),
-        (route) => false,
-      );
+    final learnerShell = LearnerShellPage.of(context);
+    if (learnerShell != null) {
+      learnerShell.selectTab(tabIndex, subTab: subTab);
+      return;
     }
+    final trainerShell = TrainerShellPage.of(context);
+    if (trainerShell != null) {
+      // Only "Home"/logo maps onto the Trainer shell's own tab 0 -- the
+      // Learner-only nav links (Courses/Exams/Pathway) have no Trainer
+      // equivalent, so just pop back to wherever the trainer came from.
+      if (tabIndex == 0) {
+        trainerShell.selectTab(0);
+      } else if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      return;
+    }
+    final courseManagerShell = CourseManagerShellPage.of(context);
+    if (courseManagerShell != null) {
+      if (tabIndex == 0) {
+        courseManagerShell.selectTab(0);
+      } else if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      return;
+    }
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+      return;
+    }
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LearnerShellPage(initialIndex: tabIndex, initialSubTab: subTab),
+      ),
+      (route) => false,
+    );
   }
 
   @override

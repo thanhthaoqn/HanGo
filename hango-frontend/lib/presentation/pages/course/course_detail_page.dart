@@ -7,6 +7,8 @@ import '../../../data/services/auth_service.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/shared_footer.dart';
 import '../learner/learner_home_page.dart';
+import '../trainer/trainer_shell_page.dart';
+import '../course_manager/course_manager_shell_page.dart';
 import '../login_page.dart';
 import 'review_tab.dart';
 import 'lesson_detail_page.dart';
@@ -44,6 +46,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   int _currentUserId = 1;
   bool _canEnroll = true;
   bool _canRateAndComment = true;
+  List<String> _userRoles = [];
 
   @override
   void initState() {
@@ -91,6 +94,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     if (mounted) {
       setState(() {
         _currentUserId = prefs.getInt('user_id') ?? 1;
+        _userRoles = roles;
         _canEnroll =
             roles.contains('ENROLL_AND_LEARN_COURSES') ||
             roles.contains('ROLE_ADMINISTRATOR');
@@ -859,15 +863,28 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                     onTap: () {
                       if (Navigator.canPop(context)) {
                         Navigator.pop(context);
-                      } else {
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const LearnerHomePage(),
-                          ),
-                          (route) => false,
-                        );
+                        return;
                       }
+                      // No history to pop to (e.g. a direct/deep link landed
+                      // straight on this page) -- send the user to their own
+                      // role's home instead of always assuming Learner, which
+                      // used to misroute Trainers/Course Managers.
+                      final isTrainer = _userRoles.contains('ROLE_TRAINER') ||
+                          _userRoles.contains('TRAINER');
+                      final isCourseManager =
+                          _userRoles.contains('ROLE_COURSE_MANAGER') ||
+                          _userRoles.contains('COURSE_MANAGER');
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => isTrainer
+                              ? const TrainerShellPage()
+                              : isCourseManager
+                                  ? const CourseManagerShellPage()
+                                  : const LearnerHomePage(),
+                        ),
+                        (route) => false,
+                      );
                     },
                     hoverColor: Colors.transparent,
                     splashColor: Colors.transparent,

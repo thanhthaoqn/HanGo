@@ -12,6 +12,7 @@ import '../../widgets/trainer/trainer_sidebar.dart';
 import '../login_page.dart';
 import 'trainer_courses_page.dart';
 import 'trainer_profile_page.dart';
+import 'trainer_shell_page.dart';
 
 class TrainerDashboardPage extends StatefulWidget {
   final bool isEmbedded;
@@ -422,7 +423,14 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
               ),
               const SizedBox(width: 16),
               InkWell(
-                onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerCoursesPage())),
+                onTap: () {
+                  final shell = TrainerShellPage.of(context);
+                  if (shell != null) {
+                    shell.selectTab(1);
+                  } else {
+                    Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerCoursesPage()));
+                  }
+                },
                 borderRadius: BorderRadius.circular(16),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),

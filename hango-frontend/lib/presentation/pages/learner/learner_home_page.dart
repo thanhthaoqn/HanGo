@@ -625,12 +625,14 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       final userId = prefs.getInt('user_id') ?? 0;
       if (prefs.getBool('dismissed_entry_exam_$userId') == true) return;
 
-      final attempts = await _examRepository.fetchMyExamAttempts();
-      final hasCompleted = attempts.any(
-        (a) => a['examId'] == 1035 || a['examId'] == '1035',
-      );
+      // Entry Exam is no longer a single hardcoded exam id: a Course Manager
+      // flags one or more exams as candidates, and one is served at random -
+      // so "already completed" is checked against that live flagged set.
+      final status = await _examRepository.fetchEntryExamStatus();
+      final configured = status['configured'] == true;
+      final hasCompleted = status['completed'] == true;
 
-      if (!hasCompleted) {
+      if (configured && !hasCompleted) {
         _showEntryExamSuggestion();
       }
     } catch (e) {
@@ -681,23 +683,17 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       ),
     );
     try {
-      final exams = await _examRepository.fetchExams();
+      final entryExam = await _examRepository.fetchEntryExam();
       if (!mounted) return;
       Navigator.pop(context); // Close loading
 
-      final entryExam = exams.firstWhere(
-        (e) => e.id == '1035',
-        orElse: () => Exam(
-          id: '1035',
-          title: 'Global Entry Placement Test',
-          description: 'A comprehensive exam to assess all 25 skill domains and provide a personalized learning pathway.',
-          creatorName: 'System',
-          questionCount: 40,
-          durationMinutes: 50,
-          rating: 5.0,
-          learnerCountFormatted: '1k Learner',
-        ),
-      );
+      if (entryExam == null) {
+        ToastHelper.showError(
+          context,
+          'No Entry Exam is configured yet. Please check back later.',
+        );
+        return;
+      }
 
       Navigator.push(
         context,

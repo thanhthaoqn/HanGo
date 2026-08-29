@@ -115,13 +115,53 @@ class ExamRepository {
     }
   }
 
-  Future<bool> hasCompletedEntryExam() async {
-    try {
-      final attempts = await fetchExamAttempts('60');
-      return attempts.isNotEmpty;
-    } catch (e) {
-      return false;
+  /// The Entry Exam is no longer a hardcoded exam id: a Course Manager flags
+  /// one or more exams as entry-exam candidates in Exam Management, and the
+  /// backend picks one at random each time. Returns null when none is
+  /// configured yet.
+  Future<Exam?> fetchEntryExam() async {
+    final response = await http.get(Uri.parse('$baseUrl/exams/entry'));
+    if (response.statusCode == 404) {
+      return null;
     }
+    if (response.statusCode != 200) {
+      throw Exception('Failed to load entry exam: ${response.statusCode}');
+    }
+    final json = jsonDecode(utf8.decode(response.bodyBytes));
+    return Exam(
+      id: json['id'].toString(),
+      title: json['title'] ?? '',
+      description: json['description'] ?? '',
+      status: json['status'] ?? '',
+      creatorName: json['creatorName'] ?? 'Unknown',
+      questionCount: json['questionCount'] ?? 0,
+      durationMinutes: json['durationMinutes'] ?? 0,
+      rating: (json['rating'] ?? 0.0).toDouble(),
+      learnerCountFormatted: json['learnerCountFormatted'] ?? '0 Learner',
+    );
+  }
+
+  /// Whether the learner has completed ANY exam currently flagged as an Entry
+  /// Exam (checked against the live flagged set, not a single hardcoded id -
+  /// which one gets served is randomized and can change as Course Managers
+  /// (un)flag exams over time). Also reports whether one is configured at all.
+  Future<Map<String, dynamic>> fetchEntryExamStatus() async {
+    final uri = Uri.parse('$baseUrl/exams/entry/status');
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+
+    final response = await http.get(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return Map<String, dynamic>.from(jsonDecode(utf8.decode(response.bodyBytes)));
+    }
+    throw Exception('Failed to load entry exam status: ${response.statusCode}');
   }
 
   Future<List<Map<String, dynamic>>> fetchMyExamAttempts() async {

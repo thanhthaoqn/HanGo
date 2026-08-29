@@ -51,6 +51,25 @@ public class ExamController {
         return ResponseEntity.ok(questions);
     }
 
+    @GetMapping("/entry")
+    public ResponseEntity<ExamResponseDTO> getEntryExam() {
+        ExamResponseDTO exam = examService.getRandomEntryExam();
+        if (exam == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(exam);
+    }
+
+    @GetMapping("/entry/status")
+    @PreAuthorize("hasAuthority('ATTEMPT_QUIZ_AND_EXAM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<Map<String, Object>> getEntryExamStatus() {
+        Long currentUserId = getCurrentUserId();
+        if (currentUserId == null) {
+            return ResponseEntity.status(401).build();
+        }
+        return ResponseEntity.ok(examService.getEntryExamStatus(currentUserId));
+    }
+
     @GetMapping("/my-attempts")
     @PreAuthorize("hasAuthority('ATTEMPT_QUIZ_AND_EXAM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<List<ExamAttemptResponseDTO>> getMyExamAttempts() {

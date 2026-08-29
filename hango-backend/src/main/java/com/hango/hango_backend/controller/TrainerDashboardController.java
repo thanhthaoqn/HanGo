@@ -30,6 +30,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.hango.hango_backend.service.CloudinaryService;
 import com.hango.hango_backend.dto.TrainerCreateCourseRequestDTO;
 import com.hango.hango_backend.exception.ApiException;
+import com.hango.hango_backend.exception.CourseImportValidationException;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
@@ -112,6 +113,11 @@ public class TrainerDashboardController {
             }
             CourseImportResultDTO result = courseImportService.importWorkbook(userDetails.getUsername(), file);
             return ResponseEntity.ok(result);
+        } catch (CourseImportValidationException e) {
+            java.util.Map<String, Object> body = new java.util.HashMap<>();
+            body.put("error", e.getMessage());
+            body.put("errors", e.getErrors());
+            return ResponseEntity.badRequest().body(body);
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");

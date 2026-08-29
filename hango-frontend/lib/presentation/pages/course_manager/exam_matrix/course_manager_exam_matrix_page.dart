@@ -32,6 +32,8 @@ class _CourseManagerExamMatrixPageState extends State<CourseManagerExamMatrixPag
   bool _isLoading = true;
   String? _selectedMatrixId;
   int _questionSourceType = 3;
+  bool _isCheckingSufficiency = false;
+  List<dynamic> _shortfalls = [];
 
   String get apiBaseUrl => EnvConfig.v1BaseUrl;
 
@@ -96,6 +98,42 @@ class _CourseManagerExamMatrixPageState extends State<CourseManagerExamMatrixPag
       if (mounted) {
         setState(() => _isLoading = false);
         ToastHelper.show(context, 'System error, please try again later.', isError: true);
+      }
+    }
+  }
+
+  Future<void> _checkSufficiency() async {
+    if (_selectedMatrixId == null) {
+      setState(() => _shortfalls = []);
+      return;
+    }
+    final matrixId = int.parse(_selectedMatrixId!);
+    setState(() => _isCheckingSufficiency = true);
+    try {
+      final result = widget.isCourseManager
+          ? await CourseManagerApi().checkMatrixSufficiency(
+              matrixId,
+              questionSourceType: _questionSourceType,
+            )
+          : await _api.checkMatrixSufficiency(
+              matrixId,
+              questionSourceType: _questionSourceType,
+            );
+      if (mounted) {
+        setState(() {
+          _shortfalls = (result['shortfalls'] as List?) ?? [];
+        });
+      }
+    } catch (e) {
+      // Sufficiency is an upfront hint, not a hard gate - if the check itself
+      // fails (network, auth, etc.) let the trainer proceed and rely on the
+      // Generate button's own error handling instead of blocking them here.
+      if (mounted) {
+        setState(() => _shortfalls = []);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isCheckingSufficiency = false);
       }
     }
   }
@@ -266,7 +304,10 @@ class _CourseManagerExamMatrixPageState extends State<CourseManagerExamMatrixPag
     final bool selected = _questionSourceType == value;
     return Expanded(
       child: GestureDetector(
-        onTap: () => setState(() => _questionSourceType = value),
+        onTap: () {
+          setState(() => _questionSourceType = value);
+          _checkSufficiency();
+        },
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
@@ -501,16 +542,87 @@ class _CourseManagerExamMatrixPageState extends State<CourseManagerExamMatrixPag
                                 onChanged: (val) {
                                   if (val != null) {
                                     setState(() => _selectedMatrixId = val);
+                                    _checkSufficiency();
                                   }
                                 },
                               ),
                             ),
                         ),
+                        if (_isCheckingSufficiency) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            children: const [
+                              SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Checking Question Bank...',
+                                style: TextStyle(color: Color(0xFF64748B), fontSize: 12, fontFamily: 'Outfit'),
+                              ),
+                            ],
+                          ),
+                        ] else if (_shortfalls.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF2F2),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFFECACA)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Row(
+                                  children: [
+                                    Icon(Icons.error_outline, color: Color(0xFFDC2626), size: 16),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      'Not enough questions in the Question Bank for this matrix:',
+                                      style: TextStyle(
+                                        color: Color(0xFF991B1B),
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'Outfit',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                ..._shortfalls.map((s) {
+                                  final skill = s['skillName'] ?? 'Any Skill';
+                                  final difficulty = s['difficultyName'] ?? 'Any Difficulty';
+                                  final groupType = s['groupTypeName'];
+                                  final required = s['required'] ?? 0;
+                                  final available = s['available'] ?? 0;
+                                  final label = groupType != null
+                                      ? '$skill · $difficulty · $groupType'
+                                      : '$skill · $difficulty';
+                                  return Padding(
+                                    padding: const EdgeInsets.only(left: 22, bottom: 2),
+                                    child: Text(
+                                      '$label — need $required, have $available',
+                                      style: const TextStyle(
+                                        color: Color(0xFF991B1B),
+                                        fontSize: 12,
+                                        fontFamily: 'Outfit',
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 48),
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
-                            onPressed: _selectedMatrixId == null
+                            onPressed: (_selectedMatrixId == null || _shortfalls.isNotEmpty)
                                 ? null
                                 : () async {
                                     if (!_formKey.currentState!.validate()) return;

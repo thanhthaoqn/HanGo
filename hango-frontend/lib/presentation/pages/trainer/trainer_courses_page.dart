@@ -16,6 +16,8 @@ import '../../../utils/download_helper.dart';
 import '../../../utils/toast_helper.dart';
 import 'trainer_profile_page.dart';
 import '../../widgets/trainer/trainer_sidebar.dart';
+import '../../../domain/model/exam_import_error.dart';
+import '../course_manager/exam_import_error_dialog.dart';
 
 class TrainerCoursesPage extends StatefulWidget {
   final bool isEmbedded;
@@ -545,6 +547,16 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
           }
         }
       } else {
+        final errors = _extractImportErrors(responseBody);
+        if (errors != null && errors.isNotEmpty) {
+          if (mounted) {
+            await showDialog(
+              context: context,
+              builder: (_) => ExamImportErrorDialog(errors: errors),
+            );
+          }
+          return;
+        }
         throw Exception(_extractErrorMessage(responseBody));
       }
     } catch (e) {
@@ -571,6 +583,24 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
       // Fall back to the raw response below.
     }
     return responseBody.isEmpty ? 'Import failed' : responseBody;
+  }
+
+  // Same "errors" list shape as the Exam Excel import
+  // (CourseImportValidationException on the backend), so the row/field-level
+  // popup can be reused as-is instead of just a flat toast message.
+  List<ExamImportError>? _extractImportErrors(String responseBody) {
+    try {
+      final data = jsonDecode(responseBody);
+      if (data is Map && data['errors'] is List) {
+        return (data['errors'] as List)
+            .whereType<Map<String, dynamic>>()
+            .map(ExamImportError.fromJson)
+            .toList();
+      }
+    } catch (_) {
+      // Not a structured-error response; fall back to the plain message.
+    }
+    return null;
   }
 
   String _formatDate(dynamic dateStr) {

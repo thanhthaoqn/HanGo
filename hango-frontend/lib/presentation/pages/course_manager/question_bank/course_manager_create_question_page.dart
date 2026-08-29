@@ -14,6 +14,7 @@ class OptionState {
   int? id;
   TextEditingController textController = TextEditingController();
   bool isCorrect;
+  String? errorText;
   OptionState({this.id, String text = '', this.isCorrect = false}) {
     textController.text = text;
   }
@@ -424,6 +425,13 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
           if (q.questionTextController.text.trim().isEmpty) {
             q.questionTextError = 'Question text cannot be empty';
             isValid = false;
+          }
+          for (var opt in q.options) {
+            opt.errorText = null;
+            if (opt.textController.text.trim().isEmpty) {
+              opt.errorText = 'Option text cannot be empty';
+              isValid = false;
+            }
           }
           if (!q.options.any((opt) => opt.isCorrect)) {
             q.optionsError = 'Must have at least one correct option';
@@ -1231,6 +1239,7 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
             readOnly: widget.isReadOnly,
             decoration: InputDecoration(
               hintText: 'Option $letter',
+              errorText: option.errorText,
               isDense: true,
               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               border: OutlineInputBorder(
