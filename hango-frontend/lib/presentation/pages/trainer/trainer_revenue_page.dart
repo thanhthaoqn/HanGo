@@ -497,21 +497,14 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
                                 borderRadius: BorderRadius.circular(4),
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(vertical: 4),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        s['statementCode']?.toString() ?? 'N/A',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFF2563EB),
-                                          decoration: TextDecoration.underline,
-                                          fontFamily: 'Outfit',
-                                        ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      const Icon(Icons.open_in_new_rounded, size: 13, color: Color(0xFF2563EB)),
-                                    ],
+                                  child: Text(
+                                    s['statementCode']?.toString() ?? 'N/A',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF2563EB),
+                                      decoration: TextDecoration.underline,
+                                      fontFamily: 'Outfit',
+                                    ),
                                   ),
                                 ),
                               ),
