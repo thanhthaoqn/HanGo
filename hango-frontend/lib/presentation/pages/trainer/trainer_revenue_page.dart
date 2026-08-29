@@ -55,6 +55,23 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
     return '${val.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} VNĐ';
   }
 
+  String _formatDateTime(dynamic dateTime) {
+    if (dateTime == null) return '-';
+    try {
+      final str = dateTime.toString();
+      if (str.isEmpty || str == 'null') return '-';
+      final dt = DateTime.parse(str).toLocal();
+      final day = dt.day.toString().padLeft(2, '0');
+      final month = dt.month.toString().padLeft(2, '0');
+      final year = dt.year.toString();
+      final hour = dt.hour.toString().padLeft(2, '0');
+      final minute = dt.minute.toString().padLeft(2, '0');
+      return '$day/$month/$year $hour:$minute';
+    } catch (_) {
+      return dateTime.toString();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -480,6 +497,7 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
                       columnSpacing: 28,
                       columns: [
                         DataColumn(label: Text(isVi ? 'Mã Báo cáo' : 'Statement Code', style: _headerStyle)),
+                        DataColumn(label: Text(isVi ? 'Thời gian tạo' : 'Created At', style: _headerStyle)),
                         DataColumn(label: Text(isVi ? 'Kỳ Tháng' : 'Period', style: _headerStyle)),
                         DataColumn(label: Text(isVi ? 'Số đơn' : 'Orders', style: _headerStyle)),
                         DataColumn(label: Text(isVi ? 'Tổng bán' : 'Gross Amount', style: _headerStyle)),
@@ -507,6 +525,12 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
                                     ),
                                   ),
                                 ),
+                              ),
+                            ),
+                            DataCell(
+                              Text(
+                                _formatDateTime(s['paidAt'] ?? s['createdAt'] ?? s['trainerConfirmedAt']),
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontFamily: 'Outfit'),
                               ),
                             ),
                             DataCell(Text(s['periodMonth']?.toString() ?? 'N/A')),
