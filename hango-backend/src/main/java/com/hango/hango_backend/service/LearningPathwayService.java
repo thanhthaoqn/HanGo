@@ -38,6 +38,7 @@ import com.hango.hango_backend.repository.LearningPathwayRepository;
 import com.hango.hango_backend.repository.LessonProgressRepository;
 import com.hango.hango_backend.repository.LessonRepository;
 import com.hango.hango_backend.repository.UserRepository;
+import com.hango.hango_backend.repository.EnrollmentRepository;
 import com.hango.hango_backend.service.SkillCategoryMappingService;
 
 import lombok.RequiredArgsConstructor;
@@ -56,6 +57,7 @@ public class LearningPathwayService {
     private final ExamAttemptRepository examAttemptRepository;
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
+    private final EnrollmentRepository enrollmentRepository;
     private final GeminiClientService geminiClientService;
     private final ObjectMapper objectMapper;
     private final ExamResultAnalyzerService examResultAnalyzerService;
@@ -151,7 +153,7 @@ public class LearningPathwayService {
                 %s
                 Core rules:
                 1. Only choose course_id values from [AVAILABLE_COURSES]. Never invent a course.
-                2. Prioritize foundations first, then harder reading or advanced skills.
+                2. COURSE DIFFICULTY MUST MATCH THE LEARNER'S CURRENT SCORE (latest_score or score_avg). DO NOT RECOMMEND "Advanced" or "Hard" courses in early steps if the learner's score is below 7.0, even if their goal is high. Prioritize foundations first.
                 3. ƯU TIÊN chọn các khóa học khắc phục trực tiếp các "weak_skills" trong phần phân tích và hướng tới MỤC TIÊU CỦA NGƯỜI HỌC. Đưa ra "reason_why" giải thích rõ tại sao khóa học này lại giúp cải thiện điểm yếu hoặc giúp đạt mục tiêu đó. "reason_why" phải giải thích cụ thể "Khóa này giải quyết lỗi vừa mắc" hay "Khóa này củng cố điểm yếu kinh niên".
                 4. "mentor_summary" PHẢI LÀ LỜI CHÀO VÀ TÓM TẮT THÔNG MINH, MẶC ĐỊNH SỬ DỤNG TIẾNG VIỆT (có thể dùng tiếng Anh nếu người dùng hỏi bằng tiếng Anh). Bạn PHẢI so sánh điểm số bài thi gần nhất (latest_score) với điểm trung bình lịch sử (lấy từ "score_avg" trong knowledge_gaps_json). Ví dụ: "Dựa trên lịch sử làm bài, điểm trung bình của bạn đang là [score_avg]/10. Tuy nhiên, trong bài thi vừa rồi (được [latest_score]/10 điểm), bạn đang gặp khó khăn ở phần [X]. Đồng thời, [Y] vẫn là điểm yếu kinh niên cần khắc phục...". TUYỆT ĐỐI KHÔNG trộn lẫn ngôn ngữ (nửa Anh nửa Việt) trong một câu.
                 5. Return valid JSON only, without markdown fences.
@@ -533,8 +535,13 @@ public class LearningPathwayService {
             if ("COMPLETED".equalsIgnoreCase(node.getStatus())) {
                 estimatedHoursPerNode.add(0); // Completed nodes consume no forward capacity
             } else {
-                long totalLessons = lessonRepository.countByCourseId(node.getCourse().getId());
-                estimatedHoursPerNode.add(totalLessons == 0 ? 3 : (int) (totalLessons * 2));
+                Integer estDuration = node.getCourse().getEstimatedDuration();
+                if (estDuration != null && estDuration > 0) {
+                    estimatedHoursPerNode.add(estDuration);
+                } else {
+                    long totalLessons = lessonRepository.countByCourseId(node.getCourse().getId());
+                    estimatedHoursPerNode.add(totalLessons == 0 ? 3 : (int) (totalLessons * 2));
+                }
             }
         }
 
@@ -610,12 +617,13 @@ public class LearningPathwayService {
                 resolvedStatus = "IN_PROGRESS";
             }
 
-            return PathwayNodeDTO.builder()
-                    .id(node.getId())
-                    .step(node.getStepOrder())
-                    .courseId(node.getCourse().getId())
-                    .courseTitle(node.getCourse().getTitle())
-                    .status(resolvedStatus)
+                    return PathwayNodeDTO.builder()
+                            .id(node.getId())
+                            .step(node.getStepOrder())
+                            .courseId(node.getCourse().getId())
+                            .courseTitle(node.getCourse().getTitle())
+                            .difficulty(node.getCourse().getDifficulty() != null ? node.getCourse().getDifficulty().getParamValue() : "N/A")
+                            .status(resolvedStatus)
                     .reasonWhy(node.getReasonWhy())
                     .progressPercent(realProgress)
                     .skillType(skillType)
@@ -674,10 +682,18 @@ public class LearningPathwayService {
 
         if (currentNode != null) {
             int progress = calculateCourseProgressPercent(studentId, currentNode.getCourse().getId());
-            suggestedActions.add("FAST_TRACK"); // Unconditionally allow fast-track for current node
+            boolean isFree = currentNode.getCourse().getPrice() == null || currentNode.getCourse().getPrice().compareTo(java.math.BigDecimal.ZERO) == 0;
+            boolean isEnrolled = isFree || enrollmentRepository.existsByUserIdAndCourseId(studentId, currentNode.getCourse().getId());
 
-            if (progress > 0 && progress < 50) {
-                suggestedActions.add("TAKE_QUIZ");
+            if (isEnrolled) {
+                suggestedActions.add("FAST_TRACK"); // Only allow fast-track if enrolled or free
+
+                if (progress > 0 && progress < 50) {
+                    suggestedActions.add("TAKE_QUIZ");
+                }
+            } else {
+                suggestedActions.add("ENROLL_OR_REGENERATE");
+                pathway.setMentorSummary("Đường dẫn này yêu cầu một khóa học Premium. Bạn có thể mua khóa học để tiếp tục, hoặc tôi có thể thiết kế lại một lộ trình thay thế hoàn toàn miễn phí cho bạn.");
             }
         } else if (completedSteps > 0 && completedSteps == totalSteps) {
             // Pathway is fully completed
@@ -902,7 +918,14 @@ public class LearningPathwayService {
                     courseId);
         }
 
-        applyMasteryResult(node, score);
+        int passingScore = MASTERY_PASS_SCORE;
+        if (primaryLessonId != null) {
+            Lesson quizLesson = lessonRepository.findById(primaryLessonId).orElse(null);
+            if (quizLesson != null && quizLesson.getExam() != null && quizLesson.getExam().getPassingScore() != null) {
+                passingScore = (int) Math.round(quizLesson.getExam().getPassingScore());
+            }
+        }
+        applyMasteryResult(node, score, passingScore);
         learningPathwayRepository.save(pathway);
         return com.hango.hango_backend.dto.MasterySubmitResponseDTO.builder()
                 .pathway(toResponseDto(pathway, studentId))
@@ -1013,9 +1036,9 @@ public class LearningPathwayService {
      * Ap ket qua mastery vao node: >=80 thi mastered + tang chu ky on tap
      * 1->3->7->14->30 ngay.
      */
-    private void applyMasteryResult(PathwayNode node, Integer score) {
+    private void applyMasteryResult(PathwayNode node, Integer score, int passingScore) {
         node.setMasteryScore(score);
-        if (score != null && score >= MASTERY_PASS_SCORE) {
+        if (score != null && score >= passingScore) {
             node.setIsMastered(true);
             if (node.getReviewIntervalDays() == null) {
                 node.setReviewIntervalDays(1);
@@ -1056,11 +1079,21 @@ public class LearningPathwayService {
             throw new ApiException("Score must be between 0 and 100", HttpStatus.BAD_REQUEST);
         }
 
-        applyMasteryResult(node, request.getScore());
+        int passingScore = MASTERY_PASS_SCORE;
+        List<Long> quizLessonIds = resolveQuizLessonIds(node.getCourse().getId());
+        Long primaryLessonId = !quizLessonIds.isEmpty() ? quizLessonIds.get(0) : null;
+        if (primaryLessonId != null) {
+            Lesson quizLesson = lessonRepository.findById(primaryLessonId).orElse(null);
+            if (quizLesson != null && quizLesson.getExam() != null && quizLesson.getExam().getPassingScore() != null) {
+                passingScore = (int) Math.round(quizLesson.getExam().getPassingScore());
+            }
+        }
+
+        applyMasteryResult(node, request.getScore(), passingScore);
         pathway.setMentorSummary(Boolean.TRUE.equals(node.getIsMastered())
                 ? "Congratulations on achieving Mastery! This course is scheduled for review in "
                         + node.getReviewIntervalDays() + " days."
-                : "Your score is " + request.getScore() + ". You need " + MASTERY_PASS_SCORE
+                : "Your score is " + request.getScore() + ". You need " + passingScore
                         + " points to Master the course. Keep reviewing!");
 
         return toResponseDto(pathway, studentId);
@@ -1151,6 +1184,7 @@ public class LearningPathwayService {
                                     .step(currentStep)
                                     .courseId(course.getId())
                                     .courseTitle(course.getTitle())
+                                    .difficulty(course.getDifficulty() != null ? course.getDifficulty().getParamValue() : "N/A")
                                     .status(currentStep == 1 ? "IN_PROGRESS" : "LOCKED")
                                     .reasonWhy(defaultReasonForCourse(course, examAttempt))
                                     .progressPercent(0)

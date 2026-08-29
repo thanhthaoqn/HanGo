@@ -9,6 +9,7 @@ class PathwayNode {
   final int step;
   final int courseId;
   final String courseTitle;
+  final String? difficulty;
   final List<String> tags;
   final NodeStatus status;
   final String reasonWhy;
@@ -50,6 +51,7 @@ class PathwayNode {
     required this.step,
     required this.courseId,
     required this.courseTitle,
+    this.difficulty,
     required this.tags,
     required this.status,
     required this.reasonWhy,
@@ -107,6 +109,7 @@ class PathwayNode {
       step: step ?? this.step,
       courseId: courseId ?? this.courseId,
       courseTitle: courseTitle ?? this.courseTitle,
+      difficulty: difficulty ?? this.difficulty,
       tags: tags ?? this.tags,
       status: status ?? this.status,
       reasonWhy: reasonWhy ?? this.reasonWhy,
@@ -214,6 +217,7 @@ class PathwayNode {
           : int.tryParse('$rawCourseId') ?? 0,
       courseTitle:
           json['course_title'] ?? json['courseTitle'] ?? 'Course Title',
+      difficulty: json['difficulty'],
       tags: List<String>.from(json['tags'] ?? []),
       status: parseStatus('${json['status']}'),
       reasonWhy: json['reason_why'] ?? json['reasonWhy'] ?? '',

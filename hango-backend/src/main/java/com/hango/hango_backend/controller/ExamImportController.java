@@ -87,8 +87,8 @@ public class ExamImportController {
                 String title = getCellString(row, 1);
                 String description = getCellString(row, 2);
                 String qCountStr = getCellString(row, 3);
-                String passingScoreStr = getCellString(row, 4);
-                String timeStr = getCellString(row, 5);
+                String timeStr = getCellString(row, 4);
+                String passingScoreStr = getCellString(row, 5);
                 String thumbnailUrl = com.hango.hango_backend.entity.Exam.resolveThumbnailUrl(getCellString(row, 6));
 
                 boolean rowHasError = false;
@@ -295,7 +295,8 @@ public class ExamImportController {
                 }
             }
 
-            // --- DECISION POINT: report every error at once, insert nothing if any exist ---
+            // --- DECISION POINT: report every error at once, insert nothing if any exist
+            // ---
             if (!errors.isEmpty()) {
                 Map<String, Object> body = new HashMap<>();
                 body.put("error", errors.get(0).get("message"));
@@ -401,8 +402,10 @@ public class ExamImportController {
                                     "INSERT INTO questions (created_by, category_id, question_text, explanation, difficulty_param_id, status, group_id, skill_param_id, usage_type) VALUES (?, ?, ?, ?, ?, 'PRIVATE', ?, ?, 2)",
                                     java.sql.Statement.RETURN_GENERATED_KEYS);
                             ps.setLong(1, userId);
-                            if (fCategory != null) ps.setLong(2, fCategory);
-                            else ps.setNull(2, java.sql.Types.BIGINT);
+                            if (fCategory != null)
+                                ps.setLong(2, fCategory);
+                            else
+                                ps.setNull(2, java.sql.Types.BIGINT);
                             ps.setString(3, qt);
                             if (explanation != null)
                                 ps.setString(4, explanation);
@@ -477,7 +480,8 @@ public class ExamImportController {
     public ResponseEntity<byte[]> downloadTemplate() {
         try {
             String fileName = "Hango_Exam_Import_Template.xlsx";
-            org.springframework.core.io.ClassPathResource resource = new org.springframework.core.io.ClassPathResource("templates/" + fileName);
+            org.springframework.core.io.ClassPathResource resource = new org.springframework.core.io.ClassPathResource(
+                    "templates/" + fileName);
             if (!resource.exists()) {
                 throw new java.io.IOException("Template not found in classpath:templates/");
             }
@@ -504,8 +508,10 @@ public class ExamImportController {
         };
     }
 
-    // Cells typed as "Number" in Excel (e.g. Passing Score entered as 7.5) must keep
-    // their decimal part; truncating to (long) before stringifying silently drops it.
+    // Cells typed as "Number" in Excel (e.g. Passing Score entered as 7.5) must
+    // keep
+    // their decimal part; truncating to (long) before stringifying silently drops
+    // it.
     // Whole numbers still come out as plain integers ("30", not "30.0") so existing
     // integer fields (Question Count, Time, Order Index) keep parsing correctly.
     private String formatNumericCell(double value) {
@@ -518,27 +524,42 @@ public class ExamImportController {
     private Long resolveSystemParam(String paramValue) {
         if (paramValue == null || paramValue.isBlank())
             return null;
-        
+
         String searchVal = paramValue.trim();
-        
+
         // Map old Skill Types to new ones
-        if (searchVal.equalsIgnoreCase("Conversation/Short Sentences")) searchVal = "Conversation ordering"; // Or any appropriate new skill
-        else if (searchVal.equalsIgnoreCase("Synonym")) searchVal = "Synonym in context";
-        else if (searchVal.equalsIgnoreCase("Antonym")) searchVal = "Antonym in context";
-        else if (searchVal.equalsIgnoreCase("Pronunciation")) searchVal = "Phonetics";
-        else if (searchVal.equalsIgnoreCase("Grammar")) searchVal = "Vocabulary"; // Fallback
-        else if (searchVal.equalsIgnoreCase("Sentence Meaning")) searchVal = "Contextual meaning";
-        else if (searchVal.equalsIgnoreCase("Sentence Combining")) searchVal = "Word order";
-        else if (searchVal.equalsIgnoreCase("Fill in Blank")) searchVal = "Vocabulary";
-        else if (searchVal.equalsIgnoreCase("Reading Comprehension")) searchVal = "Reading Comprehension - 10 questions";
-        else if (searchVal.equalsIgnoreCase("Arrangement")) searchVal = "Paragraph ordering";
-        
+        if (searchVal.equalsIgnoreCase("Conversation/Short Sentences"))
+            searchVal = "Conversation ordering"; // Or any appropriate new skill
+        else if (searchVal.equalsIgnoreCase("Synonym"))
+            searchVal = "Synonym in context";
+        else if (searchVal.equalsIgnoreCase("Antonym"))
+            searchVal = "Antonym in context";
+        else if (searchVal.equalsIgnoreCase("Pronunciation"))
+            searchVal = "Phonetics";
+        else if (searchVal.equalsIgnoreCase("Grammar"))
+            searchVal = "Vocabulary"; // Fallback
+        else if (searchVal.equalsIgnoreCase("Sentence Meaning"))
+            searchVal = "Contextual meaning";
+        else if (searchVal.equalsIgnoreCase("Sentence Combining"))
+            searchVal = "Word order";
+        else if (searchVal.equalsIgnoreCase("Fill in Blank"))
+            searchVal = "Vocabulary";
+        else if (searchVal.equalsIgnoreCase("Reading Comprehension"))
+            searchVal = "Reading Comprehension - 10 questions";
+        else if (searchVal.equalsIgnoreCase("Arrangement"))
+            searchVal = "Paragraph ordering";
+
         // Map old Group Types to new ones
-        if (searchVal.equalsIgnoreCase("Notice Completion")) searchVal = "Read and Fill in a Notice";
-        else if (searchVal.equalsIgnoreCase("Flyer Completion")) searchVal = "Read and Fill in a Leaflet/Advertisement";
-        else if (searchVal.equalsIgnoreCase("Passage Arrangement")) searchVal = "Paragraph/Text Reordering";
-        else if (searchVal.equalsIgnoreCase("Information Gap Filling")) searchVal = "Guided Cloze Test";
-        else if (searchVal.equalsIgnoreCase("Reading Comprehension")) searchVal = "Reading Comprehension - 10 questions";
+        if (searchVal.equalsIgnoreCase("Notice Completion"))
+            searchVal = "Read and Fill in a Notice";
+        else if (searchVal.equalsIgnoreCase("Flyer Completion"))
+            searchVal = "Read and Fill in a Leaflet/Advertisement";
+        else if (searchVal.equalsIgnoreCase("Passage Arrangement"))
+            searchVal = "Paragraph/Text Reordering";
+        else if (searchVal.equalsIgnoreCase("Information Gap Filling"))
+            searchVal = "Guided Cloze Test";
+        else if (searchVal.equalsIgnoreCase("Reading Comprehension"))
+            searchVal = "Reading Comprehension - 10 questions";
 
         List<Long> ids = jdbcTemplate.query(
                 "SELECT id FROM system_parameters WHERE LOWER(param_value) = LOWER(?) LIMIT 1",

@@ -270,6 +270,12 @@ class _NodeCard extends StatelessWidget {
                   status: node.status,
                   isDarkMode: isDarkMode,
                 ),
+              if (node.difficulty != null && node.difficulty != 'N/A' && node.difficulty!.isNotEmpty)
+                _SkillTag(
+                  label: '#${node.difficulty}',
+                  status: node.status,
+                  isDarkMode: isDarkMode,
+                ),
             ],
           ),
           if (node.reasonWhy.isNotEmpty) ...[
@@ -588,6 +594,10 @@ class _SkillTag extends StatelessWidget {
       color = const Color(0xFF8B5CF6); // Purple for long-term mastery
       bgColor = color.withOpacity(isDarkMode ? 0.2 : 0.12);
       borderColor = color.withOpacity(0.4);
+    } else if (label == "#Easy" || label == "#Medium" || label == "#Hard") {
+      color = const Color(0xFFEAB308); // Yellow/Orange for difficulty
+      bgColor = color.withOpacity(isDarkMode ? 0.2 : 0.12);
+      borderColor = color.withOpacity(0.4);
     }
 
     return Container(
@@ -615,57 +625,13 @@ class _ScheduleChip extends StatelessWidget {
 
   const _ScheduleChip({required this.node, required this.isDarkMode});
 
-  String _formatDate(DateTime d) {
-    final day = d.day.toString().padLeft(2, '0');
-    final month = d.month.toString().padLeft(2, '0');
-    return '$day/$month';
-  }
-
   @override
   Widget build(BuildContext context) {
-    final startDate = node.startDate;
-    final deadline = node.deadline;
-    if (startDate == null && deadline == null) return const SizedBox.shrink();
-
-    final status = node.scheduleStatus ?? ScheduleStatus.onTrack;
-
-    Color bg;
-    Color fg;
-    String label;
-
-    switch (status) {
-      case ScheduleStatus.behind:
-        bg = const Color(0xFFDC2626);
-        fg = Colors.white;
-        label = 'Behind';
-        break;
-      case ScheduleStatus.atRisk:
-        bg = const Color(0xFFF59E0B);
-        fg = Colors.black;
-        label = 'At risk';
-        break;
-      case ScheduleStatus.completed:
-        bg = const Color(0xFF10B981);
-        fg = Colors.white;
-        label = 'Completed';
-        break;
-      case ScheduleStatus.onTrack:
-      default:
-        bg = const Color(0xFF28B79B);
-        fg = Colors.white;
-        label = 'On track';
-        break;
-    }
-
-    if (!isDarkMode && status != ScheduleStatus.atRisk) {
-      fg = bg;
-    }
-
     final hours = node.estimatedHours;
-    final dateText = startDate != null && deadline != null
-        ? '${_formatDate(startDate)} - ${_formatDate(deadline)}'
-        : _formatDate(startDate ?? deadline!);
-    final hoursText = hours != null ? ' | ${hours}h' : '';
+    if (hours == null || hours <= 0) return const SizedBox.shrink();
+
+    Color bg = const Color(0xFF28B79B);
+    Color fg = isDarkMode ? Colors.white : bg;
 
     return Align(
       alignment: Alignment.centerLeft,
@@ -677,7 +643,7 @@ class _ScheduleChip extends StatelessWidget {
           border: Border.all(color: bg.withOpacity(0.45)),
         ),
         child: Text(
-          '$label | $dateText$hoursText',
+          '⏳ Estimated: ${hours}h',
           style: TextStyle(
             color: fg,
             fontSize: 12,
