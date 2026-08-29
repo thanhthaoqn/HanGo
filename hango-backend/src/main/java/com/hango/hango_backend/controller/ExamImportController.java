@@ -87,8 +87,8 @@ public class ExamImportController {
                 String title = getCellString(row, 1);
                 String description = getCellString(row, 2);
                 String qCountStr = getCellString(row, 3);
-                String timeStr = getCellString(row, 4);
-                String passingScoreStr = getCellString(row, 5);
+                String passingScoreStr = getCellString(row, 4);
+                String timeStr = getCellString(row, 5);
                 String thumbnailUrl = com.hango.hango_backend.entity.Exam.resolveThumbnailUrl(getCellString(row, 6));
 
                 boolean rowHasError = false;

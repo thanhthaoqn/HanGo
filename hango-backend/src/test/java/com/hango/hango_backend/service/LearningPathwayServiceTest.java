@@ -78,6 +78,18 @@ class LearningPathwayServiceTest {
     @Mock
     private LessonRepository lessonRepository;
 
+    @Mock
+    private com.hango.hango_backend.repository.EnrollmentRepository enrollmentRepository;
+
+    @Mock
+    private SkillCategoryMappingService skillCategoryMappingService;
+
+    @Mock
+    private com.hango.hango_backend.repository.LessonQuizAttemptRepository quizAttemptRepository;
+
+    @Mock
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
     @InjectMocks
     private LearningPathwayService learningPathwayService;
 
