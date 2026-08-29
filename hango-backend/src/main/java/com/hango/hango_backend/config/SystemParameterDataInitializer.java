@@ -99,8 +99,9 @@ public class SystemParameterDataInitializer implements CommandLineRunner {
         skills.put("MAIN_IDEA_CENTRAL_THEME_QUESTION", "Main idea / Central theme question");
         skills.put("TRUE_NOT_TRUE_QUESTION", "TRUE / NOT TRUE question");
         skills.put("INFERENCE_QUESTION", "Inference question");
+        skills.put("PART_OF_SPEECH_PARTICIPLE", "Part of speech / Participle");
 
-        // --- STEP 1.2: Ensure 25 Skill Types exist for SKILL_TYPE and SKILL ---
+        // --- STEP 1.2: Ensure 26 Skill Types exist for SKILL_TYPE and SKILL ---
         String[] skillParamTypes = { "SKILL_TYPE", "SKILL" };
         for (String paramType : skillParamTypes) {
             for (Map.Entry<String, String> entry : skills.entrySet()) {
@@ -154,9 +155,9 @@ public class SystemParameterDataInitializer implements CommandLineRunner {
             ensureExistsBulk(toCreate, existingParams, "DIFFICULTY", entry.getKey(), entry.getValue());
         }
 
-        // --- STEP 4: Ensure 26 SKILL_CATEGORY_MAP exist ---
+        // --- STEP 4: Ensure 27 SKILL_CATEGORY_MAP exist ---
         Map<String, String> skillCategoryMap = new LinkedHashMap<>();
-        // Grammar (8 skills)
+        // Grammar (9 skills)
         skillCategoryMap.put("WORD_ORDER", "GRAMMAR");
         skillCategoryMap.put("REDUCED_RELATIVE_CLAUSE", "GRAMMAR");
         skillCategoryMap.put("PREPOSITION", "GRAMMAR");
@@ -165,6 +166,7 @@ public class SystemParameterDataInitializer implements CommandLineRunner {
         skillCategoryMap.put("PREPOSITIONAL_PHRASE", "GRAMMAR");
         skillCategoryMap.put("PASSIVE_VOICE", "GRAMMAR");
         skillCategoryMap.put("RELATIVE_CLAUSE", "GRAMMAR");
+        skillCategoryMap.put("PART_OF_SPEECH_PARTICIPLE", "GRAMMAR");
         
         // Vocabulary (5 skills)
         skillCategoryMap.put("COLLOCATION", "VOCABULARY");

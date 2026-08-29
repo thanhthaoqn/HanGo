@@ -27,13 +27,17 @@ class QuestionTable extends StatelessWidget {
     this.isCourseManager = false,
   }) : super(key: key);
 
-  String _formatTime(DateTime dt) {
+  // Legacy/imported questions can have no recorded timestamp at all - show
+  // "--:--" / "--" for those instead of silently making one up.
+  String _formatTime(DateTime? dt) {
+    if (dt == null) return '--:--';
     final hh = dt.hour.toString().padLeft(2, '0');
     final mm = dt.minute.toString().padLeft(2, '0');
     return '$hh:$mm';
   }
 
-  String _formatDate(DateTime dt) {
+  String _formatDate(DateTime? dt) {
+    if (dt == null) return '--';
     final d = dt.day.toString().padLeft(2, '0');
     final m = dt.month.toString().padLeft(2, '0');
     final y = dt.year.toString();

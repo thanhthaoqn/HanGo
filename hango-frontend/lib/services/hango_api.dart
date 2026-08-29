@@ -592,6 +592,29 @@ class HangoApi {
     }
   }
 
+  /// Checks whether the Question Bank has enough questions to satisfy every
+  /// row of the given matrix, using the same filters exam generation itself
+  /// uses - so this matches what generating an exam from it would find.
+  Future<Map<String, dynamic>> checkMatrixSufficiency(
+    int matrixId, {
+    int? questionSourceType,
+  }) async {
+    final query = questionSourceType != null
+        ? '?questionSourceType=$questionSourceType'
+        : '';
+    final response = await _send(
+      http.get(
+        _uri('/trainer/matrices/$matrixId/check-sufficiency$query'),
+        headers: _headers,
+      ),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    }
+    throw ApiFailure('Failed to check matrix sufficiency: ${response.statusCode}');
+  }
+
   Future<Map<String, double>> getSkillAnalytics() async {
     final response = await _send(
       http.get(_uri('/exams/users/me/analytics/skills'), headers: _headers),

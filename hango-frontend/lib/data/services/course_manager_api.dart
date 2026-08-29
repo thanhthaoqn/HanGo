@@ -379,6 +379,30 @@ class CourseManagerApi {
     );
   }
 
+  /// Checks whether the Question Bank has enough questions to satisfy every
+  /// row of the given matrix, using the same filters exam generation itself
+  /// uses - so this matches what generating an exam from it would find.
+  Future<Map<String, dynamic>> checkMatrixSufficiency(
+    int matrixId, {
+    int? questionSourceType,
+  }) async {
+    final response = await _get(
+      '/matrices/$matrixId/check-sufficiency',
+      queryParameters: {
+        if (questionSourceType != null)
+          'questionSourceType': questionSourceType.toString(),
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    }
+
+    throw Exception(
+      'Failed to check matrix sufficiency: ${response.statusCode}',
+    );
+  }
+
   Future<List<Map<String, dynamic>>> getCategories() async {
     final token = await _requireToken();
 

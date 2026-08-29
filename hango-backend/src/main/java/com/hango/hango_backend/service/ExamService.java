@@ -77,6 +77,54 @@ public class ExamService {
         }).collect(Collectors.toList());
     }
 
+    /**
+     * Picks a random exam among those flagged as an Entry Exam by a Course
+     * Manager. Returns null when none is configured (no hardcoded fallback) -
+     * the caller decides how to handle "no entry exam configured yet".
+     */
+    public ExamResponseDTO getRandomEntryExam() {
+        List<Exam> entryExams = examRepository.findByIsEntryExamTrueAndStatusAndDeletedAtIsNull("PUBLISHED");
+        if (entryExams.isEmpty()) {
+            return null;
+        }
+        Exam chosen = entryExams.get(new java.util.Random().nextInt(entryExams.size()));
+
+        int qCount = examQuestionRepository.countQuestionsByExamIds(List.of(chosen.getId())).stream()
+                .findFirst()
+                .map(row -> ((Number) row[1]).intValue())
+                .orElse(0);
+        Long sCount = examAttemptRepository.countDistinctStudentsByExamIds(List.of(chosen.getId())).stream()
+                .findFirst()
+                .map(row -> ((Number) row[1]).longValue())
+                .orElse(0L);
+
+        return mapToDTO(chosen, qCount, sCount);
+    }
+
+    /**
+     * Whether the given learner has already completed ANY exam currently
+     * flagged as an Entry Exam - checked against the live flagged set (not a
+     * single hardcoded id), since which exam gets served is randomized and can
+     * change over time as Course Managers flag/unflag exams.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> getEntryExamStatus(Long userId) {
+        List<Exam> entryExams = examRepository.findByIsEntryExamTrueAndStatusAndDeletedAtIsNull("PUBLISHED");
+        java.util.Set<Long> entryExamIds = entryExams.stream().map(Exam::getId).collect(Collectors.toSet());
+
+        boolean completed = false;
+        if (!entryExamIds.isEmpty()) {
+            List<ExamAttempt> attempts = examAttemptRepository.findByStudentIdOrderByStartedAtDesc(userId);
+            completed = attempts.stream()
+                    .anyMatch(a -> a.getExam() != null && entryExamIds.contains(a.getExam().getId()));
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("configured", !entryExamIds.isEmpty());
+        result.put("completed", completed);
+        return result;
+    }
+
     private ExamResponseDTO mapToDTO(Exam exam, int questionCount, Long count) {
         String learnerCountStr = "0";
         if (count != null && count > 0) {

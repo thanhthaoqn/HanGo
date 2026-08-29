@@ -235,13 +235,13 @@ class _TrainerOnboardingAgreementPageState
                         children: [
                           _buildTermTitle(
                             isVi
-                                ? 'ĐIỀU 1: TỶ LỆ CHIA SẺ DOANH THU & QUYẾT TOÁN THUẾ'
+                                ? 'ĐIỀU 1: TỶ LỆ CHIA SẺ DOANH THU & QUYẾT TOÁN'
                                 : 'ARTICLE 1: REVENUE SHARE & SETTLEMENT',
                           ),
                           _buildTermText(
                             isVi
-                                ? 'Loại tài khoản lựa chọn: ${isPro ? "Giáo viên chính thức (tỷ lệ 70/30)" : "Gia sư / Sinh viên (tỷ lệ 60/40)"}.\n- Tỷ lệ phân chia doanh thu: $splitText.\n- Thu nhập được quyết toán định kỳ hàng tháng. Khoản chi trả từ 2.000.000 VND trở lên trong kỳ có thể bị khấu trừ 10% Thuế Thu nhập cá nhân tại nguồn theo quy định áp dụng.'
-                                : 'Based on selected profile: ${isPro ? "Professional Teacher (70/30 split)" : "Peer Tutor (60/40 split)"}.\n- Contracted Revenue Split Ratio: $splitText.\n- Payouts are processed monthly. A 10% Personal Income Tax withholding may apply when gross payout in a period is 2,000,000 VND or higher under the applicable regulations.',
+                                ? 'Loại tài khoản lựa chọn: ${isPro ? "Giáo viên chính thức (tỷ lệ 70/30)" : "Gia sư / Sinh viên (tỷ lệ 60/40)"}.\n- Tỷ lệ phân chia doanh thu: $splitText.\n- Thu nhập được quyết toán định kỳ hàng tháng chuyển khoản trực tiếp vào tài khoản ngân hàng của bạn.'
+                                : 'Based on selected profile: ${isPro ? "Professional Teacher (70/30 split)" : "Peer Tutor (60/40 split)"}.\n- Contracted Revenue Split Ratio: $splitText.\n- Payouts are processed monthly and wired directly to your registered bank account.',
                           ),
                           const SizedBox(height: 16),
                           _buildTermTitle(

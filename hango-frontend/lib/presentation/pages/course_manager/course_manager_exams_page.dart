@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
 import 'course_manager_create_exam_page.dart';
@@ -13,6 +14,7 @@ import 'package:hango/presentation/widgets/internal_app_header.dart';
 import '../../widgets/course_manager_sidebar.dart';
 import '../../../data/services/course_manager_api.dart';
 import '../../../domain/model/trainer_ai_exam_models.dart';
+import '../../../utils/toast_helper.dart';
 
 class CourseManagerExamsPage extends StatefulWidget {
   final bool isEmbedded;
@@ -200,6 +202,12 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
 
       // 3. Sorting
       filteredData.sort((a, b) {
+        // In the Published tab, always surface Entry Exam candidates first.
+        if (_selectedStatus == 'PUBLISHED') {
+          final bool entryA = a['isEntryExam'] == true;
+          final bool entryB = b['isEntryExam'] == true;
+          if (entryA != entryB) return entryA ? -1 : 1;
+        }
         if (_selectedSortBy == 'STATUS') {
           if (_selectedStatus == 'ALL') {
             final dateA = _parseDate(a['updatedAt'] ?? a['createdAt']);
@@ -346,7 +354,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
                       children: [
                         _buildFilterContainer(),
                         const SizedBox(height: 24),
-                        _buildExamsTable(),
+                        _buildExamsList(),
                       ],
                     ),
                   ),
@@ -620,7 +628,7 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
     );
   }
 
-  Widget _buildExamsTable() {
+  Widget _buildExamsList() {
     int totalItems = _examsList.length;
     int totalPages = (totalItems / _itemsPerPage).ceil();
     if (totalPages == 0) totalPages = 1;
@@ -634,416 +642,486 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
         ? []
         : _examsList.sublist(startIndex, endIndex);
 
-    return Container(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (currentExams.isEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 64),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFEFF2F5)),
+            ),
+            child: _isLoading
+                ? const CircularProgressIndicator(color: Color(0xFF20B486))
+                : const Column(
+                    children: [
+                      Icon(Icons.assignment_outlined, size: 48, color: Color(0xFF94A3B8)),
+                      SizedBox(height: 16),
+                      Text(
+                        'No exams found matching this criteria',
+                        style: TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                    ],
+                  ),
+          )
+        else
+          for (final exam in currentExams)
+            _ExamCardWrapper(
+              exam: exam as Map<String, dynamic>,
+              buildCard: _buildExamCard,
+            ),
+        const SizedBox(height: 8),
+        _buildPagination(totalPages),
+      ],
+    );
+  }
+
+  // ─── Exam Card ─────────────────────────────────────────────────────────────
+
+  Widget _buildExamCard(Map<String, dynamic> exam, bool isHovered) {
+    final status = exam['status']?.toString().toUpperCase() ?? 'DRAFT';
+    final isCreator = _currentUserId != null && exam['creatorId'] == _currentUserId;
+    final title = (exam['title'] ?? 'Untitled Exam') as String;
+    final questionCount = exam['questionCount']?.toString() ?? '0';
+    final durationMinutes = exam['durationMinutes'] ?? 0;
+    final dateStr = _formatDate(exam['createdAt']);
+    final thumbnail = (exam['thumbnailUrl'] ?? '').toString();
+    final rejectionReason = (exam['rejectionReason'] ?? '').toString();
+
+    final borderColor = status == 'SUBMITTED'
+        ? const Color(0xFFFDE68A)
+        : status == 'REJECTED'
+        ? const Color(0xFFFECACA)
+        : const Color(0xFFEFF2F5);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      margin: const EdgeInsets.only(bottom: 16),
+      transform: Matrix4.translationValues(0, isHovered ? -4 : 0, 0),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isHovered ? const Color(0xFF20B486).withAlpha(102) : borderColor,
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isHovered
+                ? const Color(0xFF20B486).withAlpha(31)
+                : const Color.fromRGBO(0, 0, 0, 0.04),
+            blurRadius: isHovered ? 20 : 10,
+            offset: Offset(0, isHovered ? 8 : 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header + Body: fixed-flex columns need a minimum width so they
-          // don't get squeezed/overflow on narrow windows; fall back to
-          // horizontal scroll instead.
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final tableWidth = constraints.maxWidth < 900
-                  ? 900.0
-                  : constraints.maxWidth;
-              return SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: SizedBox(
-                  width: tableWidth,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Table Header
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 16,
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final useRow = constraints.maxWidth > 600;
+
+                final imageWidget = Container(
+                  width: useRow ? 80 : double.infinity,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEF2F6),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: thumbnail.isNotEmpty
+                      ? Image.network(
+                          thumbnail,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => const Icon(
+                            Icons.assignment,
+                            color: Color(0xFF20B486),
+                            size: 32,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.assignment,
+                          color: Color(0xFF20B486),
+                          size: 32,
                         ),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.vertical(
-                            top: Radius.circular(12),
+                );
+
+                final infoCol = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E293B),
+                            fontFamily: 'Outfit',
                           ),
                         ),
+                        _buildStatusChip(status),
+                        if (exam['isEntryExam'] == true) _buildEntryExamBadge(),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 16,
+                      runSpacing: 6,
+                      children: [
+                        _statChip(Icons.help_outline, '$questionCount questions'),
+                        _statChip(Icons.timer_outlined, '$durationMinutes mins'),
+                        _statChip(Icons.calendar_today_outlined, dateStr),
+                      ],
+                    ),
+                    if (status == 'REJECTED' && rejectionReason.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFFFECACA)),
+                        ),
                         child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            const Icon(Icons.info_outline, color: Color(0xFFDC2626), size: 16),
+                            const SizedBox(width: 6),
                             Expanded(
-                              flex: 3,
-                              child: _buildTableHeaderText('Exam Title'),
-                            ),
-                            Expanded(
-                              flex: 1,
-                              child: _buildTableHeaderText('Create Date'),
-                            ),
-                            Expanded(
-                              flex: 1,
-                              child: _buildTableHeaderText('Questions'),
-                            ),
-                            Expanded(
-                              flex: 1,
-                              child: _buildTableHeaderText('Duration'),
-                            ),
-                            Expanded(
-                              flex: 1,
-                              child: _buildTableHeaderText('Status'),
-                            ),
-                            Expanded(
-                              flex: 1,
-                              child: _buildTableHeaderText(
-                                'Actions',
-                                align: TextAlign.center,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Rejected Reason:',
+                                    style: TextStyle(
+                                      color: Color(0xFF991B1B),
+                                      fontSize: 13,
+                                      fontFamily: 'Outfit',
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  MarkdownBody(
+                                    data: rejectionReason,
+                                    styleSheet: MarkdownStyleSheet(
+                                      p: const TextStyle(
+                                        color: Color(0xFF991B1B),
+                                        fontSize: 12,
+                                        fontFamily: 'Outfit',
+                                      ),
+                                      listBullet: const TextStyle(
+                                        color: Color(0xFF991B1B),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const Divider(height: 1, color: Color(0xFFE2E8F0)),
-                      // Table Body
-                      currentExams.isEmpty
-                          ? (_isLoading
-                                ? const Padding(
-                                    padding: EdgeInsets.all(80.0),
-                                    child: Center(
-                                      child: CircularProgressIndicator(
-                                        color: Color(0xFF10B981),
-                                      ),
-                                    ),
-                                  )
-                                : const Padding(
-                                    padding: EdgeInsets.all(40.0),
-                                    child: Center(
-                                      child: Text(
-                                        'No exams found.',
-                                        style: TextStyle(
-                                          color: Color(0xFF64748B),
-                                          fontFamily: 'Outfit',
-                                        ),
-                                      ),
-                                    ),
-                                  ))
-                          : ListView.separated(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: currentExams.length,
-                              separatorBuilder: (context, index) =>
-                                  const Divider(
-                                    height: 1,
-                                    color: Color(0xFFE2E8F0),
-                                  ),
-                              itemBuilder: (context, index) {
-                                final exam = currentExams[index];
-                                return _buildExamRow(exam);
-                              },
-                            ),
                     ],
-                  ),
+                  ],
+                );
+
+                if (useRow) {
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      imageWidget,
+                      const SizedBox(width: 16),
+                      Expanded(child: infoCol),
+                    ],
+                  );
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [imageWidget, const SizedBox(height: 14), infoCol],
+                );
+              },
+            ),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: const BorderRadius.vertical(
+                bottom: Radius.circular(14),
+              ),
+              border: Border(
+                top: BorderSide(color: borderColor.withAlpha(100)),
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: _buildExamActions(
+              exam: exam,
+              status: status,
+              isCreator: isCreator,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExamActions({
+    required Map<String, dynamic> exam,
+    required String status,
+    required bool isCreator,
+  }) {
+    final canEdit = isCreator && (status == 'DRAFT' || status == 'REJECTED');
+    return Row(
+      children: [
+        if (canEdit)
+          _actionChip(
+            icon: Icons.edit_outlined,
+            label: 'Edit',
+            color: const Color(0xFF64748B),
+            bg: const Color(0xFFF1F5F9),
+            onTap: () => setState(() => _editingExamData = exam),
+          )
+        else
+          _actionChip(
+            icon: Icons.visibility_outlined,
+            label: 'View',
+            color: const Color(0xFF20B486),
+            bg: const Color(0xFFE6F7F1),
+            onTap: () {
+              showDialog(
+                context: context,
+                builder: (ctx) => ExamReviewDashboardDialog(
+                  examId: exam['id'] as int,
+                  examTitle: exam['title'] ?? 'Untitled Exam',
+                  examExpectedCount: exam['expectedQuestionCount'] as int? ?? 10,
+                  examQuestionCount: exam['questionCount'] as int? ?? 0,
+                  examDurationMinutes: exam['durationMinutes'] as int? ?? 0,
+                  examCreatedAt: _formatDate(exam['createdAt']),
+                  examUpdatedAt: exam['updatedAt'] != null
+                      ? _formatDate(exam['updatedAt'])
+                      : null,
+                  status: status,
+                  isCourseManager: true,
+                  creatorId: exam['creatorId'] as int?,
+                  creatorName: exam['creatorName']?.toString(),
+                  currentUserId: _currentUserId,
+                  onActionSuccess: () {
+                    _fetchExamsData();
+                  },
+                  onEditExam: isCreator && ['REJECTED', 'PUBLISHED', 'HIDDEN'].contains(status)
+                      ? () {
+                          setState(() => _editingExamData = exam);
+                        }
+                      : null,
                 ),
               );
             },
           ),
-          const Divider(height: 1, color: Color(0xFFE2E8F0)),
-          // Pagination Footer
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            child: Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                Text(
-                  'Showing ${totalItems == 0 ? 0 : startIndex + 1} to $endIndex of $totalItems entries',
-                  style: const TextStyle(
-                    color: Color(0xFF64748B),
-                    fontSize: 14,
-                    fontFamily: 'Outfit',
-                  ),
-                ),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _buildPaginationButton(
-                        Icons.chevron_left,
-                        onPressed: _currentPage > 1
-                            ? () => setState(() => _currentPage--)
-                            : null,
-                      ),
-                      const SizedBox(width: 8),
-                      ...List.generate(totalPages, (index) {
-                        int pageNum = index + 1;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8.0),
-                          child: _buildPaginationNumber(
-                            pageNum.toString(),
-                            isActive: pageNum == _currentPage,
-                            onPressed: () =>
-                                setState(() => _currentPage = pageNum),
-                          ),
-                        );
-                      }),
-                      _buildPaginationButton(
-                        Icons.chevron_right,
-                        onPressed: _currentPage < totalPages
-                            ? () => setState(() => _currentPage++)
-                            : null,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+        if (status == 'PUBLISHED' || exam['isEntryExam'] == true) ...[
+          const SizedBox(width: 8),
+          _buildEntryExamToggle(exam),
         ],
-      ),
+        const Spacer(),
+        _iconBtn(
+          icon: Icons.history,
+          tooltip: 'View history',
+          onTap: () {
+            showDialog(
+              context: context,
+              builder: (ctx) => ExamHistoryDialog(
+                examId: exam['id'] as int,
+                examTitle: exam['title'] ?? 'Untitled Exam',
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 
-  Widget _buildTableHeaderText(
-    String text, {
-    TextAlign align = TextAlign.left,
-  }) {
-    return Text(
-      text,
-      textAlign: align,
-      style: const TextStyle(
-        color: Color(0xFF64748B),
-        fontWeight: FontWeight.bold,
-        fontSize: 14,
-        fontFamily: 'Outfit',
-        letterSpacing: 0.5,
+  Widget _buildEntryExamBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEF2FF),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: const Color(0xFFC7D2FE)),
       ),
-    );
-  }
-
-  Widget _buildExamRow(Map<String, dynamic> exam) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      child: Row(
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            flex: 3,
-            child: Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child:
-                      exam['thumbnailUrl'] != null &&
-                          exam['thumbnailUrl'].toString().isNotEmpty
-                      ? Image.network(
-                          exam['thumbnailUrl'],
-                          width: 48,
-                          height: 48,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              Container(
-                                width: 48,
-                                height: 48,
-                                color: const Color(0xFFE2E8F0),
-                                child: const Icon(
-                                  Icons.image_not_supported,
-                                  color: Color(0xFF94A3B8),
-                                ),
-                              ),
-                        )
-                      : Container(
-                          width: 48,
-                          height: 48,
-                          color: const Color(0xFFE2E8F0),
-                          child: const Icon(
-                            Icons.assignment,
-                            color: Color(0xFF94A3B8),
-                          ),
-                        ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    exam['title'] ?? 'Untitled',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1E293B),
-                      fontSize: 15,
-                      fontFamily: 'Outfit',
-                      height: 1.5,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 1,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE6FFFA),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  _formatDate(exam['createdAt']),
-                  style: const TextStyle(
-                    color: Color(0xFF20B486),
-                    fontWeight: FontWeight.w500,
-                    fontSize: 13,
-                    fontFamily: 'Outfit',
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 1,
-            child: Text(
-              exam['questionCount']?.toString() ?? '0',
-              style: const TextStyle(
-                color: Color(0xFF1E293B),
-                fontWeight: FontWeight.w500,
-                fontSize: 14,
-                fontFamily: 'Outfit',
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 1,
-            child: Text(
-              '${exam['durationMinutes'] ?? 0} mins',
-              style: const TextStyle(
-                color: Color(0xFF1E293B),
-                fontWeight: FontWeight.w500,
-                fontSize: 14,
-                fontFamily: 'Outfit',
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 1,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: _buildStatusChip(exam['status'] ?? 'DRAFT'),
-            ),
-          ),
-          Expanded(
-            flex: 1,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Builder(
-                  builder: (context) {
-                    final status =
-                        exam['status']?.toString().toUpperCase() ?? 'DRAFT';
-                    final bool isCreator =
-                        _currentUserId != null &&
-                        exam['creatorId'] == _currentUserId;
-
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (isCreator &&
-                            (status == 'DRAFT' || status == 'REJECTED'))
-                          IconButton(
-                            icon: const Icon(
-                              Icons.edit_outlined,
-                              color: Color(0xFF64748B),
-                              size: 20,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _editingExamData = exam as Map<String, dynamic>;
-                              });
-                            },
-                            splashRadius: 20,
-                            constraints: const BoxConstraints(),
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                          ),
-
-                        if (!isCreator ||
-                            (status != 'DRAFT' && status != 'REJECTED'))
-                          IconButton(
-                            icon: const Icon(
-                              Icons.remove_red_eye_outlined,
-                              color: Color(0xFF20B486),
-                              size: 20,
-                            ),
-                            onPressed: () {
-                              showDialog(
-                                context: context,
-                                builder: (ctx) => ExamReviewDashboardDialog(
-                                  examId: exam['id'] as int,
-                                  examTitle: exam['title'] ?? 'Untitled Exam',
-                                  examExpectedCount:
-                                      exam['expectedQuestionCount'] as int? ??
-                                      10,
-                                  examQuestionCount:
-                                      exam['questionCount'] as int? ?? 0,
-                                  examDurationMinutes:
-                                      exam['durationMinutes'] as int? ?? 0,
-                                  examCreatedAt: _formatDate(exam['createdAt']),
-                                  examUpdatedAt: exam['updatedAt'] != null
-                                      ? _formatDate(exam['updatedAt'])
-                                      : null,
-                                  status: status,
-                                  isCourseManager: true,
-                                  creatorId: exam['creatorId'] as int?,
-                                  creatorName: exam['creatorName']?.toString(),
-                                  currentUserId: _currentUserId,
-                                  onActionSuccess: () {
-                                    _fetchExamsData();
-                                  },
-                                  onEditExam: isCreator && ['REJECTED', 'PUBLISHED', 'HIDDEN'].contains(status)
-                                      ? () {
-                                          setState(() {
-                                            _editingExamData = exam as Map<String, dynamic>;
-                                          });
-                                        }
-                                      : null,
-                                ),
-                              );
-                            },
-                            splashRadius: 20,
-                            constraints: const BoxConstraints(),
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                          ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.history,
-                            color: Color(0xFF64748B),
-                            size: 20,
-                          ),
-                          tooltip: 'View history',
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (ctx) => ExamHistoryDialog(
-                                examId: exam['id'] as int,
-                                examTitle: exam['title'] ?? 'Untitled Exam',
-                              ),
-                            );
-                          },
-                          splashRadius: 20,
-                          constraints: const BoxConstraints(),
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ],
+          Icon(Icons.flag, size: 11, color: Color(0xFF4F46E5)),
+          SizedBox(width: 4),
+          Text(
+            'Entry Exam',
+            style: TextStyle(
+              color: Color(0xFF4F46E5),
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'Outfit',
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // Lets a Course Manager mark any published exam as a candidate for the
+  // learner-facing Entry Exam (placement test). When more than one exam is
+  // flagged, the backend picks one at random each time a learner takes it.
+  Widget _buildEntryExamToggle(Map<String, dynamic> exam) {
+    final bool isEntryExam = exam['isEntryExam'] == true;
+    return isEntryExam
+        ? _actionChip(
+            icon: Icons.flag,
+            label: 'Entry Exam',
+            color: const Color(0xFF4F46E5),
+            bg: const Color(0xFFEEF2FF),
+            onTap: () => _confirmEntryExamChange(exam, false),
+          )
+        : _actionChip(
+            icon: Icons.outlined_flag,
+            label: 'Set as Entry Exam',
+            color: const Color(0xFF475569),
+            bg: const Color(0xFFF1F5F9),
+            onTap: () => _confirmEntryExamChange(exam, true),
+          );
+  }
+
+  void _confirmEntryExamChange(Map<String, dynamic> exam, bool newValue) {
+    final String title = exam['title'] ?? 'this exam';
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          newValue ? 'Set as Entry Exam' : 'Remove from Entry Exam',
+          style: const TextStyle(
+            fontFamily: 'Outfit',
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          newValue
+              ? 'Do you want to set "$title" as an Entry Exam candidate for learners?'
+              : 'Do you want to remove "$title" from the Entry Exam candidates?',
+          style: const TextStyle(fontFamily: 'Outfit'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Color(0xFF64748B)),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _updateEntryExamStatus(exam['id'] as int, newValue);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF20B486),
+            ),
+            child: const Text(
+              'Confirm',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Shared UI micro-components ───────────────────────────────────────────
+
+  Widget _statChip(IconData icon, String text) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: const Color(0xFF94A3B8)),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: const TextStyle(
+            color: Color(0xFF64748B),
+            fontSize: 13,
+            fontFamily: 'Outfit',
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _actionChip({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    Color color = const Color(0xFF475569),
+    Color bg = const Color(0xFFF1F5F9),
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Outfit',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _iconBtn({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+    Color color = const Color(0xFF64748B),
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFEFF2F5)),
+          ),
+          child: Icon(icon, color: color, size: 16),
+        ),
       ),
     );
   }
@@ -1099,6 +1177,44 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
         ],
       ),
     );
+  }
+
+  Future<void> _updateEntryExamStatus(int examId, bool newValue) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return;
+      final uri = Uri.parse('$apiBaseUrl/course-manager/exams/$examId/entry-exam-status');
+      final response = await http.patch(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'isEntryExam': newValue}),
+      );
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        ToastHelper.showSuccess(
+          context,
+          newValue
+              ? 'Exam set as an Entry Exam candidate'
+              : 'Exam removed from Entry Exam candidates',
+        );
+        _fetchExamsData();
+      } else {
+        String message = 'System error, please try again later.';
+        try {
+          final body = jsonDecode(response.body);
+          if (body is Map && body['error'] != null) message = body['error'].toString();
+        } catch (_) {}
+        ToastHelper.showError(context, message);
+      }
+    } catch (e) {
+      debugPrint('Error updating entry exam status: $e');
+      if (mounted) {
+        ToastHelper.showError(context, 'System error, please try again later.');
+      }
+    }
   }
 
   Future<void> _updateExamVisibility(int examId, String newVisibility) async {
@@ -1224,57 +1340,68 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
     );
   }
 
-  Widget _buildPaginationButton(IconData icon, {VoidCallback? onPressed}) {
-    return InkWell(
-      onTap: onPressed,
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        width: 32,
-        height: 32,
-        decoration: BoxDecoration(
-          color: onPressed == null ? const Color(0xFFF8FAFC) : Colors.white,
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Icon(
-          icon,
-          size: 18,
-          color: onPressed == null
-              ? const Color(0xFFCBD5E1)
-              : const Color(0xFF64748B),
-        ),
-      ),
-    );
-  }
+  Widget _buildPagination(int totalPages) {
+    if (_examsList.isEmpty) return const SizedBox();
 
-  Widget _buildPaginationNumber(
-    String text, {
-    bool isActive = false,
-    VoidCallback? onPressed,
-  }) {
-    return InkWell(
-      onTap: onPressed,
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        width: 32,
-        height: 32,
-        decoration: BoxDecoration(
-          color: isActive ? const Color(0xFF0F766E) : Colors.white,
-          border: Border.all(
-            color: isActive ? const Color(0xFF0F766E) : const Color(0xFFE2E8F0),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        InkWell(
+          onTap: _currentPage > 1
+              ? () {
+                  setState(() {
+                    _currentPage--;
+                  });
+                }
+              : null,
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: _currentPage > 1 ? Colors.white : const Color(0xFFF1F5F9),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.chevron_left,
+              size: 16,
+              color: _currentPage > 1 ? const Color(0xFF475569) : const Color(0xFF94A3B8),
+            ),
           ),
-          borderRadius: BorderRadius.circular(6),
         ),
-        alignment: Alignment.center,
-        child: Text(
-          text,
-          style: TextStyle(
-            color: isActive ? Colors.white : const Color(0xFF64748B),
-            fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+        const SizedBox(width: 12),
+        Text(
+          'Page $_currentPage of $totalPages',
+          style: const TextStyle(
             fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF475569),
+            fontFamily: 'Outfit',
           ),
         ),
-      ),
+        const SizedBox(width: 12),
+        InkWell(
+          onTap: _currentPage < totalPages
+              ? () {
+                  setState(() {
+                    _currentPage++;
+                  });
+                }
+              : null,
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: _currentPage < totalPages ? Colors.white : const Color(0xFFF1F5F9),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.chevron_right,
+              size: 16,
+              color: _currentPage < totalPages ? const Color(0xFF475569) : const Color(0xFF94A3B8),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1330,6 +1457,30 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ExamCardWrapper extends StatefulWidget {
+  final Map<String, dynamic> exam;
+  final Widget Function(Map<String, dynamic> exam, bool isHovered) buildCard;
+
+  const _ExamCardWrapper({required this.exam, required this.buildCard});
+
+  @override
+  State<_ExamCardWrapper> createState() => _ExamCardWrapperState();
+}
+
+class _ExamCardWrapperState extends State<_ExamCardWrapper> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: widget.buildCard(widget.exam, _isHovered),
     );
   }
 }

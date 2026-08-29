@@ -193,6 +193,24 @@ public class CourseManagerDashboardController {
         }
     }
 
+    @org.springframework.web.bind.annotation.PatchMapping("/exams/{id}/entry-exam-status")
+    @PreAuthorize("hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<?> setEntryExamStatus(
+            @PathVariable Long id,
+            @org.springframework.web.bind.annotation.RequestBody java.util.Map<String, Object> body) {
+        try {
+            Object flag = body.get("isEntryExam");
+            if (!(flag instanceof Boolean)) {
+                return ResponseEntity.badRequest().body("{\"error\": \"isEntryExam (boolean) is required\"}");
+            }
+            courseManagerDashboardService.setEntryExamStatus(id, (Boolean) flag);
+            return ResponseEntity.ok("{\"message\": \"Entry Exam status updated\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
     @PostMapping("/exams/{id}/reject")
     @PreAuthorize("hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> rejectExam(@PathVariable Long id, @org.springframework.web.bind.annotation.RequestBody(required = false) java.util.Map<String, String> body) {

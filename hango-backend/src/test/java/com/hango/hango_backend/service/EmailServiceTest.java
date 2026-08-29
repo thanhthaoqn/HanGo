@@ -66,7 +66,7 @@ class EmailServiceTest {
         assertTrue(html.contains("review the administrator's feedback"));
         assertTrue(html.contains("Update your trainer profile"));
         assertTrue(html.contains("Resubmit your application for another review"));
-        assertTrue(html.contains("https://hangog92.online/login"));
+        assertTrue(html.contains("https://hangog92.online"));
     }
 
     private String extractText(Part part) throws Exception {

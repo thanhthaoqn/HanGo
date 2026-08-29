@@ -87,8 +87,8 @@ public class ExamImportController {
                 String title = getCellString(row, 1);
                 String description = getCellString(row, 2);
                 String qCountStr = getCellString(row, 3);
-                String timeStr = getCellString(row, 4);
-                String passingScoreStr = getCellString(row, 5);
+                String passingScoreStr = getCellString(row, 4);
+                String timeStr = getCellString(row, 5);
                 String thumbnailUrl = com.hango.hango_backend.entity.Exam.resolveThumbnailUrl(getCellString(row, 6));
 
                 boolean rowHasError = false;
@@ -399,7 +399,7 @@ public class ExamImportController {
                         GeneratedKeyHolder qkh = new GeneratedKeyHolder();
                         jdbcTemplate.update(con -> {
                             var ps = con.prepareStatement(
-                                    "INSERT INTO questions (created_by, category_id, question_text, explanation, difficulty_param_id, status, group_id, skill_param_id, usage_type) VALUES (?, ?, ?, ?, ?, 'PRIVATE', ?, ?, 2)",
+                                    "INSERT INTO questions (created_by, category_id, question_text, explanation, difficulty_param_id, status, group_id, skill_param_id, usage_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'PRIVATE', ?, ?, 2, NOW(6), NOW(6))",
                                     java.sql.Statement.RETURN_GENERATED_KEYS);
                             ps.setLong(1, userId);
                             if (fCategory != null)

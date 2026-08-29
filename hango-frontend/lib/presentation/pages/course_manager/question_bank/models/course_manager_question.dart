@@ -7,8 +7,8 @@ class CourseManagerQuestion {
   final String difficultyName;
   String status;
   final String creatorName;
-  final DateTime createdAt;
-  final DateTime updatedAt;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
   final bool isGroup;
   final int? usageType;
 
@@ -24,14 +24,19 @@ class CourseManagerQuestion {
     required this.difficultyName,
     required this.status,
     required this.creatorName,
-    required this.createdAt,
-    required this.updatedAt,
+    this.createdAt,
+    this.updatedAt,
     this.isGroup = false,
     this.usageType,
   });
 
-  static DateTime _parseDate(dynamic dateData) {
-    if (dateData == null) return DateTime.now();
+  // Returns null (rather than DateTime.now()) when the backend sent no value -
+  // legacy/imported questions can genuinely have no recorded created/updated
+  // timestamp, and silently substituting "now" made every refresh recompute a
+  // fresh-looking date for those rows, making an edit look like it had also
+  // rewritten the original creation time.
+  static DateTime? _parseDate(dynamic dateData) {
+    if (dateData == null) return null;
     if (dateData is List && dateData.isNotEmpty) {
       try {
         return DateTime(
@@ -43,10 +48,10 @@ class CourseManagerQuestion {
           dateData.length > 5 ? (dateData[5] as num).toInt() : 0,
         );
       } catch (e) {
-        return DateTime.now();
+        return null;
       }
     }
-    return DateTime.tryParse(dateData.toString()) ?? DateTime.now();
+    return DateTime.tryParse(dateData.toString());
   }
 
   factory CourseManagerQuestion.fromJson(Map<String, dynamic> json) {

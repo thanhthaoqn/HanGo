@@ -167,6 +167,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .courseIds(courseIdsStr)
                 .amount(totalAmount)
                 .status("PENDING")
+                .createdAt(LocalDateTime.now())
                 .txnRef("")
                 .build();
         payment = paymentRepository.save(payment);

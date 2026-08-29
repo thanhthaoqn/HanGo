@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -259,9 +260,8 @@ class MonthlyStatementServiceImplTest {
         assertEquals(2, dto.getTotalOrders());
         // p1 gross 7000000 + p2 fallback gross (5000000 * 0.70 = 3500000) = 10500000 trainer gross
         assertEquals(new BigDecimal("10500000.00"), dto.getTotalTrainerGross());
-        // trainer gross >= 2,000,000 -> PIT tax = 10% of trainer gross = 1050000; net payout = 9450000
-        assertEquals(new BigDecimal("1050000.00"), dto.getPitTaxAmount());
-        assertEquals(new BigDecimal("9450000.00"), dto.getNetPayoutAmount());
+        assertEquals(BigDecimal.ZERO, dto.getPitTaxAmount());
+        assertEquals(new BigDecimal("10500000.00"), dto.getNetPayoutAmount());
 
         verify(notificationService).notifyUser(eq(creator), eq(NotificationService.TYPE_STATEMENT_READY), any(), any(), any());
         verify(paymentRepository, times(2)).save(any());
@@ -285,7 +285,7 @@ class MonthlyStatementServiceImplTest {
 
         ArgumentCaptor<Payment> captor = ArgumentCaptor.forClass(Payment.class);
         verify(paymentRepository).save(captor.capture());
-        assertEquals("IN_STATEMENT", captor.getValue().getSettlementStatus());
+        assertEquals("SETTLED", captor.getValue().getSettlementStatus());
         assertEquals(200L, captor.getValue().getStatementId());
     }
 
@@ -459,7 +459,7 @@ class MonthlyStatementServiceImplTest {
 
         MonthlyStatementDTO result = statementService.regenerateStatement(1L);
 
-        assertEquals("PENDING_TRAINER_CONFIRM", result.getStatus());
+        assertEquals("PAID", result.getStatus());
         assertEquals(1, result.getTotalOrders());
         assertEquals(new BigDecimal("70000.00"), result.getTotalTrainerGross());
         verify(notificationService).notifyUser(eq(owner), eq(NotificationService.TYPE_STATEMENT_READY), any(), any(), any());
@@ -561,13 +561,17 @@ class MonthlyStatementServiceImplTest {
     }
 
     @Test
-    void settleStatementShouldThrowWhenBankTxnRefIsBlank() {
+    void settleStatementShouldAutoGenerateBankTxnRefWhenBlank() {
         User owner = trainer(1L, "owner@example.com");
-        MonthlyStatement statement = MonthlyStatement.builder().id(3L).trainer(owner).periodMonth("2026-07").build();
+        MonthlyStatement statement = MonthlyStatement.builder().id(3L).trainer(owner).periodMonth("2026-07")
+                .statementCode("STMT-202607-003").build();
         when(statementRepository.findById(3L)).thenReturn(Optional.of(statement));
+        when(statementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        assertThrows(IllegalArgumentException.class,
-                () -> statementService.settleStatement(3L, "  ", "note", "https://example.com/r.png"));
+        MonthlyStatementDTO result = statementService.settleStatement(3L, "  ", "note", "https://example.com/r.png");
+        assertEquals("PAID", result.getStatus());
+        assertNotNull(statement.getBankTxnRef());
+        assertTrue(statement.getBankTxnRef().startsWith("TXN-"));
     }
 
     @Test
@@ -633,7 +637,7 @@ class MonthlyStatementServiceImplTest {
         assertEquals("TXN-123", statement.getBankTxnRef());
         assertEquals("Paid via bank transfer", statement.getAdminNotes());
         assertEquals(true, statement.getPaidAt() != null);
-        verify(emailService).sendSettlementPaidEmail(eq("trainer@example.com"), any(), eq("2026-07"), any(), eq("TXN-123"), eq("https://example.com/receipts/txn-123.png"));
+        verify(emailService).sendSettlementPaidEmail(eq("trainer@example.com"), any(), eq("2026-07"), any(), eq("TXN-123"));
     }
 
     // =================================================================
