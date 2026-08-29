@@ -2070,24 +2070,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
     return 'Mr. $name';
   }
 
-  String _getOriginalPrice(String currentPrice) {
-    if (currentPrice == 'Miễn phí') return '';
-    try {
-      final clean = currentPrice.replaceAll(RegExp(r'[^0-9]'), '');
-      if (clean.isEmpty) return '';
-      final val = double.parse(clean);
-      final original = val * 1.3;
-      final formatted = original
-          .toStringAsFixed(0)
-          .replaceAllMapped(
-            RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-            (m) => '${m[1]}.',
-          );
-      return '$formattedđ';
-    } catch (_) {
-      return '';
-    }
-  }
+
 
   Widget _buildCourseCardHeaderPlaceholder(Map<String, dynamic> theme) {
     return Stack(
@@ -2111,7 +2094,6 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
     final isVi = LanguageManager.isVi;
     final theme = _getCourseTheme(course);
     final priceStr = _getCoursePrice(course);
-    final originalPriceStr = _getOriginalPrice(priceStr);
     final isFree = priceStr == 'Miễn phí';
     final displayPrice = isFree ? (isVi ? 'Miễn phí' : 'Free') : priceStr;
     final teacherName = _getTeacherSalutation(course.creatorName);
@@ -2293,34 +2275,16 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                         ),
                       ],
                       const Spacer(),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Text(
-                            displayPrice,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: isFree
-                                  ? const Color(0xFF28B79B)
-                                  : const Color(0xFF0F172A),
-                              fontFamily: 'Outfit',
-                            ),
-                          ),
-                          if (!isFree) ...[
-                            const SizedBox(width: 8),
-                            Text(
-                              originalPriceStr,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF94A3B8),
-                                decoration: TextDecoration.lineThrough,
-                                fontFamily: 'Outfit',
-                              ),
-                            ),
-                          ],
-                        ],
+                      Text(
+                        displayPrice,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isFree
+                              ? const Color(0xFF28B79B)
+                              : const Color(0xFF0F172A),
+                          fontFamily: 'Outfit',
+                        ),
                       ),
                     ],
                   ),

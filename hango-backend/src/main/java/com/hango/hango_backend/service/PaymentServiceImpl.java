@@ -200,6 +200,20 @@ public class PaymentServiceImpl implements PaymentService {
 
         String signature = hmacSHA256(checksumKey, signatureData);
 
+        // Build items list for PayOS order breakdown
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (Course c : courses) {
+            Map<String, Object> item = new HashMap<>();
+            String itemTitle = formatCourseTitleForPayOS(c.getTitle());
+            item.put("name", itemTitle);
+            item.put("quantity", 1);
+            long itemPrice = (c.getPrice() != null && c.getPrice().compareTo(BigDecimal.ZERO) > 0)
+                    ? c.getPrice().longValue()
+                    : 0L;
+            item.put("price", itemPrice);
+            items.add(item);
+        }
+
         // Build request body
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("orderCode", orderCode);
@@ -208,6 +222,17 @@ public class PaymentServiceImpl implements PaymentService {
         requestBody.put("cancelUrl", cancelUrl);
         requestBody.put("returnUrl", returnUrl);
         requestBody.put("signature", signature);
+        requestBody.put("items", items);
+
+        if (user.getFullName() != null && !user.getFullName().trim().isEmpty()) {
+            requestBody.put("buyerName", user.getFullName().trim());
+        }
+        if (user.getEmail() != null && !user.getEmail().trim().isEmpty()) {
+            requestBody.put("buyerEmail", user.getEmail().trim());
+        }
+        if (user.getPhoneNumber() != null && !user.getPhoneNumber().trim().isEmpty()) {
+            requestBody.put("buyerPhone", user.getPhoneNumber().trim());
+        }
 
         // Gọi PayOS API tạo link thanh toán
         Map<String, String> payOSResponse = createPayOSPaymentLink(requestBody);
@@ -716,6 +741,22 @@ public class PaymentServiceImpl implements PaymentService {
             }
         }
         return value.toString();
+    }
+
+    private String formatCourseTitleForPayOS(String title) {
+        if (title == null || title.trim().isEmpty()) {
+            return "Khóa học HanGo";
+        }
+        String cleanTitle = title.trim().replaceAll("\\s+", " ");
+        int maxLength = 36;
+        if (cleanTitle.length() <= maxLength) {
+            return cleanTitle;
+        }
+        int lastSpace = cleanTitle.substring(0, maxLength - 3).lastIndexOf(' ');
+        if (lastSpace > 15) {
+            return cleanTitle.substring(0, lastSpace) + "...";
+        }
+        return cleanTitle.substring(0, maxLength - 3) + "...";
     }
 
     private String hmacSHA256(String key, String data) {

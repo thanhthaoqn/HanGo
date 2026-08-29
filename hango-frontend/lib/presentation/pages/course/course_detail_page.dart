@@ -17,8 +17,9 @@ import 'cart_page.dart';
 import '../../../utils/cart_manager.dart';
 import '../../../utils/language_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../data/repositories/payment_repository.dart';
 import '../../../utils/toast_helper.dart';
-import '../../widgets/payment_qr_dialog.dart';
 
 class CourseDetailPage extends StatefulWidget {
   final int courseId;
@@ -39,6 +40,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   late ScrollController _scrollController;
   late Future<CourseReviewSummary> _reviewsFuture;
   bool _isEnrolling = false;
+  bool _isBuying = false;
   bool _isSwitchingVersion = false;
   bool _isInCart = false;
   bool _dismissedVersionBanner = false;
@@ -1486,29 +1488,8 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     return '$formattedđ';
   }
 
-  String _getOriginalPrice(String currentPrice) {
-    if (currentPrice == 'Miễn phí') return '';
-    try {
-      final clean = currentPrice.replaceAll(RegExp(r'[^0-9]'), '');
-      if (clean.isEmpty) return '';
-      final val = double.parse(clean);
-      final original = val * 1.3;
-      final formatted = original
-          .toStringAsFixed(0)
-          .replaceAllMapped(
-            RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-            (m) => '${m[1]}.',
-          );
-      return '$formattedđ';
-    } catch (_) {
-      return '';
-    }
-  }
 
-  /// Trả về giá số (VND) để truyền vào PaymentQrDialog
-  double _getCourseNumericPrice(CourseDetail course) {
-    return course.price;
-  }
+
 
   Widget _buildTrainerTab(CourseDetail course) {
     final isVi = LanguageManager.isVi;
@@ -1686,7 +1667,6 @@ class _CourseDetailPageState extends State<CourseDetailPage>
 
     final priceStr = _getCoursePrice(course);
     final isFree = priceStr == 'Miễn phí';
-    final originalPriceStr = _getOriginalPrice(priceStr);
 
     return Container(
       padding: const EdgeInsets.all(28),
@@ -1706,67 +1686,15 @@ class _CourseDetailPageState extends State<CourseDetailPage>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Price Display Section
-          if (isFree)
-            const Text(
-              'Free',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF28B79B),
-                fontFamily: 'Outfit',
-              ),
-            )
-          else
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(
-                      priceStr,
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF0F172A),
-                        fontFamily: 'Outfit',
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      originalPriceStr,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF94A3B8),
-                        decoration: TextDecoration.lineThrough,
-                        fontFamily: 'Outfit',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFEE2E2),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Text(
-                    'Save 30%',
-                    style: TextStyle(
-                      color: Color(0xFFEF4444),
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Outfit',
-                    ),
-                  ),
-                ),
-              ],
+          Text(
+            isFree ? 'Free' : priceStr,
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              color: isFree ? const Color(0xFF28B79B) : const Color(0xFF0F172A),
+              fontFamily: 'Outfit',
             ),
+          ),
 
           const SizedBox(height: 24),
           const Divider(color: Color(0xFFF1F5F9)),
@@ -1943,42 +1871,61 @@ class _CourseDetailPageState extends State<CourseDetailPage>
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () async {
-                    final authService = AuthService();
-                    final isLoggedIn = await authService.isLoggedIn();
-                    if (!isLoggedIn) {
-                      if (!mounted) return;
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const LoginPage(),
-                        ),
-                      );
-                      return;
-                    }
-                    // Mở dialog thanh toán VNPay QR
-                    if (!mounted) return;
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (context) => PaymentQrDialog(
-                        courseId: course.id,
-                        courseTitle: course.title,
-                        price: _getCourseNumericPrice(course),
-                        onPaymentSuccess: () {
-                          setState(() {
-                            _courseDetail = _courseDetail!.copyWith(
-                              isEnrolled: true,
+                  onPressed: _isBuying
+                      ? null
+                      : () async {
+                          final authService = AuthService();
+                          final isLoggedIn = await authService.isLoggedIn();
+                          if (!isLoggedIn) {
+                            if (!mounted) return;
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const LoginPage(),
+                              ),
                             );
-                          });
-                          _showNotification(
-                            '🎉 Payment successful! Course unlocked.',
-                          );
-                          _loadCourseDetail();
+                            return;
+                          }
+
+                          setState(() => _isBuying = true);
+                          try {
+                            final res = await PaymentRepository().createPayment(
+                              courseId: course.id,
+                            );
+                            final paymentUrl = res['paymentUrl'] as String?;
+
+                            if (paymentUrl == 'FREE_SUCCESS') {
+                              setState(() {
+                                _courseDetail = _courseDetail!.copyWith(
+                                  isEnrolled: true,
+                                );
+                              });
+                              _showNotification(
+                                '🎉 Enrolled in course successfully!',
+                              );
+                              _loadCourseDetail();
+                              return;
+                            }
+
+                            if (paymentUrl != null && paymentUrl.isNotEmpty) {
+                              final uri = Uri.parse(paymentUrl);
+                              await launchUrl(uri, webOnlyWindowName: '_self');
+                            } else {
+                              throw Exception('Could not generate payment link.');
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ToastHelper.showError(
+                                context,
+                                e.toString().replaceAll('Exception: ', ''),
+                              );
+                            }
+                          } finally {
+                            if (mounted) {
+                              setState(() => _isBuying = false);
+                            }
+                          }
                         },
-                      ),
-                    );
-                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFF05A22),
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -1987,15 +1934,24 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                     ),
                     elevation: 0,
                   ),
-                  child: const Text(
-                    'Buy Now',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Outfit',
-                    ),
-                  ),
+                  child: _isBuying
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Text(
+                          'Buy Now',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 12),
