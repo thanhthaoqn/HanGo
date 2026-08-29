@@ -120,7 +120,7 @@ void main() {
       treeHarness(nodes: [scheduledNode], onNodeTap: (_) {}),
     );
 
-    expect(find.text('6h'), findsOneWidget);
+    expect(find.text('⏳ Estimated: 6h'), findsOneWidget);
   });
 }
 

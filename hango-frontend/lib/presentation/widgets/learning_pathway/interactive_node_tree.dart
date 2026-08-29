@@ -626,57 +626,15 @@ class _ScheduleChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final startDate = node.startDate;
-    final deadline = node.deadline;
     final hours = node.estimatedHours;
-    if (startDate == null && deadline == null && (hours == null || hours <= 0)) {
+    if (hours == null || hours <= 0) {
       return const SizedBox.shrink();
     }
 
-    final status = node.scheduleStatus ?? ScheduleStatus.onTrack;
+    String text = '⏳ Estimated: ${hours}h';
 
-    Color bg;
-    Color fg;
-    String label;
-
-    switch (status) {
-      case ScheduleStatus.behind:
-        bg = const Color(0xFFDC2626);
-        fg = Colors.white;
-        label = 'Behind';
-        break;
-      case ScheduleStatus.atRisk:
-        bg = const Color(0xFFF59E0B);
-        fg = Colors.black;
-        label = 'At risk';
-        break;
-      case ScheduleStatus.completed:
-        bg = const Color(0xFF10B981);
-        fg = Colors.white;
-        label = 'Completed';
-        break;
-      case ScheduleStatus.onTrack:
-      default:
-        bg = const Color(0xFF28B79B);
-        fg = Colors.white;
-        label = 'On track';
-        break;
-    }
-
-    if (!isDarkMode && status != ScheduleStatus.atRisk) {
-      fg = bg;
-    }
-
-    String text;
-    if (startDate != null || deadline != null) {
-      final dateText = startDate != null && deadline != null
-          ? '${_formatDate(startDate)} - ${_formatDate(deadline)}'
-          : _formatDate(startDate ?? deadline!);
-      final hoursText = hours != null ? ' | ${hours}h' : '';
-      text = '$label | $dateText$hoursText';
-    } else {
-      text = '⏳ Estimated: ${hours}h';
-    }
+    Color bg = const Color(0xFF28B79B);
+    Color fg = isDarkMode ? Colors.white : bg;
 
     return Align(
       alignment: Alignment.centerLeft,
