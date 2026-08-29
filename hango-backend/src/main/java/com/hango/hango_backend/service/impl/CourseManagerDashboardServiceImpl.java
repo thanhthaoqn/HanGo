@@ -643,6 +643,13 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
             throw new RuntimeException("Only a published exam can be set as an Entry Exam");
         }
 
+        // The learner-facing Entry Exam feature needs at least one candidate at
+        // all times, so the last remaining flagged exam cannot be unflagged.
+        if (!isEntryExam && Boolean.TRUE.equals(exam.getIsEntryExam())
+                && examRepository.countByIsEntryExamTrueAndDeletedAtIsNull() <= 1) {
+            throw new RuntimeException("At least one exam must be kept as an Entry Exam");
+        }
+
         exam.setIsEntryExam(isEntryExam);
         examRepository.save(exam);
     }

@@ -14,6 +14,7 @@ import 'package:hango/presentation/widgets/internal_app_header.dart';
 import '../../widgets/course_manager_sidebar.dart';
 import '../../../data/services/course_manager_api.dart';
 import '../../../domain/model/trainer_ai_exam_models.dart';
+import '../../../utils/toast_helper.dart';
 
 class CourseManagerExamsPage extends StatefulWidget {
   final bool isEmbedded;
@@ -201,6 +202,12 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
 
       // 3. Sorting
       filteredData.sort((a, b) {
+        // In the Published tab, always surface Entry Exam candidates first.
+        if (_selectedStatus == 'PUBLISHED') {
+          final bool entryA = a['isEntryExam'] == true;
+          final bool entryB = b['isEntryExam'] == true;
+          if (entryA != entryB) return entryA ? -1 : 1;
+        }
         if (_selectedSortBy == 'STATUS') {
           if (_selectedStatus == 'ALL') {
             final dateA = _parseDate(a['updatedAt'] ?? a['createdAt']);
@@ -983,15 +990,59 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
             label: 'Entry Exam',
             color: const Color(0xFF4F46E5),
             bg: const Color(0xFFEEF2FF),
-            onTap: () => _updateEntryExamStatus(exam['id'] as int, false),
+            onTap: () => _confirmEntryExamChange(exam, false),
           )
         : _actionChip(
             icon: Icons.outlined_flag,
             label: 'Set as Entry Exam',
             color: const Color(0xFF475569),
             bg: const Color(0xFFF1F5F9),
-            onTap: () => _updateEntryExamStatus(exam['id'] as int, true),
+            onTap: () => _confirmEntryExamChange(exam, true),
           );
+  }
+
+  void _confirmEntryExamChange(Map<String, dynamic> exam, bool newValue) {
+    final String title = exam['title'] ?? 'this exam';
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          newValue ? 'Set as Entry Exam' : 'Remove from Entry Exam',
+          style: const TextStyle(
+            fontFamily: 'Outfit',
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          newValue
+              ? 'Do you want to set "$title" as an Entry Exam candidate for learners?'
+              : 'Do you want to remove "$title" from the Entry Exam candidates?',
+          style: const TextStyle(fontFamily: 'Outfit'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Color(0xFF64748B)),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _updateEntryExamStatus(exam['id'] as int, newValue);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF20B486),
+            ),
+            child: const Text(
+              'Confirm',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // ─── Shared UI micro-components ───────────────────────────────────────────
@@ -1143,14 +1194,11 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
       );
       if (!mounted) return;
       if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              newValue
-                  ? 'Exam set as an Entry Exam candidate'
-                  : 'Exam removed from Entry Exam candidates',
-            ),
-          ),
+        ToastHelper.showSuccess(
+          context,
+          newValue
+              ? 'Exam set as an Entry Exam candidate'
+              : 'Exam removed from Entry Exam candidates',
         );
         _fetchExamsData();
       } else {
@@ -1159,10 +1207,13 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
           final body = jsonDecode(response.body);
           if (body is Map && body['error'] != null) message = body['error'].toString();
         } catch (_) {}
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+        ToastHelper.showError(context, message);
       }
     } catch (e) {
       debugPrint('Error updating entry exam status: $e');
+      if (mounted) {
+        ToastHelper.showError(context, 'System error, please try again later.');
+      }
     }
   }
 
