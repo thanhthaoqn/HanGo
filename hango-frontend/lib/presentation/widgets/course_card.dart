@@ -25,7 +25,6 @@ class CourseCard extends StatefulWidget {
 
 class _CourseCardState extends State<CourseCard> {
   bool _isHovered = false;
-  bool _isInWishlist = false;
   bool _isInCart = false;
   bool _isEnrolled = false;
   bool _isLoadingEnroll = false;
@@ -53,7 +52,6 @@ class _CourseCardState extends State<CourseCard> {
 
     if (mounted) {
       setState(() {
-        _isInWishlist = wishlist.contains(widget.course.id.toString());
         _isInCart = cart.contains(widget.course.id.toString());
         _isEnrolled = enrolledLocal || (widget.course.progressPercentage > 0);
         _canEnroll = PermissionUtils.canEnrollAndLearn(roles);
@@ -61,29 +59,7 @@ class _CourseCardState extends State<CourseCard> {
     }
   }
 
-  Future<void> _toggleWishlist() async {
-    final prefs = await SharedPreferences.getInstance();
-    final wishlist = prefs.getStringList('wishlisted_course_ids') ?? [];
-    final courseIdStr = widget.course.id.toString();
 
-    setState(() {
-      if (_isInWishlist) {
-        wishlist.remove(courseIdStr);
-        _isInWishlist = false;
-        ToastHelper.show(context, LanguageManager.isVi ? 'Đã xóa khỏi danh sách yêu thích' : 'Removed from wishlist');
-      } else {
-        wishlist.add(courseIdStr);
-        _isInWishlist = true;
-        ToastHelper.show(context, LanguageManager.isVi ? 'Đã thêm vào danh sách yêu thích' : 'Added to wishlist');
-      }
-    });
-
-    await prefs.setStringList('wishlisted_course_ids', wishlist);
-    await WishlistManager.updateCount();
-    if (widget.onStateChanged != null) {
-      widget.onStateChanged!();
-    }
-  }
 
   Future<void> _toggleCart() async {
     final isVi = LanguageManager.isVi;
@@ -483,152 +459,5 @@ class _CourseCardState extends State<CourseCard> {
   );
 }
 
-  Widget _buildActionButton(bool isVi) {
-    if (_isEnrolled) {
-      return SizedBox(
-        width: double.infinity,
-        height: 36,
-        child: OutlinedButton(
-          style: OutlinedButton.styleFrom(
-            side: const BorderSide(color: Color(0xFF28B79B)),
-            foregroundColor: const Color(0xFF28B79B),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            padding: EdgeInsets.zero,
-          ),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => CourseDetailPage(courseId: widget.course.id),
-              ),
-            );
-          },
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFF28B79B)),
-              const SizedBox(width: 6),
-              Text(
-                isVi ? 'Vào học ngay' : 'Learn Now',
-                style: const TextStyle(fontSize: 12, fontFamily: 'Outfit', fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
 
-    if (!_canEnroll) {
-      return SizedBox(
-        width: double.infinity,
-        height: 36,
-        child: OutlinedButton(
-          style: OutlinedButton.styleFrom(
-            side: const BorderSide(color: Color(0xFFE2E8F0)),
-            foregroundColor: const Color(0xFF64748B),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            padding: EdgeInsets.zero,
-          ),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => CourseDetailPage(courseId: widget.course.id),
-              ),
-            );
-          },
-          child: Text(
-            isVi ? 'Xem chi tiết' : 'View details',
-            style: const TextStyle(
-              fontSize: 12,
-              fontFamily: 'Outfit',
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      );
-    }
-
-    final priceStr = _getCoursePrice(widget.course);
-    final isFree = priceStr == 'Miễn phí';
-
-    if (isFree) {
-      return SizedBox(
-        width: double.infinity,
-        height: 36,
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF28B79B),
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            padding: EdgeInsets.zero,
-          ),
-          onPressed: _isLoadingEnroll ? null : _enrollFreeCourse,
-          child: _isLoadingEnroll
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                )
-              : Text(
-                  isVi ? 'Đăng ký miễn phí' : 'Enroll Free',
-                  style: const TextStyle(fontSize: 12, fontFamily: 'Outfit', fontWeight: FontWeight.bold),
-                ),
-        ),
-      );
-    }
-
-    // For paid courses, show Buy Now & Cart icon side by side
-    return Row(
-      children: [
-        Expanded(
-          child: SizedBox(
-            height: 36,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF28B79B),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                padding: EdgeInsets.zero,
-              ),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => CourseDetailPage(courseId: widget.course.id),
-                  ),
-                );
-              },
-              child: Text(
-                isVi ? 'Mua ngay' : 'Buy Now',
-                style: const TextStyle(fontSize: 12, fontFamily: 'Outfit', fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Container(
-          height: 36,
-          width: 36,
-          decoration: BoxDecoration(
-            color: _isInCart ? const Color(0xFFE6FFFA) : const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: _isInCart ? const Color(0xFF28B79B) : Colors.transparent,
-              width: _isInCart ? 1.2 : 0,
-            ),
-          ),
-          child: IconButton(
-            icon: Icon(
-              _isInCart ? Icons.shopping_bag_rounded : Icons.add_shopping_cart_rounded,
-              size: 16,
-              color: _isInCart ? const Color(0xFF28B79B) : const Color(0xFF475569),
-            ),
-            padding: EdgeInsets.zero,
-            onPressed: _toggleCart,
-          ),
-        ),
-      ],
-    );
-  }
 }
