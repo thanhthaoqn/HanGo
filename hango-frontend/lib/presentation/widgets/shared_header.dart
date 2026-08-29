@@ -7,7 +7,6 @@ import '../pages/exam/list_exams_page.dart';
 import '../pages/course/list_courses_page.dart';
 import '../pages/course/cart_page.dart';
 import '../pages/course/course_detail_page.dart';
-import '../pages/learner/learner_home_page.dart';
 import '../pages/learner/learner_shell_page.dart';
 import '../pages/learner/learning_pathway_page.dart';
 import '../pages/learner/my_information_page.dart';
@@ -563,7 +562,7 @@ class _SharedHeaderState extends State<SharedHeader> {
     if (mounted) {
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (context) => const LearnerHomePage()),
+        MaterialPageRoute(builder: (context) => const LearnerShellPage()),
         (route) => false,
       );
     }

@@ -44,10 +44,18 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
       // GET /pathways/me - backend tra pathway ACTIVE duy nhat cua user
       final pathway = _preparePathwayForDisplay(await _repository.getMyPathway());
       if (!mounted) return;
-      setState(() {
-        _pathway = pathway;
-        _selectedNode = _initialSelectedNode(pathway.nodes);
-      });
+        setState(() {
+          _pathway = pathway;
+          if (_selectedNode != null) {
+            try {
+              _selectedNode = pathway.nodes.firstWhere((n) => n.step == _selectedNode!.step);
+            } catch (_) {
+              _selectedNode = _initialSelectedNode(pathway.nodes);
+            }
+          } else {
+            _selectedNode = _initialSelectedNode(pathway.nodes);
+          }
+        });
       // C3 (spec 20): tu dong lay pending reroute suggestion sau moi lan load
       // (thay cho viec persist suggestion vao database)
       _refreshRerouteSuggestion();
@@ -387,6 +395,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
                 child: InteractiveNodeTree(
                   nodes: _pathway!.nodes,
                   onNodeTap: _handleNodeTap,
+                  onStartLearningTap: _openCourseAndRefresh,
                   onFastTrackTap: _handleFastTrack,
                   onMasteryTap: _openMasteryQuiz,
                   selectedNode: _selectedNode,
@@ -440,6 +449,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
           child: InteractiveNodeTree(
             nodes: _pathway!.nodes,
             onNodeTap: _handleNodeTap,
+            onStartLearningTap: _openCourseAndRefresh,
             onFastTrackTap: _handleFastTrack,
             onMasteryTap: _openMasteryQuiz,
             selectedNode: _selectedNode,

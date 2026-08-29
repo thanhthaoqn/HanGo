@@ -8,7 +8,7 @@ import '../../data/services/auth_service.dart';
 import '../../utils/toast_helper.dart';
 import 'register_page.dart';
 import 'forgot_password_page.dart';
-import 'learner/learner_home_page.dart';
+import 'learner/learner_shell_page.dart';
 import 'admin/admin_dashboard_page.dart';
 import 'trainer/trainer_dashboard_page.dart';
 import 'trainer/trainer_shell_page.dart';
@@ -80,7 +80,7 @@ class _LoginPageState extends State<LoginPage> {
       Navigator.of(context).pop();
     } else {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const LearnerHomePage()),
+        MaterialPageRoute(builder: (context) => const LearnerShellPage()),
       );
     }
   }
@@ -273,7 +273,7 @@ class _LoginPageState extends State<LoginPage> {
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const LearnerHomePage()),
+          MaterialPageRoute(builder: (context) => const LearnerShellPage()),
         );
       }
     }

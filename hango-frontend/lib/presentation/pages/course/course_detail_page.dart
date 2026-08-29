@@ -6,7 +6,7 @@ import '../../../domain/model/course_review_summary.dart';
 import '../../../data/services/auth_service.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/shared_footer.dart';
-import '../learner/learner_home_page.dart';
+import '../learner/learner_shell_page.dart';
 import '../trainer/trainer_shell_page.dart';
 import '../course_manager/course_manager_shell_page.dart';
 import '../login_page.dart';
@@ -883,7 +883,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                               ? const TrainerShellPage()
                               : isCourseManager
                                   ? const CourseManagerShellPage()
-                                  : const LearnerHomePage(),
+                                  : const LearnerShellPage(),
                         ),
                         (route) => false,
                       );

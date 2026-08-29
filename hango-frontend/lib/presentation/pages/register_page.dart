@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/services/auth_service.dart';
 import '../../utils/register_verification_guard.dart';
 import '../../utils/toast_helper.dart';
-import 'learner/learner_home_page.dart';
+import 'learner/learner_shell_page.dart';
 import 'terms_and_privacy_page.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -72,7 +72,7 @@ class _RegisterPageState extends State<RegisterPage> {
       if (!_verificationGuard.tryClose()) return;
       _verificationTimer?.cancel();
       navigator.pushReplacement(
-        MaterialPageRoute(builder: (context) => const LearnerHomePage()),
+        MaterialPageRoute(builder: (context) => const LearnerShellPage()),
       );
     }
   }

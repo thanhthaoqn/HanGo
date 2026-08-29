@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
 import '../login_page.dart';
 import 'comment_management_page.dart';
-import '../learner/learner_home_page.dart';
+import '../learner/learner_shell_page.dart';
 import 'admin_trainer_reviews_page.dart';
 import '../ticket/management_tickets_page.dart';
 import '../../../utils/toast_helper.dart';
@@ -1213,7 +1213,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             onTap: () {
               Navigator.pushAndRemoveUntil(
                 context,
-                MaterialPageRoute(builder: (context) => const LearnerHomePage()),
+                MaterialPageRoute(builder: (context) => const LearnerShellPage()),
                 (route) => false,
               );
             },
