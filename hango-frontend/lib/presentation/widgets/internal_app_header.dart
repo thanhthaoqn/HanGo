@@ -4,7 +4,7 @@ import '../../../data/services/auth_service.dart';
 import '../../../domain/model/notification_item.dart';
 import '../../../data/repositories/notification_repository.dart';
 import '../pages/login_page.dart';
-import '../pages/learner/learner_home_page.dart';
+import '../pages/learner/learner_shell_page.dart';
 import '../pages/trainer/trainer_profile_page.dart';
 import '../pages/trainer/trainer_shell_page.dart';
 import '../pages/course_manager/course_manager_my_information_page.dart';
@@ -300,7 +300,7 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
               onTap: () {
                 Navigator.pushAndRemoveUntil(
                   context,
-                  MaterialPageRoute(builder: (context) => const LearnerHomePage()),
+                  MaterialPageRoute(builder: (context) => const LearnerShellPage()),
                   (route) => false,
                 );
               },
