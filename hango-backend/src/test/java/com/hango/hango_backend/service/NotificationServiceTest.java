@@ -212,10 +212,10 @@ class NotificationServiceTest {
 
     @Test
     void markAsReadShouldSetReadTrueWhenBroadcastToOneOfCallersRoles() {
-        Notification n = Notification.builder().id(1L).recipientRole("TRAINER_LEAD").read(false).build();
+        Notification n = Notification.builder().id(1L).recipientRole("COURSE_MANAGER").read(false).build();
         when(notificationRepository.findById(1L)).thenReturn(Optional.of(n));
 
-        notificationService.markAsRead(1L, 7L, List.of("TRAINER_LEAD"));
+        notificationService.markAsRead(1L, 7L, List.of("COURSE_MANAGER"));
 
         assertTrue(n.isRead());
         verify(notificationRepository).save(n);
@@ -232,7 +232,7 @@ class NotificationServiceTest {
 
     @Test
     void markAsReadShouldThrowWhenBroadcastRoleDoesNotMatchCallersRoles() {
-        Notification n = Notification.builder().id(1L).recipientRole("TRAINER_LEAD").read(false).build();
+        Notification n = Notification.builder().id(1L).recipientRole("COURSE_MANAGER").read(false).build();
         when(notificationRepository.findById(1L)).thenReturn(Optional.of(n));
 
         assertThrows(RuntimeException.class, () -> notificationService.markAsRead(1L, 7L, List.of("LEARNER")));

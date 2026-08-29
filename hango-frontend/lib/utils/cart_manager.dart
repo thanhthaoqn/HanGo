@@ -197,6 +197,19 @@ class CartManager {
   static Future<void> _updateCountInternal({required bool forceRefresh}) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
+    final roles = prefs.getStringList('user_roles') ?? [];
+
+    final isStaff = roles.any((r) =>
+        r.contains('ADMIN') ||
+        r.contains('COURSE_MANAGER') ||
+        r.contains('TRAINER') ||
+        r.contains('TEACHER'));
+
+    if (isStaff) {
+      cartCoursesNotifier.value = [];
+      cartCountNotifier.value = 0;
+      return;
+    }
 
     if (token != null && token.isNotEmpty) {
       try {
