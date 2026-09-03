@@ -472,6 +472,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       await _adminConfigService.updateAiConfig(configs);
       if (mounted) ToastHelper.showSuccess(context, 'AI Configurations saved successfully');
     } catch (e) {
+      debugPrint('[AdminDashboard] Error saving AI config: $e');
       if (mounted) ToastHelper.showError(context, 'Failed to save configurations');
     }
   }
