@@ -17,7 +17,7 @@ public class AdminConfigController {
     private final com.hango.hango_backend.config.GeminiProperties geminiProperties;
 
     @GetMapping("/ai")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR') or hasRole('ADMIN')")
     public ResponseEntity<Map<String, String>> getAiConfig() {
         Map<String, String> configs = new java.util.HashMap<>(systemConfigService.getAllConfigsByType("AI"));
         
@@ -48,7 +48,7 @@ public class AdminConfigController {
     }
 
     @PutMapping("/ai")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR') or hasRole('ADMIN')")
     public ResponseEntity<Void> updateAiConfig(@RequestBody Map<String, String> configs) {
         systemConfigService.updateConfigs("AI", configs);
         return ResponseEntity.ok().build();

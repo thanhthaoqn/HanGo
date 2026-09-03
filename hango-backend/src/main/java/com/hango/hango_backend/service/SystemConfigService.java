@@ -30,7 +30,13 @@ public class SystemConfigService {
 
     @Transactional
     public void updateConfigs(String type, Map<String, String> configs) {
+        if (configs == null) {
+            return;
+        }
         for (Map.Entry<String, String> entry : configs.entrySet()) {
+            if (entry.getKey() == null || entry.getValue() == null) {
+                continue;
+            }
             Optional<SystemParameter> existingOpt = systemParameterRepository.findByParamTypeAndParamKey(type, entry.getKey());
             if (existingOpt.isPresent()) {
                 SystemParameter param = existingOpt.get();

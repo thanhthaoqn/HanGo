@@ -128,7 +128,8 @@ public class GeminiClientService {
          */
         @Cacheable(value = "geminiStatus")
         public AiHealthResponse checkAvailability() {
-                if (geminiProperties.getApiKey() == null || geminiProperties.getApiKey().isBlank()) {
+                String apiKey = getApiKey();
+                if (apiKey == null || apiKey.isBlank()) {
                         return buildHealth(false, "GEMINI_API_KEY is not configured");
                 }
 
@@ -144,7 +145,8 @@ public class GeminiClientService {
                                                 .build())
                                 .build();
 
-                String path = String.format("v1beta/models/%s:generateContent", geminiProperties.getChatModel());
+                String chatModel = getChatModel();
+                String path = String.format("v1beta/models/%s:generateContent", chatModel);
 
                 try {
                         GeminiGenerateResponse response = webClient.post()
@@ -152,7 +154,7 @@ public class GeminiClientService {
                                         .bodyValue(request)
                                         .retrieve()
                                         .bodyToMono(GeminiGenerateResponse.class)
-                                        .timeout(Duration.ofSeconds(geminiProperties.getTimeoutSeconds()))
+                                        .timeout(Duration.ofSeconds(getTimeoutSeconds()))
                                         .block();
 
                         String text = response != null ? response.extractText() : null;
@@ -170,8 +172,8 @@ public class GeminiClientService {
                 return AiHealthResponse.builder()
                                 .available(available)
                                 .message(message)
-                                .chatModel(geminiProperties.getChatModel())
-                                .embeddingModel(geminiProperties.getEmbeddingModel())
+                                .chatModel(getChatModel())
+                                .embeddingModel(getEmbeddingModel())
                                 .build();
         }
 
@@ -196,7 +198,9 @@ public class GeminiClientService {
                                                 .build())
                                 .build();
 
-                String path = String.format("v1beta/models/%s:generateContent", geminiProperties.getChatModel());
+                String chatModel = getChatModel();
+                String path = String.format("v1beta/models/%s:generateContent", chatModel);
+                log.info("[GeminiClientService] Calling Gemini chat model: {} (timeout: {}s)", chatModel, getTimeoutSeconds());
                 long startedAt = System.currentTimeMillis();
 
                 try {
@@ -208,7 +212,7 @@ public class GeminiClientService {
                                         .bodyToMono(GeminiGenerateResponse.class)
                                         .retryWhen(Retry.backoff(2, Duration.ofSeconds(2))
                                                         .filter(throwable -> throwable instanceof WebClientResponseException.TooManyRequests))
-                                        .timeout(Duration.ofSeconds(geminiProperties.getTimeoutSeconds()))
+                                        .timeout(Duration.ofSeconds(getTimeoutSeconds()))
                                         .block();
 
                         String text = response != null ? response.extractText() : null;
@@ -245,7 +249,9 @@ public class GeminiClientService {
                                                 .build())
                                 .build();
 
-                String path = String.format("v1beta/models/%s:embedContent", geminiProperties.getEmbeddingModel());
+                String embedModel = getEmbeddingModel();
+                String path = String.format("v1beta/models/%s:embedContent", embedModel);
+                log.info("[GeminiClientService] Calling Gemini embedding model: {} (timeout: {}s)", embedModel, getTimeoutSeconds());
                 long startedAt = System.currentTimeMillis();
 
                 try {
@@ -256,7 +262,7 @@ public class GeminiClientService {
                                         .bodyToMono(GeminiEmbeddingDto.Response.class)
                                         .retryWhen(Retry.backoff(2, Duration.ofSeconds(2))
                                                         .filter(throwable -> throwable instanceof WebClientResponseException.TooManyRequests))
-                                        .timeout(Duration.ofSeconds(geminiProperties.getTimeoutSeconds()))
+                                        .timeout(Duration.ofSeconds(getTimeoutSeconds()))
                                         .block();
 
                         if (response == null || response.getEmbedding() == null) {
@@ -373,7 +379,7 @@ public class GeminiClientService {
                                                         .build())
                                         .build();
 
-                        String path = String.format("v1beta/models/%s:generateContent", geminiProperties.getChatModel());
+                        String path = String.format("v1beta/models/%s:generateContent", getChatModel());
 
                         GeminiGenerateResponse response = webClient.post()
                                         .uri(path)
@@ -467,7 +473,7 @@ public class GeminiClientService {
                                                 .build())
                                 .build();
 
-                String modelName = geminiProperties.getChatModel();
+                String modelName = getChatModel();
                 if (modelName == null || modelName.isBlank()) {
                         modelName = "gemini-1.5-flash-lite";
                 }
@@ -732,7 +738,7 @@ public class GeminiClientService {
                                         .bodyToMono(GeminiGenerateResponse.class)
                                         .retryWhen(Retry.backoff(2, Duration.ofSeconds(2))
                                                         .filter(throwable -> throwable instanceof WebClientResponseException.TooManyRequests))
-                                        .timeout(Duration.ofSeconds(geminiProperties.getTimeoutSeconds()))
+                                        .timeout(Duration.ofSeconds(getTimeoutSeconds()))
                                         .block();
 
                         String text = response != null ? response.extractText() : null;
