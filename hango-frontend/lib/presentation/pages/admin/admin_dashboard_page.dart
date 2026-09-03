@@ -473,7 +473,18 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       if (mounted) ToastHelper.showSuccess(context, 'AI Configurations saved successfully');
     } catch (e) {
       debugPrint('[AdminDashboard] Error saving AI config: $e');
-      if (mounted) ToastHelper.showError(context, 'Failed to save configurations');
+      if (mounted) {
+        String msg = 'Failed to save configurations';
+        final errStr = e.toString();
+        if (errStr.contains('403')) {
+          msg = 'Permission denied (403). Please re-login or check permissions.';
+        } else if (errStr.contains('401')) {
+          msg = 'Session expired (401). Please log in again.';
+        } else if (errStr.contains('Failed to connect') || errStr.contains('SocketException') || errStr.contains('ClientException')) {
+          msg = 'Cannot connect to server. Please verify backend is running.';
+        }
+        ToastHelper.showError(context, msg);
+      }
     }
   }
 
