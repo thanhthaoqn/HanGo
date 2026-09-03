@@ -13,7 +13,7 @@ import '../../../utils/toast_helper.dart';
 import '../../../utils/language_manager.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/shared_footer.dart';
-import 'learner_home_page.dart';
+import 'learner_shell_page.dart';
 import '../course/course_detail_page.dart';
 
 class MyInformationPage extends StatefulWidget {
@@ -614,7 +614,7 @@ class _MyInformationPageState extends State<MyInformationPage> {
               _authService.logout();
               Navigator.pushAndRemoveUntil(
                 context,
-                MaterialPageRoute(builder: (context) => LearnerHomePage()),
+                MaterialPageRoute(builder: (context) => const LearnerShellPage()),
                 (route) => false,
               );
             });

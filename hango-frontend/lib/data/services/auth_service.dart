@@ -135,6 +135,9 @@ class AuthService {
       await prefs.setString(_refreshTokenKey, data['refreshToken']);
     }
     await prefs.setInt(_userIdKey, data['id']);
+    // Dismissing the entry exam popup only holds for the session it was
+    // dismissed in - each fresh login should offer it again if still unfinished.
+    await prefs.remove('dismissed_entry_exam_${data['id']}');
     await prefs.setString(_userEmailKey, data['email']);
     await prefs.setString(_userFullNameKey, data['fullName']);
     final roles = List<String>.from(data['roles']);

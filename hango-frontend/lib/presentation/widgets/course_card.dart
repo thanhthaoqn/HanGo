@@ -25,7 +25,6 @@ class CourseCard extends StatefulWidget {
 
 class _CourseCardState extends State<CourseCard> {
   bool _isHovered = false;
-  bool _isInWishlist = false;
   bool _isInCart = false;
   bool _isEnrolled = false;
   bool _isLoadingEnroll = false;
@@ -53,7 +52,6 @@ class _CourseCardState extends State<CourseCard> {
 
     if (mounted) {
       setState(() {
-        _isInWishlist = wishlist.contains(widget.course.id.toString());
         _isInCart = cart.contains(widget.course.id.toString());
         _isEnrolled = enrolledLocal || (widget.course.progressPercentage > 0);
         _canEnroll = PermissionUtils.canEnrollAndLearn(roles);
@@ -61,29 +59,7 @@ class _CourseCardState extends State<CourseCard> {
     }
   }
 
-  Future<void> _toggleWishlist() async {
-    final prefs = await SharedPreferences.getInstance();
-    final wishlist = prefs.getStringList('wishlisted_course_ids') ?? [];
-    final courseIdStr = widget.course.id.toString();
 
-    setState(() {
-      if (_isInWishlist) {
-        wishlist.remove(courseIdStr);
-        _isInWishlist = false;
-        ToastHelper.show(context, LanguageManager.isVi ? 'Đã xóa khỏi danh sách yêu thích' : 'Removed from wishlist');
-      } else {
-        wishlist.add(courseIdStr);
-        _isInWishlist = true;
-        ToastHelper.show(context, LanguageManager.isVi ? 'Đã thêm vào danh sách yêu thích' : 'Added to wishlist');
-      }
-    });
-
-    await prefs.setStringList('wishlisted_course_ids', wishlist);
-    await WishlistManager.updateCount();
-    if (widget.onStateChanged != null) {
-      widget.onStateChanged!();
-    }
-  }
 
   Future<void> _toggleCart() async {
     final isVi = LanguageManager.isVi;
@@ -149,22 +125,7 @@ class _CourseCardState extends State<CourseCard> {
     return '$formattedđ';
   }
 
-  String _getOriginalPrice(String currentPrice) {
-    if (currentPrice == 'Miễn phí') return '';
-    try {
-      final clean = currentPrice.replaceAll(RegExp(r'[^0-9]'), '');
-      if (clean.isEmpty) return '';
-      final val = double.parse(clean);
-      final original = val * 1.3;
-      final formatted = original.toStringAsFixed(0).replaceAllMapped(
-        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-        (m) => '${m[1]}.',
-      );
-      return '$formattedđ';
-    } catch (_) {
-      return '';
-    }
-  }
+
 
   String _getTeacherSalutation(String name) {
     final lowerName = name.toLowerCase();
@@ -314,7 +275,6 @@ class _CourseCardState extends State<CourseCard> {
     final isVi = LanguageManager.isVi;
     final theme = _getCourseCategoryTheme(widget.course.category);
     final priceStr = _getCoursePrice(widget.course);
-    final originalPriceStr = _getOriginalPrice(priceStr);
     final isFree = priceStr == 'Miễn phí';
     final displayPrice = isFree ? (isVi ? 'Miễn phí' : 'Free') : priceStr;
     final teacherName = _getTeacherSalutation(widget.course.creatorName);
@@ -479,32 +439,14 @@ class _CourseCardState extends State<CourseCard> {
                     const Spacer(),
 
                     // Price display
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        Text(
-                          displayPrice,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: isFree ? const Color(0xFF28B79B) : const Color(0xFF0F172A),
-                            fontFamily: 'Outfit',
-                          ),
-                        ),
-                        if (!isFree) ...[
-                          const SizedBox(width: 8),
-                          Text(
-                            originalPriceStr,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF94A3B8),
-                              decoration: TextDecoration.lineThrough,
-                              fontFamily: 'Outfit',
-                            ),
-                          ),
-                        ],
-                      ],
+                    Text(
+                      displayPrice,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isFree ? const Color(0xFF28B79B) : const Color(0xFF0F172A),
+                        fontFamily: 'Outfit',
+                      ),
                     ),
                   ],
                 ),
@@ -517,152 +459,5 @@ class _CourseCardState extends State<CourseCard> {
   );
 }
 
-  Widget _buildActionButton(bool isVi) {
-    if (_isEnrolled) {
-      return SizedBox(
-        width: double.infinity,
-        height: 36,
-        child: OutlinedButton(
-          style: OutlinedButton.styleFrom(
-            side: const BorderSide(color: Color(0xFF28B79B)),
-            foregroundColor: const Color(0xFF28B79B),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            padding: EdgeInsets.zero,
-          ),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => CourseDetailPage(courseId: widget.course.id),
-              ),
-            );
-          },
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFF28B79B)),
-              const SizedBox(width: 6),
-              Text(
-                isVi ? 'Vào học ngay' : 'Learn Now',
-                style: const TextStyle(fontSize: 12, fontFamily: 'Outfit', fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
 
-    if (!_canEnroll) {
-      return SizedBox(
-        width: double.infinity,
-        height: 36,
-        child: OutlinedButton(
-          style: OutlinedButton.styleFrom(
-            side: const BorderSide(color: Color(0xFFE2E8F0)),
-            foregroundColor: const Color(0xFF64748B),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            padding: EdgeInsets.zero,
-          ),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => CourseDetailPage(courseId: widget.course.id),
-              ),
-            );
-          },
-          child: Text(
-            isVi ? 'Xem chi tiết' : 'View details',
-            style: const TextStyle(
-              fontSize: 12,
-              fontFamily: 'Outfit',
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      );
-    }
-
-    final priceStr = _getCoursePrice(widget.course);
-    final isFree = priceStr == 'Miễn phí';
-
-    if (isFree) {
-      return SizedBox(
-        width: double.infinity,
-        height: 36,
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF28B79B),
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            padding: EdgeInsets.zero,
-          ),
-          onPressed: _isLoadingEnroll ? null : _enrollFreeCourse,
-          child: _isLoadingEnroll
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                )
-              : Text(
-                  isVi ? 'Đăng ký miễn phí' : 'Enroll Free',
-                  style: const TextStyle(fontSize: 12, fontFamily: 'Outfit', fontWeight: FontWeight.bold),
-                ),
-        ),
-      );
-    }
-
-    // For paid courses, show Buy Now & Cart icon side by side
-    return Row(
-      children: [
-        Expanded(
-          child: SizedBox(
-            height: 36,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF28B79B),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                padding: EdgeInsets.zero,
-              ),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => CourseDetailPage(courseId: widget.course.id),
-                  ),
-                );
-              },
-              child: Text(
-                isVi ? 'Mua ngay' : 'Buy Now',
-                style: const TextStyle(fontSize: 12, fontFamily: 'Outfit', fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Container(
-          height: 36,
-          width: 36,
-          decoration: BoxDecoration(
-            color: _isInCart ? const Color(0xFFE6FFFA) : const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: _isInCart ? const Color(0xFF28B79B) : Colors.transparent,
-              width: _isInCart ? 1.2 : 0,
-            ),
-          ),
-          child: IconButton(
-            icon: Icon(
-              _isInCart ? Icons.shopping_bag_rounded : Icons.add_shopping_cart_rounded,
-              size: 16,
-              color: _isInCart ? const Color(0xFF28B79B) : const Color(0xFF475569),
-            ),
-            padding: EdgeInsets.zero,
-            onPressed: _toggleCart,
-          ),
-        ),
-      ],
-    );
-  }
 }

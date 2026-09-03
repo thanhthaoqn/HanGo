@@ -8,10 +8,11 @@ import '../../../utils/toast_helper.dart';
 import '../../../utils/cart_manager.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/shared_footer.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../data/repositories/payment_repository.dart';
 import 'list_courses_page.dart';
 import 'course_detail_page.dart';
 import '../login_page.dart';
-import '../../widgets/payment_qr_dialog.dart';
 
 class CartPage extends StatefulWidget {
   final bool isEmbedded;
@@ -28,6 +29,7 @@ class _CartPageState extends State<CartPage> {
   Set<String> _enrolledCourseIds = {};
   bool _isLoading = true;
   bool _canEnroll = true;
+  bool _isCheckingOut = false;
 
   @override
   void initState() {
@@ -263,41 +265,54 @@ class _CartPageState extends State<CartPage> {
     }
   }
 
-  void _payPaidCourses(List<Course> courses, double totalPrice) {
+  void _payPaidCourses(List<Course> courses, double totalPrice) async {
     final courseIds = courses.map((c) => c.id).toList();
-    final title = courses.length > 1
-        ? 'Checkout ${courses.length} courses in cart'
-        : courses.first.title;
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => PaymentQrDialog(
-        courseIds: courseIds,
-        courseTitle: title,
-        price: totalPrice,
-        onPaymentSuccess: () async {
-          final prefs = await SharedPreferences.getInstance();
-          final cartIds = await CartManager.getCartIds();
+    setState(() => _isCheckingOut = true);
+    try {
+      final res = await PaymentRepository().createPayment(courseIds: courseIds);
+      final paymentUrl = res['paymentUrl'] as String?;
 
-          for (final c in courses) {
-            await prefs.setBool('enrolled_course_id_${c.id}', true);
-            cartIds.remove(c.id.toString());
-            await CartManager.removeFromCart(c.id);
-          }
-          await CartManager.setCartIds(cartIds);
-          await CartManager.updateCount();
+      if (paymentUrl == 'FREE_SUCCESS') {
+        final prefs = await SharedPreferences.getInstance();
+        final cartIds = await CartManager.getCartIds();
 
-          if (mounted) {
-            ToastHelper.showSuccess(
-              context,
-              'Payment successful! Courses unlocked.',
-            );
-            _loadCart();
-          }
-        },
-      ),
-    );
+        for (final c in courses) {
+          await prefs.setBool('enrolled_course_id_${c.id}', true);
+          cartIds.remove(c.id.toString());
+          await CartManager.removeFromCart(c.id);
+        }
+        await CartManager.setCartIds(cartIds);
+        await CartManager.updateCount();
+
+        if (mounted) {
+          ToastHelper.showSuccess(
+            context,
+            'Free courses enrolled successfully!',
+          );
+          _loadCart();
+        }
+        return;
+      }
+
+      if (paymentUrl != null && paymentUrl.isNotEmpty) {
+        final uri = Uri.parse(paymentUrl);
+        await launchUrl(uri, webOnlyWindowName: '_self');
+      } else {
+        throw Exception('Could not generate payment link.');
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastHelper.showError(
+          context,
+          e.toString().replaceAll('Exception: ', ''),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isCheckingOut = false);
+      }
+    }
   }
 
   @override
@@ -682,10 +697,21 @@ class _CartPageState extends State<CartPage> {
               ),
               elevation: 2,
             ),
-            onPressed: _canEnroll ? _checkoutCart : null,
-            icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
+            onPressed: (_canEnroll && !_isCheckingOut) ? _checkoutCart : null,
+            icon: _isCheckingOut
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Icon(Icons.payment_rounded, size: 20),
             label: Text(
-              isVi ? 'Quét mã QR thanh toán' : 'Scan QR Code Checkout',
+              _isCheckingOut
+                  ? (isVi ? 'Đang chuyển đến PayOS...' : 'Redirecting to PayOS...')
+                  : (isVi ? 'Thanh toán qua PayOS (VietQR)' : 'Checkout with PayOS (VietQR)'),
               style: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
@@ -713,8 +739,8 @@ class _CartPageState extends State<CartPage> {
                 Expanded(
                   child: Text(
                     isVi
-                        ? 'Nút trên sẽ tự động mở VietQR PayOS để quét mã thanh toán các khóa học.'
-                        : 'Button above will automatically open VietQR PayOS for your checkout.',
+                        ? 'Hệ thống sẽ chuyển hướng bạn đến trang thanh toán PayOS để quét mã VietQR và hoàn tất đơn hàng.'
+                        : 'You will be redirected to the secure PayOS checkout page to scan the VietQR and complete your order.',
                     style: const TextStyle(
                       color: Color(0xFF64748B),
                       fontSize: 12,
