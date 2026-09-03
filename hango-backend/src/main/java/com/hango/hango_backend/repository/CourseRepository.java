@@ -147,6 +147,23 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     boolean existsByCodeIgnoreCaseAndIdNot(String code, Long id);
     boolean existsByTitleIgnoreCaseAndDeletedAtIsNull(String title);
 
+    /**
+     * Composite uniqueness check for course import (§5/§34 of course_rule.docx).
+     * A course is considered duplicate only when ALL four attributes match:
+     * same trainer + same title (case-insensitive) + same category + same difficulty.
+     */
+    @Query("SELECT CASE WHEN COUNT(c) > 0 THEN true ELSE false END FROM Course c " +
+           "WHERE c.creator.id = :creatorId " +
+           "AND LOWER(c.title) = LOWER(:title) " +
+           "AND c.category.id = :categoryId " +
+           "AND c.difficulty.id = :difficultyId " +
+           "AND c.deletedAt IS NULL")
+    boolean existsByCompositeIdentity(
+            @Param("creatorId") Long creatorId,
+            @Param("title") String title,
+            @Param("categoryId") Long categoryId,
+            @Param("difficultyId") Long difficultyId);
+
     List<Course> findByCodeAndDeletedAtIsNullOrderByCreatedAtDesc(String code);
     List<Course> findByCreatorIdAndDeletedAtIsNull(Long creatorId);
 
