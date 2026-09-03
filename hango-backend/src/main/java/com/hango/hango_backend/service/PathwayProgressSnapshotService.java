@@ -3,6 +3,7 @@ package com.hango.hango_backend.service;
 import com.hango.hango_backend.dto.ExamResultAnalysisDTO;
 import com.hango.hango_backend.dto.ProgressSnapshotDTO;
 import com.hango.hango_backend.entity.LearningPathway;
+import com.hango.hango_backend.entity.Lesson;
 import com.hango.hango_backend.entity.LessonQuizAttempt;
 import com.hango.hango_backend.entity.PathwayNode;
 import com.hango.hango_backend.repository.ExamAttemptRepository;
@@ -25,7 +26,6 @@ import java.util.Set;
 @Slf4j
 public class PathwayProgressSnapshotService {
 
-    private static final String LESSON_TYPE_FINAL_QUIZ = "FINAL_QUIZ";
     private static final double PASS_THRESHOLD = 60.0;
 
     private final LearningPathwayRepository pathwayRepository;
@@ -100,16 +100,18 @@ public class PathwayProgressSnapshotService {
     }
 
     /**
-     * Uu tien attempt thuoc lesson co lesson_type = 'FINAL_QUIZ'.
-     * Neu course chua co final quiz hoac learner chua lam → dung toan bo lesson quiz cua course.
+     * Uu tien attempt thuoc bai quiz cuoi cung (thuoc section cuoi cung) cua course.
+     * Neu course chua co quiz nao -> fallback dung tat ca quiz attempts.
      */
     private List<LessonQuizAttempt> resolveSourceAttempts(Long learnerId, Long courseId) {
-        List<LessonQuizAttempt> finalQuizAttempts = quizAttemptRepository
-                .findByStudentIdAndLessonSectionCourseIdAndLessonLessonTypeOrderBySubmittedAtDesc(
-                        learnerId, courseId, LESSON_TYPE_FINAL_QUIZ);
-        if (!finalQuizAttempts.isEmpty()) {
-            return finalQuizAttempts;
+        List<Lesson> lastQuizzes = lessonRepository.findLastQuizByCourseId(
+                courseId, org.springframework.data.domain.PageRequest.of(0, 1));
+
+        if (!lastQuizzes.isEmpty()) {
+            Lesson lastQuiz = lastQuizzes.get(0);
+            return quizAttemptRepository.findByStudentIdAndLessonIdOrderBySubmittedAtDesc(learnerId, lastQuiz.getId());
         }
+
         return quizAttemptRepository.findByStudentIdAndLessonSectionCourseIdOrderBySubmittedAtDesc(learnerId, courseId);
     }
 
