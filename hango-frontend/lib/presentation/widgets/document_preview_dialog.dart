@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../utils/language_manager.dart';
+import 'pdf_view_helper.dart';
 
 bool isTrustedTrainerDocumentUrl(String value) {
   final uri = Uri.tryParse(value.trim());
@@ -60,31 +61,9 @@ void showDocumentPreviewDialog(BuildContext context, String title, String url) {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(
-                          Icons.open_in_new_rounded,
-                          color: Color(0xFF2563EB),
-                        ),
-                        tooltip: isVi
-                            ? 'Mở trong tab mới'
-                            : 'Open in new browser tab',
-                        onPressed: () async {
-                          final uri = Uri.parse(cleanUrl);
-                          if (await canLaunchUrl(uri)) {
-                            await launchUrl(
-                              uri,
-                              mode: LaunchMode.externalApplication,
-                            );
-                          }
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ],
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.pop(context),
                   ),
                 ],
               ),
@@ -93,89 +72,9 @@ void showDocumentPreviewDialog(BuildContext context, String title, String url) {
               // Body content: PDF vs Image
               Expanded(
                 child: isPdf
-                    ? Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(20),
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFFEF2F2),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.picture_as_pdf_rounded,
-                                size: 56,
-                                color: Color(0xFFDC2626),
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            Text(
-                              title.isNotEmpty ? title : 'PDF Document',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: Color(0xFF0F172A),
-                                fontFamily: 'Outfit',
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 8),
-                            SelectableText(
-                              cleanUrl.split('/').last,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF64748B),
-                                fontFamily: 'Outfit',
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 24),
-                            ElevatedButton.icon(
-                              onPressed: () async {
-                                final uri = Uri.parse(cleanUrl);
-                                if (await canLaunchUrl(uri)) {
-                                  await launchUrl(
-                                    uri,
-                                    mode: LaunchMode.externalApplication,
-                                  );
-                                }
-                              },
-                              icon: const Icon(
-                                Icons.open_in_new_rounded,
-                                size: 18,
-                              ),
-                              label: Text(
-                                isVi
-                                    ? 'Mở & Xem file PDF trong Tab mới'
-                                    : 'Open PDF in New Browser Tab',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: 'Outfit',
-                                ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF2563EB),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 24,
-                                  vertical: 14,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                    ? buildPdfViewWidget(
+                        url: cleanUrl,
+                        title: title.isNotEmpty ? title : 'PDF Document',
                       )
                     : ClipRRect(
                         borderRadius: BorderRadius.circular(8),

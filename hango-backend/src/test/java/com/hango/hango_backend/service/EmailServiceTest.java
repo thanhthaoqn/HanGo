@@ -40,7 +40,7 @@ class EmailServiceTest {
                 "Verified credentials valid");
 
         verify(mailSender).send(message);
-        assertEquals("HanGo - Trainer Profile Approved!", message.getSubject());
+        assertEquals("HanGo - Trainer Application Approved!", message.getSubject());
 
         String html = extractText(message);
         assertFalse(html.contains("Admin Notes:"));

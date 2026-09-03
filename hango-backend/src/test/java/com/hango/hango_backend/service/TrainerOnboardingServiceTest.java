@@ -771,7 +771,7 @@ class TrainerOnboardingServiceTest {
 
         assertEquals("AWAITING_APPROVAL", result.getStatus());
         assertNotNull(complete.getSubmittedAt());
-        assertNull(complete.getAdminNotes());
+        assertEquals("previous rejection reason", complete.getAdminNotes());
     }
 
     // =================================================================
@@ -907,7 +907,7 @@ class TrainerOnboardingServiceTest {
         assertEquals(0.70, result.getRevenueShare());
         assertNotNull(p.getReviewedAt());
         verify(emailService).sendTrainerStatusNotificationEmail(
-                "trainer@example.com", "VERIFIED", "Credentials verified");
+                "trainer@example.com", "Learner User", "VERIFIED", "Credentials verified");
     }
 
     @Test
@@ -936,14 +936,14 @@ class TrainerOnboardingServiceTest {
                     .anyMatch(role -> "TRAINER".equalsIgnoreCase(role.getRoleName())));
             verify(userRepository).save(user);
             verify(emailService, never())
-                    .sendTrainerStatusNotificationEmail(anyString(), anyString(), any());
+                    .sendTrainerStatusNotificationEmail(anyString(), anyString(), anyString(), any());
 
             List<TransactionSynchronization> synchronizations =
                     TransactionSynchronizationManager.getSynchronizations();
             assertEquals(1, synchronizations.size());
             synchronizations.get(0).afterCommit();
 
-            verify(emailService).sendTrainerStatusNotificationEmail("trainer@example.com", "VERIFIED", null);
+            verify(emailService).sendTrainerStatusNotificationEmail("trainer@example.com", "Learner User", "VERIFIED", null);
         } finally {
             TransactionSynchronizationManager.clearSynchronization();
         }
@@ -1068,7 +1068,7 @@ class TrainerOnboardingServiceTest {
 
         service.reviewTrainerProfile(1L, req);
 
-        verify(emailService).sendTrainerStatusNotificationEmail("trainer@example.com", "VERIFIED", "Welcome aboard");
+        verify(emailService).sendTrainerStatusNotificationEmail("trainer@example.com", "Learner User", "VERIFIED", "Welcome aboard");
     }
 
 }

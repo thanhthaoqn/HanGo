@@ -278,5 +278,83 @@ void main() {
       expect(isValidCitizenId('001198001234'), isTrue);
       expect(isValidCitizenId('0101234567'), isFalse);
     });
+
+    test('Validates section-specific changes on rejected application', () {
+      bool validateRevisions({
+        required String adminNotes,
+        required bool bioChanged,
+        required bool certsChanged,
+      }) {
+        final revisionNotes = parseTrainerRevisionNotes(adminNotes);
+        if (revisionNotes.bio != null && !bioChanged) return false;
+        if (revisionNotes.certificates != null && !certsChanged) return false;
+        if (revisionNotes.general != null && !bioChanged && !certsChanged) {
+          return false;
+        }
+        return true;
+      }
+
+      // Bio only rejected: must change bio, changing certs alone is not enough
+      expect(
+        validateRevisions(
+          adminNotes: 'Bio: I dont understand',
+          bioChanged: false,
+          certsChanged: true,
+        ),
+        isFalse,
+      );
+      expect(
+        validateRevisions(
+          adminNotes: 'Bio: I dont understand',
+          bioChanged: true,
+          certsChanged: false,
+        ),
+        isTrue,
+      );
+
+      // Certificates only rejected: must change certs, changing bio alone is not enough
+      expect(
+        validateRevisions(
+          adminNotes: 'Certificates: Missing degree',
+          bioChanged: true,
+          certsChanged: false,
+        ),
+        isFalse,
+      );
+      expect(
+        validateRevisions(
+          adminNotes: 'Certificates: Missing degree',
+          bioChanged: false,
+          certsChanged: true,
+        ),
+        isTrue,
+      );
+
+      // Both rejected: must change both
+      expect(
+        validateRevisions(
+          adminNotes: 'Bio: Fix bio | Certificates: Fix cert',
+          bioChanged: true,
+          certsChanged: false,
+        ),
+        isFalse,
+      );
+      expect(
+        validateRevisions(
+          adminNotes: 'Bio: Fix bio | Certificates: Fix cert',
+          bioChanged: false,
+          certsChanged: true,
+        ),
+        isFalse,
+      );
+      expect(
+        validateRevisions(
+          adminNotes: 'Bio: Fix bio | Certificates: Fix cert',
+          bioChanged: true,
+          certsChanged: true,
+        ),
+        isTrue,
+      );
+    });
   });
 }

@@ -638,33 +638,73 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
                           revisionNotes.bio != null) ...[
                         const SizedBox(height: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: const Color(0xFFFEF2F2),
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: const Color(0xFFFCA5A5)),
                           ),
-                          child: Row(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(
-                                Icons.info_outline,
-                                color: Colors.redAccent,
-                                size: 16,
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.info_outline,
+                                    color: Colors.redAccent,
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      'Previous Revision Note on Bio: ${revisionNotes.bio}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF991B1B),
+                                        fontFamily: 'Outfit',
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  'Revision Note on Bio: ${revisionNotes.bio}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Color(0xFF991B1B),
-                                    fontFamily: 'Outfit',
+                              if (status == 'AWAITING_APPROVAL') ...[
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFECFDF5),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(
+                                      color: const Color(0xFFA7F3D0),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: const [
+                                      Icon(
+                                        Icons.check_circle_rounded,
+                                        size: 14,
+                                        color: Color(0xFF059669),
+                                      ),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Trainer has updated Bio after review',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF065F46),
+                                          fontFamily: 'Outfit',
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ),
+                              ],
                             ],
                           ),
                         ),
@@ -773,35 +813,75 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
                                   revisionNotes.certificates != null) ...[
                                 const SizedBox(height: 12),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 8,
-                                  ),
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
                                     color: const Color(0xFFFEF2F2),
-                                    borderRadius: BorderRadius.circular(6),
+                                    borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
                                       color: const Color(0xFFFCA5A5),
                                     ),
                                   ),
-                                  child: Row(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      const Icon(
-                                        Icons.info_outline,
-                                        color: Colors.redAccent,
-                                        size: 16,
+                                      Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.info_outline,
+                                            color: Colors.redAccent,
+                                            size: 16,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: Text(
+                                              'Previous Revision Note on Credentials: ${revisionNotes.certificates}',
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Color(0xFF991B1B),
+                                                fontFamily: 'Outfit',
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: Text(
-                                          'Revision Note on Credentials: ${revisionNotes.certificates}',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Color(0xFF991B1B),
-                                            fontFamily: 'Outfit',
+                                      if (status == 'AWAITING_APPROVAL') ...[
+                                        const SizedBox(height: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFECFDF5),
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(
+                                              color: const Color(0xFFA7F3D0),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: const [
+                                              Icon(
+                                                Icons.check_circle_rounded,
+                                                size: 14,
+                                                color: Color(0xFF059669),
+                                              ),
+                                              SizedBox(width: 4),
+                                              Text(
+                                                'Trainer has updated Credentials after review',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Color(0xFF065F46),
+                                                  fontFamily: 'Outfit',
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
-                                      ),
+                                      ],
                                     ],
                                   ),
                                 ),
@@ -1132,16 +1212,49 @@ class _AdminTrainerReviewsPageState extends State<AdminTrainerReviewsPage> {
                   _buildAvatarCircle(fullName, avatarUrl: avatarUrl),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
-                      fullName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: Color(0xFF0F172A),
-                        fontFamily: 'Outfit',
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          fullName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: Color(0xFF0F172A),
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                        if (status == 'AWAITING_APPROVAL' &&
+                            app['adminNotes'] != null &&
+                            app['adminNotes'].toString().trim().isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFFBEB),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: const Color(0xFFFDE68A),
+                              ),
+                            ),
+                            child: const Text(
+                              'Resubmitted',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFD97706),
+                                fontFamily: 'Outfit',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ],

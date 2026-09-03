@@ -94,44 +94,21 @@ public class EmailService {
         String detailsHtml;
 
         if (isApproved) {
-            subject = "HanGo - Trainer Profile Approved!";
+            subject = "HanGo - Trainer Application Approved!";
             badgeColor = "#059669";
             badgeText = "✓ Application Approved";
-            title = "Congratulations! Your Trainer Profile is Approved 🎉";
+            title = "Congratulations! Your Trainer Application is Approved 🎉";
             subtitle = "Hi <strong style=\"color: #0d9488 !important;\">" + safeName
-                    + "</strong>, we are thrilled to welcome you to the HanGo teaching community! Your application has been reviewed and officially approved by administration.";
+                    + "</strong>, we are thrilled to welcome you to the HanGo teaching community! Your application has been reviewed and officially approved.";
             ctaText = "Access Trainer Dashboard &rarr;";
             ctaUrl = "https://hangog92.online";
             ctaColor = "#28b79b";
 
-            detailsHtml = "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"background-color: #f8fafc; border-radius: 14px; border: 1px solid #e2e8f0; overflow: hidden; margin-bottom: 24px; padding: 20px 24px;\">"
-                    + "  <tr>"
-                    + "    <td>"
-                    + "      <h3 style=\"margin: 0 0 12px 0; color: #0f172a !important; font-size: 15px; font-weight: 700;\">Application Details</h3>"
-                    + "      <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">"
-                    + "        <tr>"
-                    + "          <td style=\"color: #64748b !important; font-size: 13.5px; padding: 5px 0;\">Applicant:</td>"
-                    + "          <td align=\"right\" style=\"color: #0f172a !important; font-size: 13.5px; font-weight: 600;\">"
-                    + safeName + "</td>"
-                    + "        </tr>"
-                    + "        <tr>"
-                    + "          <td style=\"color: #64748b !important; font-size: 13.5px; padding: 5px 0;\">Email:</td>"
-                    + "          <td align=\"right\" style=\"color: #0f172a !important; font-size: 13.5px; font-weight: 600;\">"
-                    + safeEmail + "</td>"
-                    + "        </tr>"
-                    + "        <tr>"
-                    + "          <td style=\"color: #64748b !important; font-size: 13.5px; padding: 5px 0;\">Application Status:</td>"
-                    + "          <td align=\"right\" style=\"color: #059669 !important; font-size: 13.5px; font-weight: 700;\">Active & Verified ✓</td>"
-                    + "        </tr>"
-                    + "      </table>"
-                    + "    </td>"
-                    + "  </tr>"
-                    + "</table>"
-                    + "<div style=\"background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 18px 20px; margin-bottom: 24px; text-align: left;\">"
-                    + "  <h4 style=\"margin: 0 0 10px 0; color: #0f172a !important; font-size: 14px; font-weight: 700;\">Next Steps for You:</h4>"
-                    + "  <p style=\"margin: 0 0 6px 0; color: #475569 !important; font-size: 13px; line-height: 1.5;\">1. Complete your <strong>Payout Setup</strong> (Bank Account) in Settlement Settings to receive course earnings.</p>"
-                    + "  <p style=\"margin: 0 0 6px 0; color: #475569 !important; font-size: 13px; line-height: 1.5;\">2. Create and publish high-quality courses, upload video lessons & structured chapters.</p>"
-                    + "  <p style=\"margin: 0 0 6px 0; color: #475569 !important; font-size: 13px; line-height: 1.5;\">3. Publish practice exams and track student performance in real-time.</p>"
+            detailsHtml = "<div style=\"background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px 24px; margin-bottom: 24px; text-align: left;\">"
+                    + "  <h4 style=\"margin: 0 0 12px 0; color: #0f172a !important; font-size: 15px; font-weight: 700;\">Next Steps for You:</h4>"
+                    + "  <p style=\"margin: 0 0 8px 0; color: #475569 !important; font-size: 13.5px; line-height: 1.5;\">1. Complete your <strong>Payout Setup</strong> (Bank Account) in Settlement Settings to receive course earnings.</p>"
+                    + "  <p style=\"margin: 0 0 8px 0; color: #475569 !important; font-size: 13.5px; line-height: 1.5;\">2. Create and publish high-quality courses, upload video lessons & structured chapters.</p>"
+                    + "  <p style=\"margin: 0; color: #475569 !important; font-size: 13.5px; line-height: 1.5;\">3. Publish practice exams and track student performance in real-time.</p>"
                     + "</div>";
         } else if (isSuspended) {
             subject = "HanGo - Trainer Account Status Notice (Suspended)";
@@ -139,7 +116,7 @@ public class EmailService {
             badgeText = "⚠ Account Suspended";
             title = "Trainer Account Status Notification";
             subtitle = "Hi <strong style=\"color: #b45309 !important;\">" + safeName
-                    + "</strong>, your trainer account status on HanGo has been set to <strong>SUSPENDED</strong> by system administration.";
+                    + "</strong>, your trainer account status on HanGo has been set to <strong>SUSPENDED</strong>.";
             ctaText = "Contact Support Team &rarr;";
             ctaUrl = "mailto:hangog92su26@gmail.com";
             ctaColor = "#475569";
