@@ -1,7 +1,6 @@
 package com.hango.hango_backend.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.hango.hango_backend.config.GeminiProperties;
 import com.hango.hango_backend.dto.ExamCourseRecommendationAIResponseDTO;
 import com.hango.hango_backend.dto.ExamResultAnalysisDTO;
 import com.hango.hango_backend.entity.Course;
@@ -9,10 +8,6 @@ import com.hango.hango_backend.entity.ExamAttempt;
 import com.hango.hango_backend.dto.ExamCourseRecommendationAIResponseDTO.RecommendedCourseDTO;
 import com.hango.hango_backend.repository.CourseRepository;
 import com.hango.hango_backend.repository.ExamAttemptRepository;
-import com.hango.hango_backend.repository.SystemParameterRepository;
-import com.hango.hango_backend.service.ExamResultAnalyzerService;
-import com.hango.hango_backend.service.GeminiClientService;
-import com.hango.hango_backend.service.SkillCategoryMappingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -28,6 +23,14 @@ import java.util.Map;
 @Slf4j
 @RequiredArgsConstructor
 public class ExamCourseRecommendationAIService {
+
+    private static final com.fasterxml.jackson.databind.ObjectMapper LENIENT_MAPPER = com.fasterxml.jackson.databind.json.JsonMapper.builder()
+            .enable(com.fasterxml.jackson.core.json.JsonReadFeature.ALLOW_UNQUOTED_FIELD_NAMES)
+            .enable(com.fasterxml.jackson.core.json.JsonReadFeature.ALLOW_TRAILING_COMMA)
+            .enable(com.fasterxml.jackson.core.json.JsonReadFeature.ALLOW_SINGLE_QUOTES)
+            .enable(com.fasterxml.jackson.core.json.JsonReadFeature.ALLOW_JAVA_COMMENTS)
+            .build()
+            .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     private final ExamAttemptRepository examAttemptRepository;
     private final CourseRepository courseRepository;
@@ -146,21 +149,39 @@ public class ExamCourseRecommendationAIService {
         // ep AI tra ve dung JSON schema {weaknessSummary, recommendedCourses[3]}
         try {
             String aiResponseText = geminiClientService.generateChatResponse(systemPrompt, chatHistory);
+            if (aiResponseText == null) {
+                aiResponseText = "";
+            }
             aiResponseText = aiResponseText.replaceAll("(?s)^```json\\s*", "")
                     .replaceAll("(?s)```\\s*$", "")
                     .trim();
 
+            // Trích xuất JSON object thuần từ phản hồi AI (bỏ qua text thừa nếu có)
+            int jsonStart = aiResponseText.indexOf('{');
+            int jsonEnd = aiResponseText.lastIndexOf('}');
+            if (jsonStart >= 0 && jsonEnd >= 0 && jsonEnd > jsonStart) {
+                aiResponseText = aiResponseText.substring(jsonStart, jsonEnd + 1);
+            }
+
             // Parse response: weaknessSummary + recommendedCourses[].
-            @SuppressWarnings("unchecked")
-            Map<String, Object> parsed = objectMapper.readValue(aiResponseText, Map.class);
+            Map<String, Object> parsed;
+            try {
+                parsed = LENIENT_MAPPER.readValue(aiResponseText, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+            } catch (Exception parseEx) {
+                parsed = objectMapper != null ? objectMapper.readValue(aiResponseText, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}) : null;
+            }
+
+            if (parsed == null) {
+                throw new IllegalStateException("Failed to parse AI recommendation JSON");
+            }
 
             String weaknessSummary = parsed.get("weaknessSummary") != null ? parsed.get("weaknessSummary").toString() : "";
             List<Map<String, Object>> recs = (List<Map<String, Object>>) parsed.get("recommendedCourses");
 
             if (recs == null) recs = Collections.emptyList();
 
-            // Map courseId AI tra ve lai voi Course that trong DB de lay title/thumbnail.
-            // courseId AI bia ra se bi loai (orElse(null) -> title rong)
+            // Map courseId AI trả về lại với Course thật trong DB để lấy title/thumbnail.
+            // Xử lý an toàn khi courseId null/không phải số để không crash toàn bộ đề xuất.
             return ExamCourseRecommendationAIResponseDTO.builder()
                     .examAttemptId(examAttemptId)
                     .weaknessSummary(weaknessSummary)
@@ -178,7 +199,7 @@ public class ExamCourseRecommendationAIService {
                                 .reasonWhy(reasonWhy)
                                 .thumbnailUrl(course != null ? course.getThumbnailUrl() : null)
                                 .build();
-                    }).toList())
+                    }).filter(java.util.Objects::nonNull).limit(3).toList())
                     .build();
         } catch (Exception e) {
             // FALLBACK (SUY GIAM NHE NHANG): Neu AI loi, Google sap, tra ve mang rong (emptyList)

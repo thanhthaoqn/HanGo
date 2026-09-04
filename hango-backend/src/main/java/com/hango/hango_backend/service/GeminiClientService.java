@@ -365,7 +365,7 @@ public class GeminiClientService {
                         String uploadUrl = "https://generativelanguage.googleapis.com/upload/v1beta/files?uploadType=media";
 
                         WebClient uploadClient = WebClient.builder()
-                                        .defaultHeader("x-goog-api-key", geminiProperties.getApiKey())
+                                        .defaultHeader("x-goog-api-key", getApiKey())
                                         .defaultHeader("Content-Type", "video/mp4")
                                         .build();
 

@@ -53,6 +53,14 @@ public class LearningPathwayService {
     private static final String ATTEMPT_STATE_MASTERY = "MASTERY";
     private static final int MASTERY_PASS_SCORE = 80;
 
+    private static final com.fasterxml.jackson.databind.ObjectMapper LENIENT_MAPPER = com.fasterxml.jackson.databind.json.JsonMapper.builder()
+            .enable(com.fasterxml.jackson.core.json.JsonReadFeature.ALLOW_UNQUOTED_FIELD_NAMES)
+            .enable(com.fasterxml.jackson.core.json.JsonReadFeature.ALLOW_TRAILING_COMMA)
+            .enable(com.fasterxml.jackson.core.json.JsonReadFeature.ALLOW_SINGLE_QUOTES)
+            .enable(com.fasterxml.jackson.core.json.JsonReadFeature.ALLOW_JAVA_COMMENTS)
+            .build()
+            .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
     private final LearningPathwayRepository learningPathwayRepository;
     private final ExamAttemptRepository examAttemptRepository;
     private final CourseRepository courseRepository;
@@ -199,10 +207,36 @@ public class LearningPathwayService {
         LearningPathwayResponseDTO responseDto;
         try {
             String aiResponseText = geminiClientService.generateChatResponse(systemPrompt, chatHistory);
-            aiResponseText = aiResponseText.replaceAll("(?s)^```json\\s*", "")
-                    .replaceAll("(?s)```\\s*$", "")
-                    .trim();
-            responseDto = objectMapper.readValue(aiResponseText, LearningPathwayResponseDTO.class);
+            if (aiResponseText != null) {
+                aiResponseText = aiResponseText.replaceAll("(?s)^```json\\s*", "")
+                        .replaceAll("(?s)```\\s*$", "")
+                        .trim();
+
+                // Trích xuất JSON object thuần từ phản hồi AI
+                int jsonStart = aiResponseText.indexOf('{');
+                int jsonEnd = aiResponseText.lastIndexOf('}');
+                if (jsonStart >= 0 && jsonEnd >= 0 && jsonEnd > jsonStart) {
+                    aiResponseText = aiResponseText.substring(jsonStart, jsonEnd + 1);
+                }
+            }
+
+            LearningPathwayResponseDTO parsed = null;
+            try {
+                if (aiResponseText != null && !aiResponseText.isBlank()) {
+                    parsed = LENIENT_MAPPER.readValue(aiResponseText, LearningPathwayResponseDTO.class);
+                }
+            } catch (Exception ignored) {}
+
+            if (parsed == null || parsed.getNodes() == null || parsed.getNodes().isEmpty()) {
+                if (objectMapper != null) {
+                    parsed = objectMapper.readValue(aiResponseText, LearningPathwayResponseDTO.class);
+                }
+            }
+
+            if (parsed == null) {
+                throw new IllegalStateException("Parsed pathway response is null");
+            }
+            responseDto = parsed;
         } catch (Exception e) {
             // Fallback: khong goi AI nua - uu tien course thuoc category yeu, gioi han 4
             // node
