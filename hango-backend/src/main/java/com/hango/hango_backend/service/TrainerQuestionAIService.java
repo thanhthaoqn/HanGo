@@ -1,12 +1,12 @@
 package com.hango.hango_backend.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.hango.hango_backend.config.GeminiProperties;
 import com.hango.hango_backend.dto.CreateTrainerQuestionAIRequestDTO;
 import com.hango.hango_backend.dto.CreateTrainerQuestionAIResponseDTO;
 import com.hango.hango_backend.dto.CreateTrainerExamAIResponseDTO;
 import com.hango.hango_backend.dto.TrainerExamChatRequestDTO;
 import com.hango.hango_backend.dto.GeminiGenerateRequest;
+import com.hango.hango_backend.dto.GeminiGenerateResponse;
 import com.hango.hango_backend.entity.SystemParameter;
 import com.hango.hango_backend.exception.ApiException;
 import com.hango.hango_backend.repository.SystemParameterRepository;
@@ -23,6 +23,14 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class TrainerQuestionAIService {
+
+    private static final ObjectMapper LENIENT_MAPPER = com.fasterxml.jackson.databind.json.JsonMapper.builder()
+            .enable(com.fasterxml.jackson.core.json.JsonReadFeature.ALLOW_UNQUOTED_FIELD_NAMES)
+            .enable(com.fasterxml.jackson.core.json.JsonReadFeature.ALLOW_TRAILING_COMMA)
+            .enable(com.fasterxml.jackson.core.json.JsonReadFeature.ALLOW_SINGLE_QUOTES)
+            .enable(com.fasterxml.jackson.core.json.JsonReadFeature.ALLOW_JAVA_COMMENTS)
+            .build()
+            .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     private final GeminiClientService geminiClientService;
     private final ObjectMapper objectMapper;
@@ -97,6 +105,8 @@ public class TrainerQuestionAIService {
         long difficultyId = req.getDifficultyId() != null ? req.getDifficultyId() : 14L;
 
         boolean isMultipleBranch = !"SINGLE".equals(mode);
+        boolean useSearchGrounding = Boolean.TRUE.equals(req.getUseSearchGrounding());
+
         List<SystemParameter> activeSkills = isMultipleBranch
                 ? systemParameterRepository.findByParamTypeAndIsActiveTrue("SKILL_TYPE")
                 : List.of();
@@ -106,21 +116,49 @@ public class TrainerQuestionAIService {
 
         String systemPrompt = buildSystemPrompt(req, mode, quantity, activeSkills, activeDifficulties);
 
-        String raw = geminiClientService.generateChatResponse(
-                systemPrompt,
-                List.of(
-                        GeminiGenerateRequest.Content.builder()
-                                .role("user")
-                                .parts(List.of(GeminiGenerateRequest.Part.builder().text(buildUserInput(req)).build()))
-                                .build()
-                )
-        );
+        String raw;
+        List<GeminiGenerateResponse.WebSource> groundingSources = List.of();
+
+        if (useSearchGrounding) {
+            GeminiClientService.GeminiChatResult chatResult = geminiClientService.generateChatResponseDetailed(
+                    systemPrompt,
+                    List.of(
+                            GeminiGenerateRequest.Content.builder()
+                                    .role("user")
+                                    .parts(List.of(GeminiGenerateRequest.Part.builder().text(buildUserInput(req)).build()))
+                                    .build()
+                    ),
+                    true
+            );
+            raw = chatResult != null ? chatResult.getText() : null;
+            if (chatResult != null && chatResult.getSources() != null) {
+                groundingSources = chatResult.getSources();
+            }
+        } else {
+            raw = geminiClientService.generateChatResponse(
+                    systemPrompt,
+                    List.of(
+                            GeminiGenerateRequest.Content.builder()
+                                    .role("user")
+                                    .parts(List.of(GeminiGenerateRequest.Part.builder().text(buildUserInput(req)).build()))
+                                    .build()
+                    )
+            );
+        }
+
+        if (raw == null || raw.isBlank()) {
+            throw new ApiException("AI returned empty response", HttpStatus.BAD_GATEWAY);
+        }
 
         // Gemini đôi khi bọc codeblock ```json ... ```
         raw = raw.replaceAll("(?s)^```json\\s*", "")
                 .replaceAll("(?s)```\\s*$", "")
                 .trim();
                 
+        // Auto-repair common LLM JSON syntax quirks (e.g. missing quote on key: `subQuestions":`)
+        raw = raw.replaceAll("(?m)^(\\s*)([a-zA-Z0-9_]+)\":", "$1\"$2\":");
+        raw = raw.replaceAll(",\\s*([}\\]])", "$1");
+
         int start = raw.indexOf('{');
         int end = raw.lastIndexOf('}');
         if (start >= 0 && end >= 0 && end > start) {
@@ -129,14 +167,41 @@ public class TrainerQuestionAIService {
 
         CreateTrainerQuestionAIResponseDTO response;
         try {
-            response = objectMapper.readValue(raw, CreateTrainerQuestionAIResponseDTO.class);
+            response = LENIENT_MAPPER.readValue(raw, CreateTrainerQuestionAIResponseDTO.class);
         } catch (Exception e) {
-            log.warn("Parse AI json failed. raw={}", raw);
+            log.warn("Parse AI json failed. raw={}", raw, e);
             throw new ApiException("AI returned invalid JSON payload", HttpStatus.BAD_GATEWAY);
         }
 
+        String formattedSources = groundingSources.isEmpty() ? null : groundingSources.stream()
+                .map(s -> (s.getTitle() != null && !s.getTitle().isBlank())
+                        ? s.getTitle() + " (" + s.getUri() + ")"
+                        : s.getUri())
+                .distinct()
+                .collect(Collectors.joining(", "));
+
         if (isMultipleBranch && response.getGroup() != null) {
             fillSubQuestionSkillAndDifficulty(response.getGroup(), activeSkills, activeDifficulties);
+
+            if (formattedSources != null && !formattedSources.isBlank()) {
+                response.getGroup().setSourceCitation("(Adapted from: " + formattedSources + ")");
+            } else {
+                response.getGroup().setSourceCitation(null);
+            }
+
+            String citation = response.getGroup().getSourceCitation();
+            if (citation != null && !citation.isBlank() && response.getGroup().getPassageText() != null
+                    && !response.getGroup().getPassageText().contains(citation)) {
+                response.getGroup().setPassageText(response.getGroup().getPassageText() + "\n\n" + citation);
+            }
+        } else if (!isMultipleBranch && response.getQuestions() != null) {
+            for (CreateTrainerQuestionAIResponseDTO.SingleQuestionDTO q : response.getQuestions()) {
+                if (formattedSources != null && !formattedSources.isBlank()) {
+                    q.setSourceCitation("(Source: " + formattedSources + ")");
+                } else {
+                    q.setSourceCitation(null);
+                }
+            }
         }
 
         return response;
@@ -234,6 +299,9 @@ public class TrainerQuestionAIService {
                 .replaceAll("(?s)```\\s*$", "")
                 .trim();
                 
+        raw = raw.replaceAll("(?m)^(\\s*)([a-zA-Z0-9_]+)\":", "$1\"$2\":");
+        raw = raw.replaceAll(",\\s*([}\\]])", "$1");
+
         int start = raw.indexOf('{');
         int end = raw.lastIndexOf('}');
         if (start >= 0 && end >= 0 && end > start) {
@@ -241,7 +309,7 @@ public class TrainerQuestionAIService {
         }
 
         try {
-            return objectMapper.readValue(raw, CreateTrainerExamAIResponseDTO.class);
+            return LENIENT_MAPPER.readValue(raw, CreateTrainerExamAIResponseDTO.class);
         } catch (Exception e) {
             log.error("Parse AI json failed for exam generation. Error: ", e);
             log.error("Raw JSON string: {}", raw);
@@ -262,6 +330,9 @@ public class TrainerQuestionAIService {
         if (req.getGroupType() != null && !req.getGroupType().isBlank()) {
             sb.append("\nGROUP_TYPE: ").append(req.getGroupType());
         }
+        if (Boolean.TRUE.equals(req.getUseSearchGrounding())) {
+            sb.append("\nUSE_SEARCH_GROUNDING: true");
+        }
         return sb.toString();
     }
 
@@ -275,13 +346,17 @@ public class TrainerQuestionAIService {
         // Yêu cầu JSON thuần theo schema mà FE parse
         Long difficultyId = req.getDifficultyId() != null ? req.getDifficultyId() : 14L;
         Long categoryId = req.getCategoryId() != null ? req.getCategoryId() : 1L;
+        boolean useSearchGrounding = Boolean.TRUE.equals(req.getUseSearchGrounding());
 
         if ("SINGLE".equals(mode)) {
             String skillReq = (req.getSkillType() != null && !req.getSkillType().isBlank()) 
                     ? " The question MUST specifically test the skill: " + req.getSkillType() + "." 
                     : "";
+            String groundingReq = useSearchGrounding
+                    ? " Use Google Search to retrieve authentic grammar references, dictionaries, or reputable facts."
+                    : "";
             return "You are an expert English test question generator for HanGo trainer.\n" +
-                    "Create ONLY SINGLE multiple-choice questions. 4 options per question. Exactly 1 correct option." + skillReq + "\n" +
+                    "Create ONLY SINGLE multiple-choice questions. 4 options per question. Exactly 1 correct option." + skillReq + groundingReq + "\n" +
                     "Return PURE JSON only (no markdown).\n" +
                     "Schema:\n" +
                     "{\n" +
@@ -290,6 +365,7 @@ public class TrainerQuestionAIService {
                     "    {\n" +
                     "      \"questionText\": \"...\",\n" +
                     "      \"explanation\": \"...\",\n" +
+                    "      \"sourceCitation\": \"...\",\n" +
                     "      \"categoryId\": " + categoryId + ",\n" +
                     "      \"difficultyId\": " + difficultyId + ",\n" +
                     "      \"options\": [\n" +
@@ -311,6 +387,9 @@ public class TrainerQuestionAIService {
         String groupReq = (req.getGroupType() != null && !req.getGroupType().isBlank())
                 ? " The format and passage MUST follow the structure of group type: " + req.getGroupType() + "."
                 : "";
+        String groundingReqMulti = useSearchGrounding
+                ? " Use Google Search to find an authentic, reputable English reading passage/article (e.g. from BBC, The Guardian, National Geographic, British Council). The passage must be factual and questions must test reading comprehension on the real passage."
+                : "";
 
         String skillOptionsText = activeSkills.isEmpty() ? "" : activeSkills.stream()
                 .map(s -> s.getId() + "=" + s.getParamValue())
@@ -326,7 +405,7 @@ public class TrainerQuestionAIService {
 
         return "You are an expert English reading comprehension test question generator for HanGo trainer.\n" +
                 "Create a group question. passageText + subQuestions[]." + groupReq + "\n" +
-                "Each subQuestion is single-answer multiple-choice with 4 options and exactly 1 correct option." + skillReqMulti +
+                "Each subQuestion is single-answer multiple-choice with 4 options and exactly 1 correct option." + skillReqMulti + groundingReqMulti +
                 perSubQuestionSkillReq + perSubQuestionDifficultyReq + "\n" +
                 "Return PURE JSON only (no markdown).\n" +
                 "Schema:\n" +
@@ -336,6 +415,7 @@ public class TrainerQuestionAIService {
                 "  \"group\": {\n" +
                 "    \"passageText\": \"...\",\n" +
                 "    \"explanation\": \"...\",\n" +
+                "    \"sourceCitation\": \"...\",\n" +
                 "    \"categoryId\": " + categoryId + ",\n" +
                 "    \"difficultyId\": " + difficultyId + ",\n" +
                 "    \"subQuestions\": [\n" +

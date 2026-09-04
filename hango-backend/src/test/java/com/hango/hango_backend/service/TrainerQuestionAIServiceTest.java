@@ -17,12 +17,16 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 
+import com.hango.hango_backend.dto.GeminiGenerateResponse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -290,6 +294,76 @@ class TrainerQuestionAIServiceTest {
 
         org.mockito.Mockito.verify(systemParameterRepository, org.mockito.Mockito.never())
                 .findByParamTypeAndIsActiveTrue(anyString());
+    }
+
+    @Test
+    void generatePayloadShouldUseSearchGroundingAndPopulateCitationForMultipleMode() {
+        when(systemParameterRepository.findByParamTypeAndIsActiveTrue("SKILL_TYPE"))
+                .thenReturn(List.of(param(101, "Main idea")));
+        when(systemParameterRepository.findByParamTypeAndIsActiveTrue("DIFFICULTY"))
+                .thenReturn(List.of(param(14, "Easy")));
+
+        String json = "{\"mode\":\"MULTIPLE\",\"questions\":[],\"group\":{\"passageText\":\"Recent archaeological findings suggest...\",\"subQuestions\":[]}}";
+        GeminiClientService.GeminiChatResult chatResult = new GeminiClientService.GeminiChatResult(
+                json,
+                List.of(GeminiGenerateResponse.WebSource.builder().title("BBC History").uri("https://www.bbc.com/news/archaeology-123").build())
+        );
+        when(geminiClientService.generateChatResponseDetailed(anyString(), any(), eq(true))).thenReturn(chatResult);
+
+        CreateTrainerQuestionAIRequestDTO req = request("MULTIPLE", "Archaeological discoveries", 1);
+        req.setUseSearchGrounding(true);
+
+        CreateTrainerQuestionAIResponseDTO result = service.generatePayload(req);
+
+        verify(geminiClientService).generateChatResponseDetailed(anyString(), any(), eq(true));
+        verify(geminiClientService, never()).generateChatResponse(anyString(), any());
+
+        assertEquals("(Adapted from: BBC History (https://www.bbc.com/news/archaeology-123))", result.getGroup().getSourceCitation());
+        assertTrue(result.getGroup().getPassageText().contains("Recent archaeological findings suggest..."));
+        assertTrue(result.getGroup().getPassageText().contains("(Adapted from: BBC History (https://www.bbc.com/news/archaeology-123))"));
+    }
+
+    @Test
+    void generatePayloadShouldUseSearchGroundingAndPopulateCitationForSingleMode() {
+        String json = "{\"mode\":\"SINGLE\",\"questions\":[{\"questionText\":\"What was discovered in 2024?\",\"options\":[]}]}";
+        GeminiClientService.GeminiChatResult chatResult = new GeminiClientService.GeminiChatResult(
+                json,
+                List.of(GeminiGenerateResponse.WebSource.builder().title("Nature Journal").uri("https://www.nature.com/articles/d41586-024").build())
+        );
+        when(geminiClientService.generateChatResponseDetailed(anyString(), any(), eq(true))).thenReturn(chatResult);
+
+        CreateTrainerQuestionAIRequestDTO req = request("SINGLE", "Recent scientific breakthroughs", 1);
+        req.setUseSearchGrounding(true);
+
+        CreateTrainerQuestionAIResponseDTO result = service.generatePayload(req);
+
+        verify(geminiClientService).generateChatResponseDetailed(anyString(), any(), eq(true));
+        verify(geminiClientService, never()).generateChatResponse(anyString(), any());
+
+        assertEquals(1, result.getQuestions().size());
+        assertEquals("(Source: Nature Journal (https://www.nature.com/articles/d41586-024))", result.getQuestions().get(0).getSourceCitation());
+    }
+
+    @Test
+    void generatePayloadShouldIncludeSearchGroundingRulesInPromptWhenEnabled() {
+        String json = "{\"mode\":\"SINGLE\",\"questions\":[]}";
+        GeminiClientService.GeminiChatResult chatResult = new GeminiClientService.GeminiChatResult(json, List.of());
+        when(geminiClientService.generateChatResponseDetailed(anyString(), any(), eq(true))).thenReturn(chatResult);
+
+        CreateTrainerQuestionAIRequestDTO req = request("SINGLE", "Current events", 1);
+        req.setUseSearchGrounding(true);
+
+        service.generatePayload(req);
+
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<List> historyCaptor = ArgumentCaptor.forClass(List.class);
+        verify(geminiClientService).generateChatResponseDetailed(promptCaptor.capture(), historyCaptor.capture(), eq(true));
+
+        assertTrue(promptCaptor.getValue().contains("Google Search"));
+        assertTrue(promptCaptor.getValue().contains("sourceCitation"));
+        String userInput = ((com.hango.hango_backend.dto.GeminiGenerateRequest.Content) historyCaptor.getValue().get(0))
+                .getParts().get(0).getText();
+        assertTrue(userInput.contains("USE_SEARCH_GROUNDING: true"));
     }
 
     private TrainerExamChatRequestDTO.Message message(String role, String text) {

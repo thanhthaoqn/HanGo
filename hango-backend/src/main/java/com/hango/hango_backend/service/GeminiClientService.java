@@ -177,34 +177,68 @@ public class GeminiClientService {
                                 .build();
         }
 
+        @lombok.Data
+        @lombok.Builder
+        @lombok.NoArgsConstructor
+        @lombok.AllArgsConstructor
+        public static class GeminiChatResult {
+                private String text;
+                private List<GeminiGenerateResponse.WebSource> sources;
+        }
+
         /**
          * Hàm Giao Tiếp Chính (Chat Completion): Nơi chính thức "nói chuyện" với con bot Gemini.
          * Đầu vào: Lời nhắc hệ thống (System Prompt - Ép AI làm giáo viên) và Toàn bộ Lịch sử Chat.
-         * Cải tiến: Được tích hợp cơ chế tự động thử lại (Retry.backoff) tối đa 2 lần 
-         * nếu máy chủ Google báo lỗi 429 quá tải (Too Many Requests).
          */
         public String generateChatResponse(String systemPrompt, List<GeminiGenerateRequest.Content> chatHistory) {
-                // Goi 1 request HTTP POST duy nhat sang Google: system prompt ep vai tro +
-                // lich su chat (contents) + cau hinh nhiet do 0.4 va toi da 8192 token
-                GeminiGenerateRequest request = GeminiGenerateRequest.builder()
+                return generateChatResponse(systemPrompt, chatHistory, false);
+        }
+
+        public String generateChatResponse(String systemPrompt, List<GeminiGenerateRequest.Content> chatHistory, boolean enableSearchGrounding) {
+                return generateChatResponseDetailed(systemPrompt, chatHistory, enableSearchGrounding).getText();
+        }
+
+        public String generateChatResponse(String systemPrompt, List<GeminiGenerateRequest.Content> chatHistory, boolean enableSearchGrounding, boolean responseJson) {
+                return generateChatResponseDetailed(systemPrompt, chatHistory, enableSearchGrounding, responseJson).getText();
+        }
+
+        /**
+         * Gọi Gemini Chat có hỗ trợ Google Search Grounding để tra cứu thông tin thời sự thật trên Internet.
+         * Trả về kết quả kèm danh sách nguồn (URL, Tiêu đề bài viết).
+         */
+        public GeminiChatResult generateChatResponseDetailed(String systemPrompt, List<GeminiGenerateRequest.Content> chatHistory, boolean enableSearchGrounding) {
+                boolean isJson = systemPrompt != null && (systemPrompt.contains("JSON") || systemPrompt.contains("json"));
+                return generateChatResponseDetailed(systemPrompt, chatHistory, enableSearchGrounding, isJson);
+        }
+
+        public GeminiChatResult generateChatResponseDetailed(String systemPrompt, List<GeminiGenerateRequest.Content> chatHistory, boolean enableSearchGrounding, boolean responseJson) {
+                GeminiGenerateRequest.GenerationConfig.GenerationConfigBuilder configBuilder = GeminiGenerateRequest.GenerationConfig.builder()
+                                .temperature(0.4)
+                                .maxOutputTokens(8192);
+                if (responseJson) {
+                        configBuilder.responseMimeType("application/json");
+                }
+
+                GeminiGenerateRequest.GeminiGenerateRequestBuilder requestBuilder = GeminiGenerateRequest.builder()
                                 .systemInstruction(GeminiGenerateRequest.SystemInstruction.builder()
                                                 .parts(List.of(GeminiGenerateRequest.Part.builder().text(systemPrompt)
                                                                 .build()))
                                                 .build())
                                 .contents(chatHistory)
-                                .generationConfig(GeminiGenerateRequest.GenerationConfig.builder()
-                                                .temperature(0.4)
-                                                .maxOutputTokens(8192)
-                                                .build())
-                                .build();
+                                .generationConfig(configBuilder.build());
+
+                if (enableSearchGrounding) {
+                        requestBuilder.tools(List.of(Map.of("google_search", Map.of())));
+                }
+
+                GeminiGenerateRequest request = requestBuilder.build();
 
                 String chatModel = getChatModel();
                 String path = String.format("v1beta/models/%s:generateContent", chatModel);
-                log.info("[GeminiClientService] Calling Gemini chat model: {} (timeout: {}s)", chatModel, getTimeoutSeconds());
+                log.info("[GeminiClientService] Calling Gemini chat model: {} (grounding: {}, responseJson: {}, timeout: {}s)", chatModel, enableSearchGrounding, responseJson, getTimeoutSeconds());
                 long startedAt = System.currentTimeMillis();
 
                 try {
-                        // block() bien call reactive thanh dong bo; tu retry 2 lan neu bi 429 (qua tai)
                         GeminiGenerateResponse response = webClient.post()
                                         .uri(path)
                                         .bodyValue(request)
@@ -217,18 +251,43 @@ public class GeminiClientService {
 
                         String text = response != null ? response.extractText() : null;
 
-                        // Response rong coi nhu loi he thong AI -> nem ApiException 502
                         if (text == null || text.isBlank()) {
                                 recordUsage("CHAT", false, System.currentTimeMillis() - startedAt, "Empty response");
                                 throw new ApiException("AI returned an invalid response", HttpStatus.BAD_GATEWAY);
                         }
                         recordUsage("CHAT", true, System.currentTimeMillis() - startedAt, null);
-                        return text;
+                        
+                        List<GeminiGenerateResponse.WebSource> sources = response != null ? response.extractGroundingSources() : List.of();
+                        return GeminiChatResult.builder()
+                                        .text(text)
+                                        .sources(sources)
+                                        .build();
 
                 } catch (ApiException e) {
                         throw e;
                 } catch (Exception e) {
-                        log.error("Error calling Gemini chat API", e);
+                        if (enableSearchGrounding) {
+                                String errorDetail = (e instanceof org.springframework.web.reactive.function.client.WebClientResponseException wcre)
+                                                ? "status=" + wcre.getStatusCode()
+                                                : e.getMessage();
+                                log.warn("Gemini chat with search grounding failed ({}), falling back to standard generation without grounding.", errorDetail);
+                                try {
+                                        String fallbackText = generateChatResponse(systemPrompt, chatHistory, false, responseJson);
+                                        return GeminiChatResult.builder()
+                                                        .text(fallbackText)
+                                                        .sources(List.of())
+                                                        .build();
+                                } catch (Exception fallbackEx) {
+                                        log.error("Fallback Gemini chat also failed: {}", fallbackEx.getMessage());
+                                }
+                        } else {
+                                if (e instanceof org.springframework.web.reactive.function.client.WebClientResponseException wcre) {
+                                        log.error("Error calling Gemini chat API: status={}, responseBody={}", wcre.getStatusCode(), wcre.getResponseBodyAsString());
+                                } else {
+                                        log.error("Error calling Gemini chat API: {}", e.getMessage(), e);
+                                }
+                        }
+
                         recordUsage("CHAT", false, System.currentTimeMillis() - startedAt,
                                         e.getClass().getSimpleName());
                         throw new ApiException("Không thể kết nối đến Trợ lý AI vào lúc này, vui lòng thử lại sau",
