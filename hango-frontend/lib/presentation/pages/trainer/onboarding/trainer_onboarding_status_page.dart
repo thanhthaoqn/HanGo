@@ -445,9 +445,13 @@ class _TrainerOnboardingStatusPageState
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              isVi
-                                  ? 'Phản hồi từ Ban quản trị:'
-                                  : 'Feedback from Administrator:',
+                              status == 'AWAITING_APPROVAL'
+                                  ? (isVi
+                                        ? 'Ghi chú phản hồi đợt duyệt trước (Đang chờ thẩm định lại):'
+                                        : 'Previous Admin Feedback (Currently under re-review):')
+                                  : (isVi
+                                        ? 'Phản hồi từ Ban quản trị:'
+                                        : 'Feedback from Administrator:'),
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,

@@ -263,7 +263,7 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
         // 3. Mark submitted and freeze edits
         profile.setStatus(STATUS_AWAITING);
         profile.setSubmittedAt(LocalDateTime.now());
-        profile.setAdminNotes(null); // Clear previous admin rejection reasons
+        // Preserve previous adminNotes so the reviewing admin can verify what was previously requested
 
         TrainerProfile saved = trainerProfileRepository.save(profile);
         log.info("Trainer profile submitted for review for user ID: {}", user.getId());
@@ -421,8 +421,12 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
 
         TrainerProfile saved = trainerProfileRepository.save(profile);
         if (saved.getUser() != null && saved.getUser().getEmail() != null) {
+            String trainerName = (saved.getUser().getFullName() != null && !saved.getUser().getFullName().trim().isEmpty())
+                    ? saved.getUser().getFullName().trim()
+                    : saved.getUser().getUsername();
             sendTrainerStatusEmailAfterCommit(
                     saved.getUser().getEmail(),
+                    trainerName,
                     newStatus,
                     adminNotes);
         }
@@ -459,10 +463,10 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
         return mapToDTO(saved);
     }
 
-    private void sendTrainerStatusEmailAfterCommit(String email, String status, String adminNotes) {
+    private void sendTrainerStatusEmailAfterCommit(String email, String trainerName, String status, String adminNotes) {
         Runnable sendEmail = () -> {
             try {
-                emailService.sendTrainerStatusNotificationEmail(email, status, adminNotes);
+                emailService.sendTrainerStatusNotificationEmail(email, trainerName, status, adminNotes);
             } catch (Exception e) {
                 log.warn("Failed to send trainer status email notification: {}", e.getMessage());
             }

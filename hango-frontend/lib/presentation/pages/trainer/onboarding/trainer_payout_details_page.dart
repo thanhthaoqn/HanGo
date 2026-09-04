@@ -29,14 +29,10 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
   final _bankNameController = TextEditingController();
   final _bankAccountController = TextEditingController();
   final _bankAccountNameController = TextEditingController();
-  final _taxCodeController = TextEditingController();
-  final _citizenIdController = TextEditingController();
 
   String? _bankNameErrorText;
   String? _bankAccountErrorText;
   String? _bankAccountNameErrorText;
-  String? _taxCodeErrorText;
-  String? _citizenIdErrorText;
 
   static const List<String> _bankSuggestions = [
     'Vietcombank (VCB)',
@@ -60,8 +56,6 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
     _bankNameController.text = p['bankName'] ?? '';
     _bankAccountController.text = p['bankAccount'] ?? '';
     _bankAccountNameController.text = p['bankAccountName'] ?? '';
-    _taxCodeController.text = p['taxCode'] ?? '';
-    _citizenIdController.text = p['citizenId'] ?? '';
   }
 
   String? _validateBankName(String bankName, bool isVi) {
@@ -81,21 +75,11 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
     return validateTrainerBankAccountName(bankAccountName, isVi: isVi);
   }
 
-  String? _validateTaxCode(String taxCode, bool isVi) {
-    return validateTrainerTaxCode(taxCode, isVi: isVi);
-  }
-
-  String? _validateCitizenId(String citizenId, bool isVi) {
-    return validateTrainerCitizenId(citizenId, isVi: isVi);
-  }
-
   bool _validateFields() {
     final isVi = LanguageManager.isVi;
     final bankName = _bankNameController.text.trim();
     final bankAccount = _bankAccountController.text.trim();
     final bankAccountName = _bankAccountNameController.text.trim();
-    final taxCode = _taxCodeController.text.trim();
-    final citizenId = _citizenIdController.text.trim();
 
     setState(() {
       _bankNameErrorText = _validateBankName(bankName, isVi);
@@ -104,15 +88,11 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
         bankAccountName,
         isVi,
       );
-      _taxCodeErrorText = _validateTaxCode(taxCode, isVi);
-      _citizenIdErrorText = _validateCitizenId(citizenId, isVi);
     });
 
     return _bankNameErrorText == null &&
         _bankAccountErrorText == null &&
-        _bankAccountNameErrorText == null &&
-        _taxCodeErrorText == null &&
-        _citizenIdErrorText == null;
+        _bankAccountNameErrorText == null;
   }
 
   void _handleComplete() async {
@@ -128,8 +108,6 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
     payload['bankAccountName'] = _bankAccountNameController.text
         .trim()
         .toUpperCase();
-    payload['taxCode'] = _taxCodeController.text.trim();
-    payload['citizenId'] = _citizenIdController.text.trim();
     payload['agreementSigned'] = true;
 
     final result = await _onboardingService.saveProfileDraft(payload);
@@ -142,7 +120,9 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
     if (result['success'] == true) {
       ToastHelper.showSuccess(
         context,
-        'Payout details saved successfully! Welcome to your Trainer Dashboard.',
+        LanguageManager.isVi
+            ? 'Cập nhật tài khoản thanh toán thành công!'
+            : 'Payout details saved successfully! Welcome to your Trainer Dashboard.',
       );
 
       Navigator.pushAndRemoveUntil(
@@ -163,8 +143,6 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
     _bankNameController.dispose();
     _bankAccountController.dispose();
     _bankAccountNameController.dispose();
-    _taxCodeController.dispose();
-    _citizenIdController.dispose();
     super.dispose();
   }
 
@@ -226,8 +204,8 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
                             children: [
                               Text(
                                 isVi
-                                    ? 'Thông tin thanh toán & CCCD'
-                                    : 'Payout & Identity Info',
+                                    ? 'Thông tin tài khoản ngân hàng'
+                                    : 'Payout Bank Account',
                                 style: const TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
@@ -238,8 +216,8 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
                               const SizedBox(height: 4),
                               Text(
                                 isVi
-                                    ? 'Nhập tài khoản nhận tiền và mã định danh'
-                                    : 'Enter payment bank account and identity ID',
+                                    ? 'Nhập tài khoản nhận thanh toán doanh thu định kỳ'
+                                    : 'Enter bank account details to receive revenue payouts',
                                 style: const TextStyle(
                                   fontSize: 13,
                                   color: Color(0xFF64748B),
@@ -424,122 +402,6 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
                         hintText: isVi
                             ? 'Ví dụ: NGUYEN VAN A'
                             : 'Example: NGUYEN VAN A',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF64748B),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF28B79B),
-                            width: 2,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Personal Tax ID
-                    Text(
-                      isVi
-                          ? 'Mã số thuế cá nhân (nếu có)'
-                          : 'Personal Tax ID (optional)',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: Color(0xFF334155),
-                        fontFamily: 'Outfit',
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _taxCodeController,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      maxLength: 13,
-                      onChanged: (value) {
-                        setState(() {
-                          _taxCodeErrorText = _validateTaxCode(
-                            value.trim(),
-                            isVi,
-                          );
-                        });
-                      },
-                      decoration: InputDecoration(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        errorText: _taxCodeErrorText,
-                        counterText: '',
-                        hintText: isVi
-                            ? 'Nhập mã số thuế 10 hoặc 13 chữ số'
-                            : 'Enter a 10 or 13-digit Tax ID',
-                        helperText: isVi
-                            ? 'Có thể để trống nếu chưa được cấp mã số thuế.'
-                            : 'Leave blank if you do not have a Tax ID yet.',
-                        fillColor: Colors.white,
-                        filled: true,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF64748B),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF28B79B),
-                            width: 2,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    Text(
-                      isVi ? 'Số CCCD *' : 'Citizen ID Number *',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: Color(0xFF334155),
-                        fontFamily: 'Outfit',
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _citizenIdController,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      maxLength: 12,
-                      onChanged: (value) {
-                        setState(() {
-                          _citizenIdErrorText = _validateCitizenId(
-                            value.trim(),
-                            isVi,
-                          );
-                        });
-                      },
-                      decoration: InputDecoration(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        errorText: _citizenIdErrorText,
-                        counterText: '',
-                        hintText: isVi
-                            ? 'Nhập đúng 12 chữ số trên CCCD'
-                            : 'Enter the 12 digits on your Citizen ID',
-                        fillColor: Colors.white,
-                        filled: true,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),

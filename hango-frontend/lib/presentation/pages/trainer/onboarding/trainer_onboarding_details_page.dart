@@ -2,10 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:hango/presentation/widgets/image_cropper_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../../data/services/auth_service.dart';
 import '../../../../data/services/trainer_onboarding_service.dart';
 import '../../../../utils/toast_helper.dart';
 import '../../../../utils/language_manager.dart';
@@ -13,14 +11,11 @@ import '../../../../utils/file_picker_helper.dart';
 import '../../../../utils/trainer_document_utils.dart';
 import '../../../../utils/trainer_revision_notes.dart';
 import '../../../../utils/trainer_onboarding_validation_utils.dart';
-import '../../../widgets/shared_header.dart';
-import '../../../widgets/shared_footer.dart';
 import 'trainer_onboarding_agreement_page.dart';
 import 'trainer_onboarding_status_page.dart';
-import 'trainer_payout_details_page.dart';
 import 'trainer_onboarding_shell_page.dart';
 import 'package:hango/presentation/widgets/document_preview_dialog.dart';
-import '../../login_page.dart';
+import 'package:hango/presentation/widgets/pdf_view_helper.dart';
 
 class TrainerOnboardingDetailsPage extends StatefulWidget {
   final Map<String, dynamic> initialProfile;
@@ -40,11 +35,8 @@ class TrainerOnboardingDetailsPage extends StatefulWidget {
 class _TrainerOnboardingDetailsPageState
     extends State<TrainerOnboardingDetailsPage> {
   final _onboardingService = TrainerOnboardingService();
-  final _authService = AuthService();
 
   bool _isLoading = false;
-  bool _isSavingDraft = false;
-  String _saveDraftText = '';
   Timer? _debounceTimer;
 
   // Form Fields
@@ -72,17 +64,55 @@ class _TrainerOnboardingDetailsPageState
   String? _gender;
   bool _isUploadingAvatar = false;
 
-  // Header Info
-  String _trainerName = '';
-  String _trainerInitials = 'T';
-  String _trainerAvatarUrl = '';
-
   @override
   void initState() {
     super.initState();
     _populateFields(widget.initialProfile);
     _loadUserAccountInfo();
-    _loadTrainerHeaderInfo();
+    _initRevisionBaseline(widget.initialProfile);
+  }
+
+  void _initRevisionBaseline(Map<String, dynamic> p) async {
+    final adminNotes = p['adminNotes']?.toString().trim();
+    if (adminNotes == null || adminNotes.isEmpty) return;
+
+    final reviewedAt = p['reviewedAt']?.toString() ?? 'latest';
+    final userId = p['userId']?.toString() ?? 'me';
+    final bioKey = 'trainer_rejected_baseline_bio_${userId}_$reviewedAt';
+    final certKey = 'trainer_rejected_baseline_cert_${userId}_$reviewedAt';
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedBio = prefs.getString(bioKey);
+      final savedCert = prefs.getString(certKey);
+
+      if (savedBio != null) {
+        _initialBio = savedBio;
+      } else {
+        await prefs.setString(bioKey, _initialBio);
+      }
+
+      if (savedCert != null) {
+        _initialCertJson = savedCert;
+      } else {
+        await prefs.setString(certKey, _initialCertJson);
+      }
+    } catch (e) {
+      debugPrint('Error loading baseline for revision: $e');
+    }
+  }
+
+  void _clearRevisionBaseline() async {
+    try {
+      final reviewedAt =
+          widget.initialProfile['reviewedAt']?.toString() ?? 'latest';
+      final userId = widget.initialProfile['userId']?.toString() ?? 'me';
+      final bioKey = 'trainer_rejected_baseline_bio_${userId}_$reviewedAt';
+      final certKey = 'trainer_rejected_baseline_cert_${userId}_$reviewedAt';
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(bioKey);
+      await prefs.remove(certKey);
+    } catch (_) {}
   }
 
   void _populateFields(Map<String, dynamic> p) {
@@ -160,7 +190,6 @@ class _TrainerOnboardingDetailsPageState
   void _updateLocalAvatar(String url) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('user_avatar_url', url);
-    _loadTrainerHeaderInfo();
   }
 
   @override
@@ -172,31 +201,12 @@ class _TrainerOnboardingDetailsPageState
   }
 
   void _triggerAutoSave() {
-    setState(() {
-      _saveDraftText = LanguageManager.isVi
-          ? 'Đang lưu bản nháp...'
-          : 'Saving draft...';
-      _isSavingDraft = true;
-    });
-
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 1000), () async {
       final draft = _buildPayload();
       final result = await _onboardingService.saveProfileDraft(draft);
-      if (mounted) {
-        setState(() {
-          _isSavingDraft = false;
-          if (result['success'] == true) {
-            _saveDraftText = LanguageManager.isVi
-                ? '✓ Đã tự động lưu nháp'
-                : '✓ Draft auto-saved';
-            _syncSharedPreferences();
-          } else {
-            _saveDraftText = LanguageManager.isVi
-                ? 'Lưu nháp thất bại'
-                : 'Save draft failed';
-          }
-        });
+      if (mounted && result['success'] == true) {
+        _syncSharedPreferences();
       }
     });
   }
@@ -560,43 +570,48 @@ class _TrainerOnboardingDetailsPageState
                                   ? Stack(
                                       children: [
                                         ClipRRect(
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                          child: Image.network(
-                                            tempUrl!,
-                                            width: double.infinity,
-                                            height: 220,
-                                            fit: BoxFit.contain,
-                                            errorBuilder: (ctx, err, st) =>
-                                                Center(
-                                                  child: Column(
-                                                    mainAxisAlignment:
-                                                        MainAxisAlignment
-                                                            .center,
-                                                    children: [
-                                                      const Icon(
-                                                        Icons.picture_as_pdf,
-                                                        size: 48,
-                                                        color: Color(
-                                                          0xFF28B79B,
-                                                        ),
-                                                      ),
-                                                      const SizedBox(height: 8),
-                                                      Text(
-                                                        tempUrl!
-                                                            .split('/')
-                                                            .last,
-                                                        style: const TextStyle(
-                                                          fontSize: 12,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                        ),
-                                                      ),
-                                                    ],
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: (tempUrl!.toLowerCase().endsWith('.pdf') ||
+                                                  tempUrl!.toLowerCase().contains('.pdf?') ||
+                                                  tempUrl!.toLowerCase().contains('/pdf/'))
+                                              ? SizedBox(
+                                                  height: 220,
+                                                  width: double.infinity,
+                                                  child: buildPdfViewWidget(
+                                                    url: tempUrl!,
+                                                    title: nameController.text.trim().isNotEmpty
+                                                        ? nameController.text.trim()
+                                                        : 'PDF Document',
                                                   ),
+                                                )
+                                              : Image.network(
+                                                  tempUrl!,
+                                                  width: double.infinity,
+                                                  height: 220,
+                                                  fit: BoxFit.contain,
+                                                  errorBuilder: (ctx, err, st) =>
+                                                      Center(
+                                                        child: Column(
+                                                          mainAxisAlignment:
+                                                              MainAxisAlignment.center,
+                                                          children: [
+                                                            const Icon(
+                                                              Icons.broken_image_rounded,
+                                                              size: 48,
+                                                              color: Color(0xFF94A3B8),
+                                                            ),
+                                                            const SizedBox(height: 8),
+                                                            Text(
+                                                              tempUrl!.split('/').last,
+                                                              style: const TextStyle(
+                                                                fontSize: 12,
+                                                                fontWeight: FontWeight.bold,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
                                                 ),
-                                          ),
                                         ),
                                         Positioned(
                                           right: 8,
@@ -1253,17 +1268,38 @@ class _TrainerOnboardingDetailsPageState
 
     final adminNotes = widget.initialProfile['adminNotes'];
     if (adminNotes != null && adminNotes.toString().trim().isNotEmpty) {
+      final revisionNotes = parseTrainerRevisionNotes(adminNotes.toString());
       final currentBio = _bioController.text.trim();
       final currentCertJson = jsonEncode(_certificates);
       final bioChanged = currentBio != _initialBio;
       final certsChanged = currentCertJson != _initialCertJson;
 
-      if (!bioChanged && !certsChanged) {
+      if (revisionNotes.bio != null && !bioChanged) {
         ToastHelper.showError(
           context,
           isVi
-              ? 'Vui lòng cập nhật Bio hoặc Chứng chỉ theo yêu cầu từ Ban quản trị trước khi nộp lại.'
-              : 'Please update your Bio or upload/change your Certificates according to the admin feedback before re-submitting.',
+              ? 'Vui lòng cập nhật phần Giới thiệu (Bio) theo yêu cầu từ Ban quản trị trước khi nộp lại.'
+              : 'Please update your Bio as requested by the administrator before re-submitting.',
+        );
+        return false;
+      }
+
+      if (revisionNotes.certificates != null && !certsChanged) {
+        ToastHelper.showError(
+          context,
+          isVi
+              ? 'Vui lòng cập nhật hoặc tải lên lại Chứng chỉ/Hồ sơ minh chứng theo yêu cầu từ Ban quản trị trước khi nộp lại.'
+              : 'Please update or re-upload your Certificates/Credentials as requested by the administrator before re-submitting.',
+        );
+        return false;
+      }
+
+      if (revisionNotes.general != null && !bioChanged && !certsChanged) {
+        ToastHelper.showError(
+          context,
+          isVi
+              ? 'Vui lòng cập nhật thông tin hồ sơ theo yêu cầu từ Ban quản trị trước khi nộp lại.'
+              : 'Please update your profile according to the administrator feedback before re-submitting.',
         );
         return false;
       }
@@ -1289,6 +1325,7 @@ class _TrainerOnboardingDetailsPageState
     if (mounted) {
       if (result['success'] == true) {
         _syncSharedPreferences();
+        _clearRevisionBaseline();
         ToastHelper.showSuccess(
           context,
           LanguageManager.isVi
@@ -1322,34 +1359,6 @@ class _TrainerOnboardingDetailsPageState
     }
   }
 
-  Future<void> _loadTrainerHeaderInfo() async {
-    final prefs = await SharedPreferences.getInstance();
-    final fullName = prefs.getString('user_fullname') ?? '';
-    final avatarUrl = prefs.getString('user_avatar_url') ?? '';
-    String initials = 'T';
-    if (fullName.trim().isNotEmpty) {
-      final parts = fullName.trim().split(' ');
-      if (parts.isNotEmpty) {
-        initials = parts.last[0].toUpperCase();
-      }
-    }
-    setState(() {
-      _trainerName = fullName;
-      _trainerInitials = initials;
-      _trainerAvatarUrl = avatarUrl;
-    });
-  }
-
-  void _handleLogout() async {
-    await _authService.logout();
-    if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => LoginPage()),
-        (route) => false,
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1481,7 +1490,7 @@ class _TrainerOnboardingDetailsPageState
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.01),
+            color: Colors.black.withValues(alpha: 0.01),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
