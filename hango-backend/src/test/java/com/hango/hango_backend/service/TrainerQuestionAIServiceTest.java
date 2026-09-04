@@ -19,6 +19,7 @@ import java.util.List;
 
 import com.hango.hango_backend.dto.GeminiGenerateResponse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -364,6 +365,46 @@ class TrainerQuestionAIServiceTest {
         String userInput = ((com.hango.hango_backend.dto.GeminiGenerateRequest.Content) historyCaptor.getValue().get(0))
                 .getParts().get(0).getText();
         assertTrue(userInput.contains("USE_SEARCH_GROUNDING: true"));
+    }
+
+    @Test
+    void generatePayloadShouldKeepTextualCitationAndStripFakeUrlsForMultipleMode() {
+        when(systemParameterRepository.findByParamTypeAndIsActiveTrue("SKILL_TYPE"))
+                .thenReturn(List.of(param(101, "Main idea")));
+        when(systemParameterRepository.findByParamTypeAndIsActiveTrue("DIFFICULTY"))
+                .thenReturn(List.of(param(14, "Easy")));
+
+        String json = "{\"mode\":\"MULTIPLE\",\"questions\":[],\"group\":{\"passageText\":\"Understanding human behavior with money.\","
+                + "\"sourceCitation\":\"Adapted from The Psychology of Money (https://fake-link-404.org/book)\",\"subQuestions\":[]}}";
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn(json);
+
+        CreateTrainerQuestionAIRequestDTO req = request("MULTIPLE", "Financial behavior", 1);
+        req.setUseSearchGrounding(false);
+
+        CreateTrainerQuestionAIResponseDTO result = service.generatePayload(req);
+
+        assertEquals("(Adapted from The Psychology of Money)", result.getGroup().getSourceCitation());
+        assertTrue(result.getGroup().getPassageText().contains("(Adapted from The Psychology of Money)"));
+        assertFalse(result.getGroup().getPassageText().contains("fake-link-404.org"));
+    }
+
+    @Test
+    void generatePayloadShouldStripPureFakeUrlToNull() {
+        when(systemParameterRepository.findByParamTypeAndIsActiveTrue("SKILL_TYPE"))
+                .thenReturn(List.of(param(101, "Main idea")));
+        when(systemParameterRepository.findByParamTypeAndIsActiveTrue("DIFFICULTY"))
+                .thenReturn(List.of(param(14, "Easy")));
+
+        String json = "{\"mode\":\"MULTIPLE\",\"questions\":[],\"group\":{\"passageText\":\"Some passage.\","
+                + "\"sourceCitation\":\"https://pure-fake-url.com/something\",\"subQuestions\":[]}}";
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn(json);
+
+        CreateTrainerQuestionAIRequestDTO req = request("MULTIPLE", "Random topic", 1);
+        req.setUseSearchGrounding(false);
+
+        CreateTrainerQuestionAIResponseDTO result = service.generatePayload(req);
+
+        assertNull(result.getGroup().getSourceCitation());
     }
 
     private TrainerExamChatRequestDTO.Message message(String role, String text) {

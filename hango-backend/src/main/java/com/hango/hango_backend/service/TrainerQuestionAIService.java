@@ -173,7 +173,7 @@ public class TrainerQuestionAIService {
             throw new ApiException("AI returned invalid JSON payload", HttpStatus.BAD_GATEWAY);
         }
 
-        String formattedSources = groundingSources.isEmpty() ? null : groundingSources.stream()
+        String searchSources = groundingSources.isEmpty() ? null : groundingSources.stream()
                 .map(s -> (s.getTitle() != null && !s.getTitle().isBlank())
                         ? s.getTitle() + " (" + s.getUri() + ")"
                         : s.getUri())
@@ -183,28 +183,83 @@ public class TrainerQuestionAIService {
         if (isMultipleBranch && response.getGroup() != null) {
             fillSubQuestionSkillAndDifficulty(response.getGroup(), activeSkills, activeDifficulties);
 
-            if (formattedSources != null && !formattedSources.isBlank()) {
-                response.getGroup().setSourceCitation("(Adapted from: " + formattedSources + ")");
+            String finalCitation;
+            if (searchSources != null && !searchSources.isBlank()) {
+                finalCitation = "(Adapted from: " + searchSources + ")";
             } else {
-                response.getGroup().setSourceCitation(null);
+                finalCitation = formatCitation(response.getGroup().getSourceCitation(), true);
             }
+            response.getGroup().setSourceCitation(finalCitation);
 
-            String citation = response.getGroup().getSourceCitation();
-            if (citation != null && !citation.isBlank() && response.getGroup().getPassageText() != null
-                    && !response.getGroup().getPassageText().contains(citation)) {
-                response.getGroup().setPassageText(response.getGroup().getPassageText() + "\n\n" + citation);
+            if (finalCitation != null && !finalCitation.isBlank() && response.getGroup().getPassageText() != null
+                    && !response.getGroup().getPassageText().contains(finalCitation)) {
+                response.getGroup().setPassageText(response.getGroup().getPassageText() + "\n\n" + finalCitation);
             }
         } else if (!isMultipleBranch && response.getQuestions() != null) {
             for (CreateTrainerQuestionAIResponseDTO.SingleQuestionDTO q : response.getQuestions()) {
-                if (formattedSources != null && !formattedSources.isBlank()) {
-                    q.setSourceCitation("(Source: " + formattedSources + ")");
+                String finalCitation;
+                if (searchSources != null && !searchSources.isBlank()) {
+                    finalCitation = "(Source: " + searchSources + ")";
                 } else {
-                    q.setSourceCitation(null);
+                    finalCitation = formatCitation(q.getSourceCitation(), false);
                 }
+                q.setSourceCitation(finalCitation);
             }
         }
 
         return response;
+    }
+
+    /**
+     * Chuẩn hóa nguồn trích dẫn văn bản (Textual Citation):
+     * - Loại bỏ hoàn toàn các đường dẫn URL (http/https/www) do AI tự bịa để tránh lỗi 404.
+     * - Giữ lại tên sách, bài báo, tác giả hợp lệ (ví dụ: "Adapted from The Psychology of Money").
+     * - Format chuẩn theo format đề thi (Adapted from: ...) hoặc (Source: ...).
+     */
+    private String formatCitation(String rawCitation, boolean isMultiple) {
+        if (rawCitation == null || rawCitation.isBlank()) {
+            return null;
+        }
+
+        String cleaned = rawCitation.trim();
+
+        if (cleaned.equalsIgnoreCase("null") || cleaned.equalsIgnoreCase("none")
+                || cleaned.equalsIgnoreCase("n/a") || cleaned.equalsIgnoreCase("unknown")
+                || cleaned.equalsIgnoreCase("undefined")) {
+            return null;
+        }
+
+        // Loại bỏ URL đặt trong ngoặc: (https://...), [https://...]
+        cleaned = cleaned.replaceAll("(?i)\\s*\\([\\s]*https?://[^)]*\\)", "");
+        cleaned = cleaned.replaceAll("(?i)\\s*\\[[\\s]*https?://[^\\]]*\\]", "");
+
+        // Loại bỏ mọi URL trần còn lại
+        cleaned = cleaned.replaceAll("(?i)https?://\\S+", "");
+        cleaned = cleaned.replaceAll("(?i)www\\.\\S+", "");
+
+        // Dọn dẹp ngoặc rỗng, ngoặc đơn lẻ loi hoặc dấu thừa ở cuối
+        cleaned = cleaned.replaceAll("\\(\\s*\\)", "");
+        cleaned = cleaned.replaceAll("\\[\\s*\\]", "");
+        cleaned = cleaned.replaceAll("[({\\[,:;\\-\\s]+$", "");
+        cleaned = cleaned.trim();
+
+        if (cleaned.isBlank()) {
+            return null;
+        }
+
+        if (cleaned.startsWith("(") && cleaned.endsWith(")")) {
+            String inner = cleaned.substring(1, cleaned.length() - 1).trim();
+            if (inner.isBlank()) return null;
+            return cleaned;
+        }
+
+        String lower = cleaned.toLowerCase();
+        if (lower.startsWith("adapted from") || lower.startsWith("source:") || lower.startsWith("from:")) {
+            return "(" + cleaned + ")";
+        }
+
+        String prefix = isMultiple ? "Adapted from: " : "Source: ";
+        return "(" + prefix + cleaned + ")";
     }
 
     /**
@@ -377,7 +432,8 @@ public class TrainerQuestionAIService {
                     "    }\n" +
                     "  ]\n" +
                     "}\n" +
-                    "Generate exactly " + quantity + " questions. Explanations should be short. Options should be plausible distractors.";
+                    "Generate exactly " + quantity + " questions. Explanations should be short. Options should be plausible distractors.\n" +
+                    "For sourceCitation: provide a brief citation of the reference book or publication if applicable (e.g. 'Source: BBC Learning English') without inventing fake URLs.";
         }
 
         // MULTIPLE
@@ -434,6 +490,7 @@ public class TrainerQuestionAIService {
                 "    ]\n" +
                 "  }\n" +
                 "}\n" +
-                "Generate at least 2 subQuestions. Here quantity=" + quantity + ". Generate exactly " + quantity + " subQuestions. Explanations should be short. Options should be plausible distractors.";
+                "Generate at least 2 subQuestions. Here quantity=" + quantity + ". Generate exactly " + quantity + " subQuestions. Explanations should be short. Options should be plausible distractors.\n" +
+                "For sourceCitation: provide an authentic citation of the work, book, magazine, or article adapted for this passage (e.g. 'Adapted from The Psychology of Money', 'Adapted from National Geographic'). Do NOT invent fake web URLs (no http/https links).";
     }
 }
