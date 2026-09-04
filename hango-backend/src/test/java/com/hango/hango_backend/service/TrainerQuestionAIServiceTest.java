@@ -535,4 +535,43 @@ class TrainerQuestionAIServiceTest {
                 TrainerExamChatRequestDTO.builder().history(List.of(message("user", "go"))).build()));
         assertEquals(502, ex.getStatus().value());
     }
+
+    @Test
+    void generateExamFromChatShouldPopulateAndFormatPassageCitationForReadingGroupBlocks() {
+        String json = "{\"title\":\"Reading Test\",\"description\":\"desc\",\"durationMinutes\":45,"
+                + "\"passingScore\":60.0,\"expectedQuestionCount\":2,\"blocks\":["
+                + "{\"isQuestionGroup\":true,\"passageText\":\"Coffee is one of the most popular drinks in the world.\","
+                + "\"sourceCitation\":\"Adapted from National Geographic (https://fake-link-404.com/coffee)\","
+                + "\"categoryId\":1,\"difficultyId\":14,\"questions\":[]}]}";
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn(json);
+
+        CreateTrainerExamAIResponseDTO result = service.generateExamFromChat(
+                TrainerExamChatRequestDTO.builder().history(List.of(message("user", "make exam"))).build());
+
+        assertEquals(1, result.getBlocks().size());
+        CreateTrainerExamAIResponseDTO.BlockDTO block = result.getBlocks().get(0);
+        assertEquals("(Adapted from National Geographic)", block.getSourceCitation());
+        assertTrue(block.getPassageText().contains("Coffee is one of the most popular drinks in the world."));
+        assertTrue(block.getPassageText().contains("(Adapted from National Geographic)"));
+        assertFalse(block.getPassageText().contains("fake-link-404.com"));
+    }
+
+    @Test
+    void generateExamFromChatShouldRelocateLeadingCitationPreambleToBottom() {
+        String json = "{\"title\":\"Sleep Test\",\"description\":\"desc\",\"durationMinutes\":45,"
+                + "\"passingScore\":60.0,\"expectedQuestionCount\":2,\"blocks\":["
+                + "{\"isQuestionGroup\":true,\"passageText\":\"Adapted from BBC Science Focus: Sleep is vital for human survival. During sleep, the brain repairs tissues.\","
+                + "\"categoryId\":1,\"difficultyId\":14,\"questions\":[]}]}";
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn(json);
+
+        CreateTrainerExamAIResponseDTO result = service.generateExamFromChat(
+                TrainerExamChatRequestDTO.builder().history(List.of(message("user", "make sleep exam"))).build());
+
+        assertEquals(1, result.getBlocks().size());
+        CreateTrainerExamAIResponseDTO.BlockDTO block = result.getBlocks().get(0);
+        assertEquals("(Adapted from: BBC Science Focus)", block.getSourceCitation());
+        assertTrue(block.getPassageText().startsWith("Sleep is vital for human survival."));
+        assertTrue(block.getPassageText().endsWith("(Adapted from: BBC Science Focus)"));
+        assertFalse(block.getPassageText().startsWith("Adapted from BBC"));
+    }
 }

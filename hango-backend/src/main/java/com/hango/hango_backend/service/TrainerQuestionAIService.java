@@ -61,6 +61,7 @@ public class TrainerQuestionAIService {
             "    {\n" +
             "      \"isQuestionGroup\": false,\n" +
             "      \"passageText\": \"\",\n" +
+            "      \"sourceCitation\": \"\",\n" +
             "      \"categoryId\": 1,\n" +
             "      \"skillParamId\": 1,\n" +
             "      \"difficultyId\": 14,\n" +
@@ -82,7 +83,7 @@ public class TrainerQuestionAIService {
             "  ]\n" +
             "}\n" +
             "categoryId can default to 1 (General). difficultyId can be 14 (Easy), 15 (Medium), 16 (Hard). skillParamId can be null if not specified.\n" +
-            "For group questions, set isQuestionGroup = true, provide passageText, and put multiple questions in the questions array.\n" +
+            "For group questions, set isQuestionGroup = true, provide passageText containing ONLY the reading passage (do NOT put 'Adapted from...' or source headers at the beginning of passageText), put multiple questions in the questions array, and provide sourceCitation separately for reading comprehension (e.g. 'Adapted from National Geographic', 'Adapted from BBC Focus') without fabricating fake web URLs.\n" +
             "For single questions, set isQuestionGroup = false, empty passageText, and exactly 1 question in the questions array.\n" +
             "Generate the EXACT number of questions and groups as discussed in the chat.";
 
@@ -183,18 +184,13 @@ public class TrainerQuestionAIService {
         if (isMultipleBranch && response.getGroup() != null) {
             fillSubQuestionSkillAndDifficulty(response.getGroup(), activeSkills, activeDifficulties);
 
-            String finalCitation;
-            if (searchSources != null && !searchSources.isBlank()) {
-                finalCitation = "(Adapted from: " + searchSources + ")";
-            } else {
-                finalCitation = formatCitation(response.getGroup().getSourceCitation(), true);
-            }
-            response.getGroup().setSourceCitation(finalCitation);
-
-            if (finalCitation != null && !finalCitation.isBlank() && response.getGroup().getPassageText() != null
-                    && !response.getGroup().getPassageText().contains(finalCitation)) {
-                response.getGroup().setPassageText(response.getGroup().getPassageText() + "\n\n" + finalCitation);
-            }
+            attachCitationToPassage(
+                    response.getGroup().getPassageText(),
+                    response.getGroup().getSourceCitation(),
+                    searchSources,
+                    response.getGroup()::setPassageText,
+                    response.getGroup()::setSourceCitation
+            );
         } else if (!isMultipleBranch && response.getQuestions() != null) {
             for (CreateTrainerQuestionAIResponseDTO.SingleQuestionDTO q : response.getQuestions()) {
                 String finalCitation;
@@ -208,6 +204,60 @@ public class TrainerQuestionAIService {
         }
 
         return response;
+    }
+
+    private static final java.util.regex.Pattern LEADING_CITATION_PATTERN = java.util.regex.Pattern.compile(
+            "(?i)^\\s*(?:\\((?:Adapted from|Source|From)[:\\s]+([^)]+)\\)|(?:\\[(?:Adapted from|Source|From)[:\\s]+([^\\]]+)\\])|(?:Adapted from|Source:?)\\s*([^:\n\r]+)[:\\-–])\\s*"
+    );
+
+    /**
+     * Dọn dẹp và chuẩn hóa bài đọc cùng nguồn trích dẫn:
+     * 1. Nếu AI lỡ đặt "Adapted from ...:" ở đầu bài đọc, tự động cắt bỏ khỏi đầu đoạn văn để mở bài tự nhiên.
+     * 2. Nếu AI có nguồn (hoặc lấy được từ đầu bài), chuẩn hóa thành (Adapted from: ...) và nối xuống dưới cùng bài đọc.
+     */
+    private void attachCitationToPassage(
+            String rawPassage,
+            String rawCitation,
+            String searchSources,
+            java.util.function.Consumer<String> passageSetter,
+            java.util.function.Consumer<String> citationSetter
+    ) {
+        if (rawPassage == null) {
+            rawPassage = "";
+        }
+
+        String cleanedPassage = rawPassage.trim();
+        String extractedLeadingSource = null;
+
+        java.util.regex.Matcher matcher = LEADING_CITATION_PATTERN.matcher(cleanedPassage);
+        if (matcher.find()) {
+            String g1 = matcher.group(1);
+            String g2 = matcher.group(2);
+            String g3 = matcher.group(3);
+            extractedLeadingSource = (g1 != null) ? g1 : (g2 != null ? g2 : g3);
+            if (extractedLeadingSource != null) {
+                extractedLeadingSource = extractedLeadingSource.trim();
+            }
+            cleanedPassage = cleanedPassage.substring(matcher.end()).trim();
+        }
+
+        String finalCitation;
+        if (searchSources != null && !searchSources.isBlank()) {
+            finalCitation = "(Adapted from: " + searchSources + ")";
+        } else {
+            String candidate = (rawCitation != null && !rawCitation.isBlank()) ? rawCitation : extractedLeadingSource;
+            finalCitation = formatCitation(candidate, true);
+        }
+
+        if (finalCitation != null && !finalCitation.isBlank()) {
+            if (cleanedPassage.endsWith(finalCitation)) {
+                cleanedPassage = cleanedPassage.substring(0, cleanedPassage.length() - finalCitation.length()).trim();
+            }
+            cleanedPassage = cleanedPassage + "\n\n" + finalCitation;
+        }
+
+        passageSetter.accept(cleanedPassage);
+        citationSetter.accept(finalCitation);
     }
 
     /**
@@ -332,7 +382,8 @@ public class TrainerQuestionAIService {
                 "For single questions, set isQuestionGroup = false, empty passageText, and exactly 1 question in the questions array. " +
                 "For single questions, the categoryId is NOT used for GROUP TYPES, it defaults to a general category ID (like 1).\n" +
                 "For group questions (e.g. Reading, Listening), set isQuestionGroup = true, provide passageText, and put multiple questions in the questions array. " +
-                "For group questions, categoryId MUST be one of the GROUP TYPES IDs provided above.\n" +
+                "For group questions, categoryId MUST be one of the GROUP TYPES IDs provided above. " +
+                "For reading comprehension passages, passageText must contain ONLY the article/passage itself (do NOT include 'Adapted from...' or source headers at the start of passageText). Provide an authentic sourceCitation separately (e.g. 'Adapted from National Geographic', 'Adapted from BBC Science Focus') without fabricating fake web URLs.\n" +
                 "Generate the EXACT number of questions and groups as discussed in the chat.";
 
         List<GeminiGenerateRequest.Content> contents = req.getHistory().stream()
@@ -364,7 +415,22 @@ public class TrainerQuestionAIService {
         }
 
         try {
-            return LENIENT_MAPPER.readValue(raw, CreateTrainerExamAIResponseDTO.class);
+            CreateTrainerExamAIResponseDTO examResponse = LENIENT_MAPPER.readValue(raw, CreateTrainerExamAIResponseDTO.class);
+            if (examResponse != null && examResponse.getBlocks() != null) {
+                for (CreateTrainerExamAIResponseDTO.BlockDTO block : examResponse.getBlocks()) {
+                    if (Boolean.TRUE.equals(block.getIsQuestionGroup()) && block.getPassageText() != null
+                            && !block.getPassageText().isBlank()) {
+                        attachCitationToPassage(
+                                block.getPassageText(),
+                                block.getSourceCitation(),
+                                null,
+                                block::setPassageText,
+                                block::setSourceCitation
+                        );
+                    }
+                }
+            }
+            return examResponse;
         } catch (Exception e) {
             log.error("Parse AI json failed for exam generation. Error: ", e);
             log.error("Raw JSON string: {}", raw);
@@ -491,6 +557,7 @@ public class TrainerQuestionAIService {
                 "  }\n" +
                 "}\n" +
                 "Generate at least 2 subQuestions. Here quantity=" + quantity + ". Generate exactly " + quantity + " subQuestions. Explanations should be short. Options should be plausible distractors.\n" +
+                "passageText must contain ONLY the article/passage itself (do NOT write 'Adapted from...' or source headers at the start of passageText). Provide the citation in the sourceCitation field instead.\n" +
                 "For sourceCitation: provide an authentic citation of the work, book, magazine, or article adapted for this passage (e.g. 'Adapted from The Psychology of Money', 'Adapted from National Geographic'). Do NOT invent fake web URLs (no http/https links).";
     }
 }
