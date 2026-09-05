@@ -294,6 +294,13 @@ class AuthService {
 
     setRememberMe(false);
     final prefs = await SharedPreferences.getInstance();
+    
+    // Xoá cờ đã tắt popup Entry Exam của user này để lần đăng nhập sau nó hiện lại
+    final currentUserId = prefs.getInt(_userIdKey) ?? 0;
+    if (currentUserId != 0) {
+      await prefs.remove('dismissed_entry_exam_$currentUserId');
+    }
+
     await prefs.remove(_tokenKey);
     await prefs.remove(_refreshTokenKey);
     await prefs.remove(_userIdKey);
