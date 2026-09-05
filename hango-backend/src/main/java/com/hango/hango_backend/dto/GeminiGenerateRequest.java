@@ -22,6 +22,7 @@ public class GeminiGenerateRequest {
     private List<Content> contents;
     private SystemInstruction systemInstruction;
     private GenerationConfig generationConfig;
+    private List<java.util.Map<String, Object>> tools;
 
     @Data
     @Builder
@@ -73,8 +74,10 @@ public class GeminiGenerateRequest {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class GenerationConfig {
         private Double temperature;
         private Integer maxOutputTokens;
+        private String responseMimeType;
     }
 }

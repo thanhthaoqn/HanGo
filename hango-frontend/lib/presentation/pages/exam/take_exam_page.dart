@@ -697,6 +697,7 @@ class _TakeExamPageState extends State<TakeExamPage>
   }
 
   Widget _buildExamActiveQuestionPane() {
+    final isDesktop = MediaQuery.of(context).size.width > 900;
     final currentQuestion = _examQuestions[_currentQuestionIndex];
 
     // Find passage if exists
@@ -709,22 +710,9 @@ class _TakeExamPageState extends State<TakeExamPage>
       }
     }
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              controller: _contentScrollController,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+    final innerContent = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
                   // Skill header
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -893,9 +881,27 @@ class _TakeExamPageState extends State<TakeExamPage>
                     );
                   }),
                 ],
+              );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (isDesktop)
+            Expanded(
+              child: SingleChildScrollView(
+                controller: _contentScrollController,
+                child: innerContent,
               ),
-            ),
-          ),
+            )
+          else
+            innerContent,
           const SizedBox(height: 16),
           // Bottom Navigation Buttons
           Row(
@@ -946,36 +952,13 @@ class _TakeExamPageState extends State<TakeExamPage>
   }
 
   Widget _buildExamRightSidebarPane() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'Progress Overview',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Answered: ${_userAnswers.length} / ${_examQuestions.length}',
-            style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
-          ),
-          const SizedBox(height: 24),
-
-          // Question Grid
-          Expanded(
-            child: SingleChildScrollView(
-              controller: _gridScrollController,
-              child: Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: List.generate(_examQuestions.length, (index) {
-                  final isAnswered = _userAnswers.containsKey(index);
+    final isDesktop = MediaQuery.of(context).size.width > 900;
+    
+    final gridContent = Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: List.generate(_examQuestions.length, (index) {
+        final isAnswered = _userAnswers.containsKey(index);
                   final isActive = _currentQuestionIndex == index;
 
                   Color bgColor = Colors.white;
@@ -983,7 +966,7 @@ class _TakeExamPageState extends State<TakeExamPage>
                   Color textColor = Colors.grey.shade700;
 
                   if (isActive) {
-                    bgColor = Colors.white;
+                    bgColor = isAnswered ? const Color(0xFFE8F8F5) : Colors.white;
                     borderColor = const Color(0xFF28B79B);
                     textColor = const Color(0xFF28B79B);
                   } else if (isAnswered) {
@@ -1017,10 +1000,40 @@ class _TakeExamPageState extends State<TakeExamPage>
                       ),
                     ),
                   );
-                }),
-              ),
-            ),
+      }),
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Progress Overview',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
+          const SizedBox(height: 8),
+          Text(
+            'Answered: ${_userAnswers.length} / ${_examQuestions.length}',
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+          ),
+          const SizedBox(height: 24),
+
+          // Question Grid
+          if (isDesktop)
+            Expanded(
+              child: SingleChildScrollView(
+                controller: _gridScrollController,
+                child: gridContent,
+              ),
+            )
+          else
+            gridContent,
           const SizedBox(height: 24),
 
           // Submit button

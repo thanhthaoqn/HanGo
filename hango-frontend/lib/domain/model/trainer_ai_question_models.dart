@@ -27,6 +27,7 @@ class TrainerAiSingleQuestion {
   final String explanation;
   final int categoryId;
   final int difficultyId;
+  final String? sourceCitation;
   final List<TrainerAiOption> options;
 
   TrainerAiSingleQuestion({
@@ -34,6 +35,7 @@ class TrainerAiSingleQuestion {
     required this.explanation,
     required this.categoryId,
     required this.difficultyId,
+    this.sourceCitation,
     required this.options,
   });
 
@@ -43,6 +45,7 @@ class TrainerAiSingleQuestion {
       explanation: (json['explanation'] ?? '') as String,
       categoryId: (json['categoryId'] as num).toInt(),
       difficultyId: (json['difficultyId'] as num).toInt(),
+      sourceCitation: json['sourceCitation'] as String?,
       options: (json['options'] as List)
           .map((e) => TrainerAiOption.fromJson(e as Map<String, dynamic>))
           .toList(),
@@ -55,6 +58,7 @@ class TrainerAiMultipleGroup {
   final String explanation;
   final int categoryId;
   final int difficultyId;
+  final String? sourceCitation;
   final List<TrainerAiSubQuestion> subQuestions;
 
   TrainerAiMultipleGroup({
@@ -62,6 +66,7 @@ class TrainerAiMultipleGroup {
     required this.explanation,
     required this.categoryId,
     required this.difficultyId,
+    this.sourceCitation,
     required this.subQuestions,
   });
 
@@ -71,6 +76,7 @@ class TrainerAiMultipleGroup {
       explanation: (json['explanation'] ?? '') as String,
       categoryId: (json['categoryId'] as num).toInt(),
       difficultyId: (json['difficultyId'] as num).toInt(),
+      sourceCitation: json['sourceCitation'] as String?,
       subQuestions: (json['subQuestions'] as List)
           .map((e) => TrainerAiSubQuestion.fromJson(e as Map<String, dynamic>))
           .toList(),

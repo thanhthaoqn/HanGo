@@ -19,6 +19,7 @@ class TrainerAiQuestionRepository {
     int? difficultyId,
     String? skillType,
     String? groupType,
+    bool useSearchGrounding = true,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
@@ -30,10 +31,11 @@ class TrainerAiQuestionRepository {
       'sectionId': sectionId,
       'topicSeed': topicSeed,
       'quantity': quantity,
-      if (categoryId != null) 'categoryId': categoryId,
-      if (difficultyId != null) 'difficultyId': difficultyId,
-      if (skillType != null) 'skillType': skillType,
-      if (groupType != null) 'groupType': groupType,
+      'useSearchGrounding': useSearchGrounding,
+      'categoryId': ?categoryId,
+      'difficultyId': ?difficultyId,
+      'skillType': ?skillType,
+      'groupType': ?groupType,
     };
 
     final response = await http.post(
