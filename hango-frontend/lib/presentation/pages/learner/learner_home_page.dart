@@ -67,7 +67,11 @@ class _EntryExamPromoDialogState extends State<_EntryExamPromoDialog>
             color: Color(0xFFE6FBF6),
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.check_rounded, color: Color(0xFF28B79B), size: 14),
+          child: const Icon(
+            Icons.check_rounded,
+            color: Color(0xFF28B79B),
+            size: 14,
+          ),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -296,7 +300,9 @@ class _EntryExamPromoDialogState extends State<_EntryExamPromoDialog>
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               elevation: 6,
-                              shadowColor: const Color(0xFF28B79B).withOpacity(0.5),
+                              shadowColor: const Color(
+                                0xFF28B79B,
+                              ).withOpacity(0.5),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14),
                               ),
@@ -315,7 +321,10 @@ class _EntryExamPromoDialogState extends State<_EntryExamPromoDialog>
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                const Icon(Icons.arrow_forward_rounded, size: 20),
+                                const Icon(
+                                  Icons.arrow_forward_rounded,
+                                  size: 20,
+                                ),
                               ],
                             ),
                           ),
@@ -399,7 +408,9 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
         Uri.parse('${EnvConfig.v1BaseUrl}/metadata/public-stats'),
       );
       if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(utf8.decode(response.bodyBytes));
+        final Map<String, dynamic> data = json.decode(
+          utf8.decode(response.bodyBytes),
+        );
         if (mounted) {
           setState(() {
             _totalCoursesCount = (data['coursesCount'] ?? 0) as int;
@@ -625,9 +636,6 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       final userId = prefs.getInt('user_id') ?? 0;
       if (prefs.getBool('dismissed_entry_exam_$userId') == true) return;
 
-      // Entry Exam is no longer a single hardcoded exam id: a Course Manager
-      // flags one or more exams as candidates, and one is served at random -
-      // so "already completed" is checked against that live flagged set.
       final status = await _examRepository.fetchEntryExamStatus();
       final configured = status['configured'] == true;
       final hasCompleted = status['completed'] == true;
@@ -704,7 +712,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context);
-      ToastHelper.showError(context, 'Lỗi kết nối máy chủ');
+      ToastHelper.showError(context, 'Error to server');
     }
   }
 
@@ -832,8 +840,6 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                           const SizedBox(height: 60),
                         ],
 
-
-
                         // 6. CTA Banner
                         _buildCtaBannerSection(isDesktop),
                         const SizedBox(height: 40),
@@ -885,7 +891,9 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                 Navigator.pop(context); // close drawer
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const ListExamsPage()),
+                  MaterialPageRoute(
+                    builder: (context) => const ListExamsPage(),
+                  ),
                 );
               },
             ),
@@ -1283,7 +1291,9 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                       _buildHeroStat(
                         _totalCoursesCount > 0
                             ? '$_totalCoursesCount+'
-                            : (_courses.isNotEmpty ? '${_courses.length}+' : '0+'),
+                            : (_courses.isNotEmpty
+                                  ? '${_courses.length}+'
+                                  : '0+'),
                         isVi ? 'Khóa học' : 'Courses',
                       ),
                       _buildHeroStat(
@@ -1996,7 +2006,9 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                               color: Color(0xFF0F172A),
                               size: 26,
                             ),
-                            tooltip: isVi ? '4 khóa học trước' : 'Previous 4 courses',
+                            tooltip: isVi
+                                ? '4 khóa học trước'
+                                : 'Previous 4 courses',
                             onPressed: () => _scrollCourses(false, isDesktop),
                           ),
                         ),
@@ -2018,7 +2030,9 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                               color: Color(0xFF0F172A),
                               size: 26,
                             ),
-                            tooltip: isVi ? '4 khóa học tiếp' : 'Next 4 courses',
+                            tooltip: isVi
+                                ? '4 khóa học tiếp'
+                                : 'Next 4 courses',
                             onPressed: () => _scrollCourses(true, isDesktop),
                           ),
                         ),
@@ -2069,8 +2083,6 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
     }
     return 'Mr. $name';
   }
-
-
 
   Widget _buildCourseCardHeaderPlaceholder(Map<String, dynamic> theme) {
     return Stack(
@@ -2613,7 +2625,9 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                                 color: Color(0xFF0F172A),
                                 size: 26,
                               ),
-                              tooltip: isVi ? '4 đề thi trước' : 'Previous 4 exams',
+                              tooltip: isVi
+                                  ? '4 đề thi trước'
+                                  : 'Previous 4 exams',
                               onPressed: () => _scrollExams(false, isDesktop),
                             ),
                           ),
@@ -3052,8 +3066,6 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
             ),
     );
   }
-
-
 
   Widget _buildCtaBannerSection(bool isDesktop) {
     final isVi = LanguageManager.isVi;
