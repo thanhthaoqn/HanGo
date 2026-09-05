@@ -197,19 +197,20 @@ public class ExamCourseRecommendationAIService {
 
             String weaknessSummary = parsed.get("weaknessSummary") != null ? parsed.get("weaknessSummary").toString()
                     : "";
-            List<Map<String, Object>> recs = (List<Map<String, Object>>) parsed.get("recommendedCourses");
-
-            if (recs == null)
-                recs = Collections.emptyList();
+            List<?> recs = parsed.get("recommendedCourses") instanceof List<?> list ? list : Collections.emptyList();
 
             // Map courseId AI trả về lại với Course thật trong DB để lấy title/thumbnail.
             // Xử lý an toàn khi courseId null/không phải số để không crash toàn bộ đề xuất.
             return ExamCourseRecommendationAIResponseDTO.builder()
                     .examAttemptId(examAttemptId)
                     .weaknessSummary(weaknessSummary)
-                    .recommendedCourses(recs.stream().limit(3).map(r -> {
-                        Long cid = r.get("courseId") instanceof Number ? ((Number) r.get("courseId")).longValue()
-                                : Long.parseLong(String.valueOf(r.get("courseId")));
+                    .recommendedCourses(recs.stream().limit(3).map(item -> {
+                        if (!(item instanceof Map<?, ?> r)) {
+                            return null;
+                        }
+                        Object rawCid = r.get("courseId");
+                        Long cid = rawCid instanceof Number num ? num.longValue()
+                                : Long.parseLong(String.valueOf(rawCid));
                         Course course = allCourses.stream().filter(c -> c.getId().equals(cid)).findFirst().orElse(null);
 
                         String reasonWhy = r.get("reasonWhy") != null ? r.get("reasonWhy").toString() : "";
