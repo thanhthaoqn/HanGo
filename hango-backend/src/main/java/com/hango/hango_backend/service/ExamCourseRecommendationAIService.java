@@ -1,7 +1,6 @@
 package com.hango.hango_backend.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.hango.hango_backend.config.GeminiProperties;
 import com.hango.hango_backend.dto.ExamCourseRecommendationAIResponseDTO;
 import com.hango.hango_backend.dto.ExamResultAnalysisDTO;
 import com.hango.hango_backend.entity.Course;
@@ -9,10 +8,6 @@ import com.hango.hango_backend.entity.ExamAttempt;
 import com.hango.hango_backend.dto.ExamCourseRecommendationAIResponseDTO.RecommendedCourseDTO;
 import com.hango.hango_backend.repository.CourseRepository;
 import com.hango.hango_backend.repository.ExamAttemptRepository;
-import com.hango.hango_backend.repository.SystemParameterRepository;
-import com.hango.hango_backend.service.ExamResultAnalyzerService;
-import com.hango.hango_backend.service.GeminiClientService;
-import com.hango.hango_backend.service.SkillCategoryMappingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -29,6 +24,19 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ExamCourseRecommendationAIService {
 
+    private static final com.fasterxml.jackson.databind.ObjectMapper LENIENT_MAPPER = com.fasterxml.jackson.databind.json.JsonMapper
+            .builder()
+            .enable(com.fasterxml.jackson.core.json.JsonReadFeature.ALLOW_UNQUOTED_FIELD_NAMES) // Cho phép tên trường
+                                                                                                // không có dấu ngoặc
+                                                                                                // kép
+            .enable(com.fasterxml.jackson.core.json.JsonReadFeature.ALLOW_TRAILING_COMMA) // Bỏ qua dấu phẩy thừa ở
+                                                                                          // cuối: [1, 2, ]
+            .enable(com.fasterxml.jackson.core.json.JsonReadFeature.ALLOW_SINGLE_QUOTES) // Cho phép nháy đơn '...'
+            .enable(com.fasterxml.jackson.core.json.JsonReadFeature.ALLOW_JAVA_COMMENTS) // Bỏ qua comment // hoặc /* */
+            .build()
+            // Nếu có key/field lạ mà FE không gửi => ignore, không báo lỗi
+            .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
     private final ExamAttemptRepository examAttemptRepository;
     private final CourseRepository courseRepository;
     private final ExamResultAnalyzerService examResultAnalyzerService;
@@ -38,9 +46,11 @@ public class ExamCourseRecommendationAIService {
 
     /**
      * Gợi ý khóa học bằng AI dựa trên examAttempt.answersJson/score.
-     * Fallback: nếu AI fail => trả weaknessSummary rỗng + list rỗng để FE quay về rule-based.
+     * Fallback: nếu AI fail => trả weaknessSummary rỗng + list rỗng để FE quay về
+     * rule-based.
      */
-    public ExamCourseRecommendationAIResponseDTO recommendCoursesAI(Long examAttemptId, String weakestSkill) {
+    public ExamCourseRecommendationAIResponseDTO recommendCoursesAI(Long examAttemptId, String weakestSkill,
+            Long currentUserId) {
         if (examAttemptId == null) {
             throw new ApiException("examAttemptId is required", HttpStatus.BAD_REQUEST);
         }
@@ -48,20 +58,27 @@ public class ExamCourseRecommendationAIService {
         ExamAttempt attempt = examAttemptRepository.findById(examAttemptId)
                 .orElseThrow(() -> new ApiException("ExamAttempt not found", HttpStatus.NOT_FOUND));
 
-        // Phân tích CHỈ dựa trên examAttemptId hiện tại (không dùng các bài exam khác).
-        // Lý do: tránh việc UI/AI suy luận sai do tổng hợp nhiều exam.
+        // E6 (spec 20): ownership check - khong cho doc phan tich bai thi cua nguoi
+        // khac
+        if (currentUserId == null || !attempt.getStudent().getId().equals(currentUserId)) {
+            throw new ApiException("Access denied to this exam attempt", HttpStatus.FORBIDDEN);
+        }
+
+        // Buoc 1: phan tich answersJson cua attempt de rut ra lo hong kien thuc
         ExamResultAnalysisDTO analysis = examResultAnalyzerService.analyzeLatestExamAttempt(attempt);
 
-
-        // Lấy danh sách course hiện có (để AI chỉ chọn đúng course_id).
+        // Buoc 2: lay danh sach course con song (chua bi xoa mem) de AI chi duoc chon
+        // trong danh sach nay
         List<Course> allCourses = courseRepository.findAll().stream()
                 .filter(c -> c.getDeletedAt() == null)
                 .toList();
 
+        // Buoc 3: anh xa skill yeu nhat (do FE gui len) sang Category tuong ung
         String mappedCategory = skillCategoryMappingService.getCategoryForSkill(weakestSkill);
         String categoryHint = "";
         if (mappedCategory != null) {
-            categoryHint = " (This skill belongs to the " + mappedCategory + " category. Prioritize courses from this category).";
+            categoryHint = " (This skill belongs to the " + mappedCategory
+                    + " category. Prioritize courses from this category).";
         }
 
         StringBuilder courseList = new StringBuilder();
@@ -69,8 +86,26 @@ public class ExamCourseRecommendationAIService {
             courseList.append("- ID: ").append(c.getId())
                     .append(", Title: ").append(c.getTitle())
                     .append(", Category: ").append(c.getCategory() != null ? c.getCategory().getParamValue() : "N/A")
-                    .append(", Difficulty: ").append(c.getDifficulty() != null ? c.getDifficulty().getParamValue() : "N/A")
+                    .append(", Difficulty: ")
+                    .append(c.getDifficulty() != null ? c.getDifficulty().getParamValue() : "N/A")
                     .append("\n");
+        }
+
+        double scoreAvg = 0.0;
+        if (analysis.getHints() != null && analysis.getHints().get("score_avg") != null) {
+            try {
+                scoreAvg = Double.parseDouble(analysis.getHints().get("score_avg").toString());
+            } catch (NumberFormatException ignored) {
+            }
+        }
+
+        String difficultyHint = "";
+        if (scoreAvg >= 8.0) {
+            difficultyHint = "\n                - [MANDATORY] Điểm học sinh >= 8.0 (Xuất sắc), bắt buộc ưu tiên chọn các khóa học có Difficulty là ADVANCED hoặc UPPER_INTERMEDIATE.";
+        } else if (scoreAvg >= 5.0) {
+            difficultyHint = "\n                - [MANDATORY] Điểm học sinh từ 5.0 đến dưới 8.0 (Khá/Trung bình), bắt buộc ưu tiên chọn các khóa học có Difficulty là INTERMEDIATE.";
+        } else {
+            difficultyHint = "\n                - [MANDATORY] Điểm học sinh < 5.0 (Căn bản/Mất gốc), bắt buộc CHỈ ĐƯỢC CHỌN các khóa học có Difficulty là BEGINNER hoặc BASIC để củng cố kiến thức nền tảng.";
         }
 
         String systemPrompt = """
@@ -83,11 +118,14 @@ public class ExamCourseRecommendationAIService {
                    - Nếu điểm `score_avg_hint` cao (>= 9) hoặc knowledge_gaps_json cho thấy ít lỗi, hãy nói rằng bạn đang làm rất tốt và chỉ gợi ý “review nhẹ” (không khẳng định yếu nhiều).
                    - Nếu điểm thấp hơn thì mô tả rõ điểm yếu dựa trên TOOL INPUT.
 
-                2) Đề xuất đúng 3 khóa học phù hợp nhất và kèm `reasonWhy` thân thiện, dễ hiểu (vì sao khóa này giúp bạn tiến bộ nhanh).
+                2) Đề xuất đúng 3 khóa học và BẮT BUỘC sắp xếp theo thứ tự ưu tiên:
+                   - Khóa học 1: Ưu tiên số 1 giải quyết trực tiếp kỹ năng yếu nhất (`explicit_weakest_skill`).
+                   - Khóa học 2 & 3: Lần lượt chọn các khóa học giải quyết các kỹ năng yếu tiếp theo trong danh sách `weak_skills` của `knowledge_gaps_json` (hoặc củng cố kiến thức nền tảng tương ứng).
+                   - Mỗi khóa học kèm `reasonWhy` thân thiện, dễ hiểu (vì sao khóa này giúp bạn tiến bộ nhanh).
 
                 Ràng buộc bắt buộc:
                 - Chỉ được chọn courseId tồn tại trong [AVAILABLE_COURSES]. Tuyệt đối không bịa courseId.
-                - Chỉ trả về JSON thuần (không markdown), schema đúng như dưới.
+                - Chỉ trả về JSON thuần (không markdown), schema đúng như dưới.%s
 
                 [AVAILABLE_COURSES]
                 %s
@@ -106,45 +144,76 @@ public class ExamCourseRecommendationAIService {
                     {"courseId": 3, "reasonWhy": "..."}
                   ]
                 }
-                """.formatted(
+                """
+                .formatted(
+                        difficultyHint,
+                        courseList,
+                        analysis.getHints() != null && analysis.getHints().get("score_avg") != null
+                                ? analysis.getHints().get("score_avg").toString()
+                                : "0",
+                        analysis.getKnowledgeGapsJson() == null ? "{}" : analysis.getKnowledgeGapsJson(),
+                        weakestSkill != null ? weakestSkill : "N/A",
+                        categoryHint);
 
-                courseList,
-                courseList,
-                analysis.getHints() != null && analysis.getHints().get("score_avg") != null ? analysis.getHints().get("score_avg").toString() : "0",
-                analysis.getKnowledgeGapsJson() == null ? "{}" : analysis.getKnowledgeGapsJson(),
-                weakestSkill != null ? weakestSkill : "N/A",
-                categoryHint
-        );
-
-
+        // "Lời mở lời của Người dùng" (User Trigger Message) để kích hoạt Google Gemini
+        // trả lời.
         List<GeminiGenerateRequest.Content> chatHistory = List.of(
                 GeminiGenerateRequest.Content.builder()
                         .role("user")
-                        .parts(List.of(GeminiGenerateRequest.Part.builder().text("Tôi cần đề xuất khóa học sau exam. Hãy trả đúng JSON schema.").build()))
-                        .build()
-        );
+                        .parts(List.of(GeminiGenerateRequest.Part.builder()
+                                .text("Tôi cần đề xuất khóa học sau exam. Hãy trả đúng JSON schema.").build()))
+                        .build());
 
+        // Buoc 4: goi Gemini voi prompt chua danh sach course + phan tich diem yeu,
+        // ep AI tra ve dung JSON schema {weaknessSummary, recommendedCourses[3]}
         try {
             String aiResponseText = geminiClientService.generateChatResponse(systemPrompt, chatHistory);
+            if (aiResponseText == null) {
+                aiResponseText = "";
+            }
             aiResponseText = aiResponseText.replaceAll("(?s)^```json\\s*", "")
                     .replaceAll("(?s)```\\s*$", "")
                     .trim();
 
+            // Trích xuất JSON object thuần từ phản hồi AI (bỏ qua text thừa nếu có)
+            int jsonStart = aiResponseText.indexOf('{');
+            int jsonEnd = aiResponseText.lastIndexOf('}');
+            if (jsonStart >= 0 && jsonEnd >= 0 && jsonEnd > jsonStart) {
+                aiResponseText = aiResponseText.substring(jsonStart, jsonEnd + 1);
+            }
+
             // Parse response: weaknessSummary + recommendedCourses[].
-            @SuppressWarnings("unchecked")
-            Map<String, Object> parsed = objectMapper.readValue(aiResponseText, Map.class);
+            Map<String, Object> parsed;
+            try {
+                parsed = LENIENT_MAPPER.readValue(aiResponseText,
+                        new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {
+                        });
+            } catch (Exception parseEx) {
+                parsed = objectMapper != null ? objectMapper.readValue(aiResponseText,
+                        new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {
+                        }) : null;
+            }
 
-            String weaknessSummary = parsed.get("weaknessSummary") != null ? parsed.get("weaknessSummary").toString() : "";
-            List<Map<String, Object>> recs = (List<Map<String, Object>>) parsed.get("recommendedCourses");
+            if (parsed == null) {
+                throw new IllegalStateException("Failed to parse AI recommendation JSON");
+            }
 
-            if (recs == null) recs = Collections.emptyList();
+            String weaknessSummary = parsed.get("weaknessSummary") != null ? parsed.get("weaknessSummary").toString()
+                    : "";
+            List<?> recs = parsed.get("recommendedCourses") instanceof List<?> list ? list : Collections.emptyList();
 
-            // Map course info back to include title/category/difficulty.
+            // Map courseId AI trả về lại với Course thật trong DB để lấy title/thumbnail.
+            // Xử lý an toàn khi courseId null/không phải số để không crash toàn bộ đề xuất.
             return ExamCourseRecommendationAIResponseDTO.builder()
                     .examAttemptId(examAttemptId)
                     .weaknessSummary(weaknessSummary)
-                    .recommendedCourses(recs.stream().limit(3).map(r -> {
-                        Long cid = r.get("courseId") instanceof Number ? ((Number) r.get("courseId")).longValue() : Long.parseLong(String.valueOf(r.get("courseId")));
+                    .recommendedCourses(recs.stream().limit(3).map(item -> {
+                        if (!(item instanceof Map<?, ?> r)) {
+                            return null;
+                        }
+                        Object rawCid = r.get("courseId");
+                        Long cid = rawCid instanceof Number num ? num.longValue()
+                                : Long.parseLong(String.valueOf(rawCid));
                         Course course = allCourses.stream().filter(c -> c.getId().equals(cid)).findFirst().orElse(null);
 
                         String reasonWhy = r.get("reasonWhy") != null ? r.get("reasonWhy").toString() : "";
@@ -152,14 +221,21 @@ public class ExamCourseRecommendationAIService {
                         return RecommendedCourseDTO.builder()
                                 .courseId(cid)
                                 .title(course != null ? course.getTitle() : "")
-                                .category(course != null && course.getCategory() != null ? course.getCategory().getParamValue() : "")
-                                .difficulty(course != null && course.getDifficulty() != null ? course.getDifficulty().getParamValue() : "")
+                                .category(course != null && course.getCategory() != null
+                                        ? course.getCategory().getParamValue()
+                                        : "")
+                                .difficulty(course != null && course.getDifficulty() != null
+                                        ? course.getDifficulty().getParamValue()
+                                        : "")
                                 .reasonWhy(reasonWhy)
                                 .thumbnailUrl(course != null ? course.getThumbnailUrl() : null)
                                 .build();
-                    }).toList())
+                    }).filter(java.util.Objects::nonNull).limit(3).toList())
                     .build();
         } catch (Exception e) {
+            // FALLBACK (SUY GIAM NHE NHANG): Neu AI loi, Google sap, tra ve mang rong
+            // (emptyList)
+            // de Frontend khong bi crash ma tu dong an tinh nang AI di
             log.warn("AI recommend failed, fallback empty. cause={}", e.getMessage());
             return ExamCourseRecommendationAIResponseDTO.builder()
                     .examAttemptId(examAttemptId)
@@ -169,4 +245,3 @@ public class ExamCourseRecommendationAIService {
         }
     }
 }
-

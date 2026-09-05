@@ -8,7 +8,7 @@ import '../../data/services/auth_service.dart';
 import '../../utils/toast_helper.dart';
 import 'register_page.dart';
 import 'forgot_password_page.dart';
-import 'learner/learner_home_page.dart';
+import 'learner/learner_shell_page.dart';
 import 'admin/admin_dashboard_page.dart';
 import 'trainer/trainer_dashboard_page.dart';
 import 'trainer/trainer_shell_page.dart';
@@ -80,7 +80,7 @@ class _LoginPageState extends State<LoginPage> {
       Navigator.of(context).pop();
     } else {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const LearnerHomePage()),
+        MaterialPageRoute(builder: (context) => const LearnerShellPage()),
       );
     }
   }
@@ -119,6 +119,9 @@ class _LoginPageState extends State<LoginPage> {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
+    // Goi AuthService.login() -> gui POST /api/auth/login xuong backend.
+    // Day la noi DUY NHAT tren man hinh nay lam viec voi mang; toan bo phan
+    // giao dien ben duoi chi phan ung lai ket qua tra ve.
     final result = await _authService.login(email, password, rememberMe: _rememberMe);
 
     setState(() {
@@ -231,6 +234,10 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
+    // Frontend TU DOC danh sach roles backend tra ve (khong goi API rieng nao
+    // khac) de quyet dinh dieu huong sang dashboard tuong ung. Day CHI la dieu
+    // huong UI/UX; neu user co gang vao thang URL/man hinh khong thuoc quyen
+    // cua minh, cac API phia sau van bi chan boi @PreAuthorize o Backend.
     // Determine role flags
     final isAdmin = roles.any((r) => r.toUpperCase().contains('ADMIN'));
     final isTrainerLead = roles.any(
@@ -266,7 +273,7 @@ class _LoginPageState extends State<LoginPage> {
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const LearnerHomePage()),
+          MaterialPageRoute(builder: (context) => const LearnerShellPage()),
         );
       }
     }

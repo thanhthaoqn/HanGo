@@ -177,7 +177,7 @@ class PaymentServiceImplTest {
         verify(enrollmentRepository).save(any());
         verify(cartItemRepository).deleteByUserIdAndCourseId(10L, 5L);
         verify(notificationService).notifyUser(eq(creator), eq(NotificationService.TYPE_NEW_ENROLLMENT), any(), any(), eq(freeCourse));
-        verify(emailService).sendEnrollmentSuccessEmail(buyer.getEmail(), buyer.getFullName(), "Free Course", "Free");
+        verify(emailService).sendEnrollmentSuccessEmail(buyer.getEmail(), buyer.getFullName(), "Free Course", "Free", null);
     }
 
     @Test
@@ -190,7 +190,7 @@ class PaymentServiceImplTest {
         when(courseRepository.findAllById(any())).thenReturn(List.of(freeCourse));
         when(enrollmentRepository.existsByUserIdAndCourseId(10L, 5L)).thenReturn(false);
         org.mockito.Mockito.doThrow(new RuntimeException("SMTP down"))
-                .when(emailService).sendEnrollmentSuccessEmail(any(), any(), any(), any());
+                .when(emailService).sendEnrollmentSuccessEmail(any(), any(), any(), any(), any());
 
         com.hango.hango_backend.dto.PaymentResponseDTO response =
                 paymentService.createPayment(request, 10L, "127.0.0.1", "http://localhost");
@@ -467,5 +467,81 @@ class PaymentServiceImplTest {
         paymentService.getMyPaymentHistory(1L, "ALL", 0, 10);
 
         verify(paymentRepository).findByUserIdOrderByCreatedAtDesc(eq(1L), any());
+    }
+
+    // =================================================================
+    // getAllPaymentsForManager
+    // =================================================================
+
+    @Test
+    void getAllPaymentsForManagerShouldSyncSettlementStatusesAndMapResultsToDTO() {
+        User buyer = user(1L, "Alice");
+        User creator = user(2L, "Trainer Bob");
+        Course course = course(10L, "Course A", new BigDecimal("100000"), creator);
+        Payment payment = Payment.builder().id(70L).user(buyer).course(course).txnRef("70")
+                .amount(new BigDecimal("100000")).status("SUCCESS").settlementStatus("PENDING").build();
+        Page<Payment> page = new PageImpl<>(List.of(payment), PageRequest.of(0, 10), 1);
+        when(paymentRepository.findAllForManager(eq(""), eq(""), eq(""), any())).thenReturn(page);
+
+        Page<com.hango.hango_backend.dto.ManagerPaymentDTO> result =
+                paymentService.getAllPaymentsForManager(null, null, null, 0, 10);
+
+        verify(paymentRepository).syncSettledPaymentsForPaidStatements();
+        assertEquals(1, result.getTotalElements());
+        assertEquals("Alice", result.getContent().get(0).getLearnerName());
+        assertEquals("Trainer Bob", result.getContent().get(0).getTrainerName());
+    }
+
+    @Test
+    void getAllPaymentsForManagerShouldNormalizeAllFilterAndLowercaseSearch() {
+        Page<Payment> page = new PageImpl<>(List.of(), PageRequest.of(0, 10), 0);
+        when(paymentRepository.findAllForManager(eq(""), eq(""), eq("%bob%"), any())).thenReturn(page);
+
+        paymentService.getAllPaymentsForManager("ALL", "ALL", "Bob", 0, 10);
+
+        verify(paymentRepository).findAllForManager(eq(""), eq(""), eq("%bob%"), any());
+    }
+
+    @Test
+    void getAllPaymentsForManagerShouldFallBackToDefaultTitleAndTrainerWhenCourseMissing() {
+        User buyer = user(1L, "Alice");
+        Payment payment = Payment.builder().id(71L).user(buyer).course(null).txnRef("71")
+                .amount(new BigDecimal("50000")).status("SUCCESS").build();
+        Page<Payment> page = new PageImpl<>(List.of(payment), PageRequest.of(0, 10), 1);
+        when(paymentRepository.findAllForManager(eq(""), eq(""), eq(""), any())).thenReturn(page);
+
+        Page<com.hango.hango_backend.dto.ManagerPaymentDTO> result =
+                paymentService.getAllPaymentsForManager(null, null, null, 0, 10);
+
+        assertEquals("HanGo Course", result.getContent().get(0).getCourseTitle());
+        assertEquals("N/A", result.getContent().get(0).getTrainerName());
+    }
+
+    // =================================================================
+    // exportPaymentsToExcel
+    // =================================================================
+
+    @Test
+    void exportPaymentsToExcelShouldSyncSettlementStatusesAndReturnNonEmptyWorkbook() {
+        User buyer = user(1L, "Alice");
+        User creator = user(2L, "Trainer Bob");
+        Course course = course(10L, "Course A", new BigDecimal("100000"), creator);
+        Payment payment = Payment.builder().id(72L).user(buyer).course(course).txnRef("72")
+                .amount(new BigDecimal("100000")).status("SUCCESS").settlementStatus("PENDING").build();
+        when(paymentRepository.findAllForManagerList(eq(""), eq(""), eq(""))).thenReturn(List.of(payment));
+
+        byte[] result = paymentService.exportPaymentsToExcel(null, null, null);
+
+        verify(paymentRepository).syncSettledPaymentsForPaidStatements();
+        assertEquals(true, result.length > 0);
+    }
+
+    @Test
+    void exportPaymentsToExcelShouldReturnValidWorkbookWhenNoPaymentsMatch() {
+        when(paymentRepository.findAllForManagerList(eq("SUCCESS"), eq(""), eq(""))).thenReturn(List.of());
+
+        byte[] result = paymentService.exportPaymentsToExcel("SUCCESS", null, null);
+
+        assertEquals(true, result.length > 0);
     }
 }

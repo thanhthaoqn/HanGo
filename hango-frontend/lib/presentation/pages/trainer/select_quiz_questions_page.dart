@@ -59,7 +59,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
   @override
   void initState() {
     super.initState();
-    _loadQuizQuestions(0);
+    _fetchInitialQuestions();
     _loadSkills();
   }
 
@@ -101,18 +101,17 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
     }
   }
 
-  // Load Paginated Questions associated with this Quiz Lesson
-  Future<void> _loadQuizQuestions(int page) async {
+  // Load all Questions associated with this Quiz Lesson into local state
+  Future<void> _fetchInitialQuestions() async {
     setState(() {
       _isLoadingQuestions = true;
-      _currentPage = page;
     });
 
     try {
       final token = await _authService.getToken();
       if (token == null) return;
 
-      final uri = Uri.parse('$apiBaseUrl/trainer/lessons/${widget.lessonId}/questions?page=$page&size=$_pageSize');
+      final uri = Uri.parse('$apiBaseUrl/trainer/lessons/${widget.lessonId}/questions?page=0&size=999');
       final response = await http.get(
         uri,
         headers: {
@@ -125,8 +124,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
         setState(() {
           _quizQuestions = data['content'] as List<dynamic>;
-          _totalElements = data['totalElements'] as int;
-          _totalPages = data['totalPages'] as int;
+          _updatePagination();
           _isLoadingQuestions = false;
         });
       } else {
@@ -144,105 +142,127 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
     }
   }
 
-  // Associate new questions to this quiz
-  Future<void> _associateQuestionsToQuiz(List<int> questionIds) async {
-    try {
-      final token = await _authService.getToken();
-      if (token == null) return;
-
-      // 1. Fetch all existing question IDs associated with the quiz
-      final getUri = Uri.parse('$apiBaseUrl/trainer/lessons/${widget.lessonId}/questions?page=0&size=999');
-      final getRes = await http.get(
-        getUri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      List<int> currentIds = [];
-      if (getRes.statusCode == 200) {
-        final data = jsonDecode(utf8.decode(getRes.bodyBytes));
-        final list = data['content'] as List<dynamic>;
-        currentIds = list.map((q) => q['id'] as int).toList();
-      }
-
-      for (var id in questionIds) {
-        if (!currentIds.contains(id)) {
-          currentIds.add(id);
-        }
-      }
-
-      // 2. Save the updated list back to the lesson
-      final postUri = Uri.parse('$apiBaseUrl/trainer/lessons/${widget.lessonId}/questions');
-      final postRes = await http.post(
-        postUri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({
-          'questionIds': currentIds,
-        }),
-      );
-
-      if (postRes.statusCode == 200) {
-        _loadQuizQuestions(0);
-      } else {
-        ToastHelper.showError(context, 'Failed to associate new questions to quiz.');
-      }
-    } catch (e) {
-      debugPrint('Error associating questions: $e');
+  void _updatePagination() {
+    _totalElements = _quizQuestions.length;
+    _totalPages = (_totalElements / _pageSize).ceil();
+    if (_currentPage >= _totalPages && _totalPages > 0) {
+      _currentPage = _totalPages - 1;
     }
   }
 
-  // Delete question association from this quiz
-  Future<void> _deleteQuestionFromQuiz(int questionId) async {
+  // Add selected questions to local state (Draft Mode)
+  Future<void> _associateQuestionsToQuiz(List<int> newQuestionIds, List<int> newGroupIds, [List<dynamic>? sourceBankQuestions]) async {
     try {
       final token = await _authService.getToken();
       if (token == null) return;
 
-      // 1. Fetch all existing question IDs
-      final getUri = Uri.parse('$apiBaseUrl/trainer/lessons/${widget.lessonId}/questions?page=0&size=999');
-      final getRes = await http.get(
-        getUri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
+      setState(() {
+        _isLoadingQuestions = true;
+      });
 
-      List<int> currentIds = [];
-      if (getRes.statusCode == 200) {
-        final data = jsonDecode(utf8.decode(getRes.bodyBytes));
-        final list = data['content'] as List<dynamic>;
-        currentIds = list.map((q) => q['id'] as int).toList();
+      List<dynamic> newQuestionsToAdd = [];
+
+      // Fetch details for normal questions
+      for (var id in newQuestionIds) {
+        // Skip if already in the list
+        if (_quizQuestions.any((q) => q['id'] == id)) continue;
+
+        final sourceQ = sourceBankQuestions?.firstWhere((q) => q['id'] == id, orElse: () => null);
+
+        final uri = Uri.parse('$apiBaseUrl/trainer/question-bank/detail/$id?isGroup=false');
+        final res = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+        if (res.statusCode == 200) {
+          final data = jsonDecode(utf8.decode(res.bodyBytes));
+          final subQs = data['subQuestions'] as List<dynamic>? ?? [];
+          final sub = subQs.isNotEmpty ? subQs[0] : {};
+
+          final skillId = sub['skillParamId'] ?? data['skillParamId'];
+          final difficultyId = sub['difficultyId'] ?? data['difficultyId'];
+          final skillObj = _skillsList.firstWhere((s) => s['id'] == skillId, orElse: () => null);
+          final difficultyObj = _difficultyList.firstWhere((d) => d['id'] == difficultyId, orElse: () => null);
+
+          final formattedQ = {
+            'id': sub['id'] ?? data['id'],
+            'questionText': sub['questionText'] ?? '',
+            'explanation': sub['explanation'] ?? data['explanation'],
+            'categoryName': sourceQ?['categoryName'] ?? 'Single Choice',
+            'difficultyName': difficultyObj != null ? difficultyObj['paramValue'] : (sourceQ?['difficultyName'] ?? ''),
+            'skillName': skillObj != null ? skillObj['paramValue'] : (sourceQ?['skillName'] ?? ''),
+            'options': sub['options'] ?? [],
+            'skillParamId': skillId,
+            'difficultyParamId': difficultyId,
+          };
+          newQuestionsToAdd.add(formattedQ);
+        }
       }
 
-      currentIds.remove(questionId);
+      // Fetch details for group questions (expand sub-questions)
+      for (var gId in newGroupIds) {
+        final sourceQ = sourceBankQuestions?.firstWhere((q) => q['id'] == gId, orElse: () => null);
+        
+        final uri = Uri.parse('$apiBaseUrl/trainer/question-bank/detail/$gId?isGroup=true');
+        final res = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+        if (res.statusCode == 200) {
+          final data = jsonDecode(utf8.decode(res.bodyBytes));
+          final subQs = data['subQuestions'] as List<dynamic>? ?? [];
+          for (var sub in subQs) {
+            // Skip if already in the list
+            if (_quizQuestions.any((q) => q['id'] == sub['id'])) continue;
+            
+            final skillId = sub['skillParamId'];
+            final difficultyId = sub['difficultyId'] ?? data['difficultyId'];
+            final groupTypeId = data['categoryId']; // Backend puts groupTypeParamId in categoryId for groups
 
-      // 2. Save the updated list back to the quiz
-      final postUri = Uri.parse('$apiBaseUrl/trainer/lessons/${widget.lessonId}/questions');
-      final postRes = await http.post(
-        postUri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({
-          'questionIds': currentIds,
-        }),
-      );
+            final skillObj = _skillsList.firstWhere((s) => s['id'] == skillId, orElse: () => null);
+            final difficultyObj = _difficultyList.firstWhere((d) => d['id'] == difficultyId, orElse: () => null);
+            final groupTypeObj = _groupTypesList.firstWhere((g) => g['id'] == groupTypeId, orElse: () => null);
 
-      if (postRes.statusCode == 200) {
-        ToastHelper.showSuccess(context, 'Question removed from quiz.');
-        _loadQuizQuestions(0);
-      } else {
-        ToastHelper.showError(context, 'Failed to remove question.');
+            final formattedQ = {
+              'id': sub['id'],
+              'questionText': sub['questionText'],
+              'explanation': sub['explanation'],
+              'categoryName': sourceQ?['categoryName'] ?? 'Reading Comprehension', 
+              'difficultyName': difficultyObj != null ? difficultyObj['paramValue'] : (sourceQ?['difficultyName'] ?? ''),
+              'groupId': data['id'],
+              'passageText': data['passageText'],
+              'skillName': skillObj != null ? skillObj['paramValue'] : (sourceQ?['skillName'] ?? ''),
+              'groupTypeName': groupTypeObj != null ? groupTypeObj['paramValue'] : (sourceQ?['groupTypeName'] ?? ''),
+              'options': sub['options'] ?? [],
+              'skillParamId': skillId,
+              'difficultyParamId': difficultyId,
+              'questionGroup': {
+                'groupTypeParamId': groupTypeId,
+                'contextText': data['passageText'],
+              }
+            };
+            newQuestionsToAdd.add(formattedQ);
+          }
+        }
       }
+
+      setState(() {
+        _quizQuestions.addAll(newQuestionsToAdd);
+        _updatePagination();
+        _isLoadingQuestions = false;
+      });
+
+      ToastHelper.showSuccess(context, 'Added ${newQuestionsToAdd.length} questions to draft.');
+
     } catch (e) {
-      debugPrint('Error removing question: $e');
+      debugPrint('Error associating questions locally: $e');
+      setState(() {
+        _isLoadingQuestions = false;
+      });
     }
+  }
+
+  // Delete question association from local draft
+  Future<void> _deleteQuestionFromQuiz(int questionId) async {
+    setState(() {
+      _quizQuestions.removeWhere((q) => q['id'] == questionId);
+      _updatePagination();
+    });
+    ToastHelper.showSuccess(context, 'Question removed from draft.');
   }
 
   // Show dialog to add questions from Question Bank
@@ -269,7 +289,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
         if (token == null) return;
 
         // Fetch Skills
-        http.get(Uri.parse('$apiBaseUrl/metadata/parameters?type=SKILL_TYPE'), headers: {'Authorization': 'Bearer $token'})
+        http.get(Uri.parse('$apiBaseUrl/metadata/parameters?type=SKILL'), headers: {'Authorization': 'Bearer $token'})
           .then((res) {
             if (res.statusCode == 200) setStateSB(() => skillsList = jsonDecode(utf8.decode(res.bodyBytes)));
         });
@@ -296,7 +316,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
         final token = await _authService.getToken();
         if (token == null) return;
         
-        String url = '$apiBaseUrl/trainer/question-bank?type=QUIZ&search=$searchQuery&sortBy=$sortBy';
+        String url = '$apiBaseUrl/trainer/question-bank?type=QUIZ&search=$searchQuery&sortBy=$sortBy&usageType=1';
         if (selectedSkillId != null) url += '&skillId=$selectedSkillId';
         if (selectedCategoryId != null) url += '&categoryId=$selectedCategoryId';
         if (selectedDifficultyId != null) url += '&difficultyId=$selectedDifficultyId';
@@ -308,9 +328,9 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
         });
         
         if (response.statusCode == 200) {
-          final data = jsonDecode(utf8.decode(response.bodyBytes));
+          final data = jsonDecode(utf8.decode(response.bodyBytes)) as List<dynamic>;
           setStateSB(() {
-            bankQuestions = data as List<dynamic>;
+            bankQuestions = data;
             isLoading = false;
             initialLoaded = true;
           });
@@ -527,10 +547,107 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                                             }
                                           });
                                         },
-                                        title: Text(q['questionText'] ?? '', style: const TextStyle(fontSize: 14, fontFamily: 'Outfit', fontWeight: FontWeight.w500)),
-                                        subtitle: Text(q['categoryName'] ?? 'Multiple Choice', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontFamily: 'Outfit')),
+                                        title: Padding(
+                                          padding: const EdgeInsets.only(bottom: 6),
+                                          child: Text(q['questionText'] ?? '', style: const TextStyle(fontSize: 14, fontFamily: 'Outfit', fontWeight: FontWeight.w500)),
+                                        ),
+                                        subtitle: Wrap(
+                                          spacing: 8,
+                                          runSpacing: 6,
+                                          crossAxisAlignment: WrapCrossAlignment.center,
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFE2E8F0),
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                q['categoryName'] == 'Multiple Choice' ? 'Multiple Question' : (q['categoryName'] ?? 'Multiple Question'),
+                                                style: const TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Color(0xFF475569),
+                                                  fontFamily: 'Outfit',
+                                                ),
+                                              ),
+                                            ),
+                                            if (q['skillName'] != null)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFDBEAFE),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  q['skillName'],
+                                                  style: const TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Color(0xFF1E3A8A),
+                                                    fontFamily: 'Outfit',
+                                                  ),
+                                                ),
+                                              ),
+                                            if (q['groupTypeName'] != null)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFFEF3C7),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  q['groupTypeName'],
+                                                  style: const TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Color(0xFF92400E),
+                                                    fontFamily: 'Outfit',
+                                                  ),
+                                                ),
+                                              ),
+                                            if (q['difficultyName'] != null)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFE0E7FF),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  q['difficultyName'],
+                                                  style: const TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Color(0xFF3730A3),
+                                                    fontFamily: 'Outfit',
+                                                  ),
+                                                ),
+                                              ),
+                                            if (q['optionsCount'] != null && q['optionsCount'] > 0)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFD1FAE5),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  '${q['optionsCount']} options',
+                                                  style: const TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Color(0xFF065F46),
+                                                    fontFamily: 'Outfit',
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
                                         controlAffinity: ListTileControlAffinity.leading,
                                         contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        secondary: IconButton(
+                                          icon: const Icon(Icons.remove_red_eye, color: Color(0xFF64748B)),
+                                          onPressed: () => _showQuestionDetailsDialog(qId, q['isGroup'] == true),
+                                        ),
                                       ),
                                     );
                                   },
@@ -547,7 +664,17 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                 ElevatedButton(
                   onPressed: selectedIds.isEmpty ? null : () {
                     Navigator.pop(ctx);
-                    _associateQuestionsToQuiz(selectedIds.toList());
+                    List<int> qIds = [];
+                    List<int> gIds = [];
+                    for (var id in selectedIds) {
+                      var q = bankQuestions.firstWhere((element) => element['id'] == id);
+                      if (q['isGroup'] == true) {
+                        gIds.add(id);
+                      } else {
+                        qIds.add(id);
+                      }
+                    }
+                    _associateQuestionsToQuiz(qIds, gIds, bankQuestions);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF20B486),
@@ -572,19 +699,36 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
     int? currentSkillParamId = q['skillParamId'] ?? (q['skillParam'] != null ? q['skillParam']['id'] : null);
     int? currentGroupTypeParamId = q['questionGroup'] != null ? (q['questionGroup']['groupTypeParamId'] ?? (q['questionGroup']['groupTypeParam'] != null ? q['questionGroup']['groupTypeParam']['id'] : null)) : null;
     int? currentDifficultyParamId = q['difficultyParamId'] ?? (q['difficultyParam'] != null ? q['difficultyParam']['id'] : null);
+    
+    if (currentSkillParamId != null && !_skillsList.any((s) => s['id'] == currentSkillParamId)) currentSkillParamId = null;
+    if (currentGroupTypeParamId != null && !_groupTypesList.any((g) => g['id'] == currentGroupTypeParamId)) currentGroupTypeParamId = null;
+    if (currentDifficultyParamId != null && !_difficultyList.any((d) => d['id'] == currentDifficultyParamId)) currentDifficultyParamId = null;
+
     bool isGrouped = q['passageText'] != null || q['questionGroup'] != null;
     
     List<String> options = [];
+    int correctIndex = 0;
     if (q['options'] != null) {
-      options = List<String>.from(q['options']);
+      final opts = q['options'] as List;
+      for (int i = 0; i < opts.length; i++) {
+        final o = opts[i];
+        if (o is Map) {
+          options.add(o['optionText']?.toString() ?? '');
+          if (o['isCorrect'] == true || o['correct'] == true) {
+            correctIndex = i;
+          }
+        } else {
+          options.add(o.toString());
+        }
+      }
     }
+    
     List<TextEditingController> optCtrls = options.map((o) => TextEditingController(text: o)).toList();
     if (optCtrls.isEmpty) {
       optCtrls.add(TextEditingController());
       optCtrls.add(TextEditingController());
     }
     
-    int correctIndex = q['correctIndex'] ?? 0;
     if (correctIndex >= optCtrls.length) correctIndex = 0;
     
     bool isSaving = false;
@@ -839,7 +983,29 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                         ToastHelper.showSuccess(ctx, 'Question updated successfully');
                         if (mounted) {
                           Navigator.pop(ctx);
-                          _loadQuizQuestions(_currentPage);
+                          
+                          // Update local draft state instead of fetching from server to preserve unsaved drafts
+                          setState(() {
+                            final index = _quizQuestions.indexWhere((item) => item['id'] == qId);
+                            if (index != -1) {
+                              _quizQuestions[index]['questionText'] = updatedText;
+                              _quizQuestions[index]['explanation'] = updatedExpl;
+                              
+                              if (isGrouped) {
+                                _quizQuestions[index]['passageText'] = passageCtrl.text.trim();
+                              }
+                              
+                              // Re-fetch the param values for display
+                              if (currentSkillParamId != null) {
+                                final sObj = _skillsList.firstWhere((s) => s['id'] == currentSkillParamId, orElse: () => null);
+                                if (sObj != null) _quizQuestions[index]['skillName'] = sObj['paramValue'];
+                              }
+                              if (currentDifficultyParamId != null) {
+                                final dObj = _difficultyList.firstWhere((d) => d['id'] == currentDifficultyParamId, orElse: () => null);
+                                if (dObj != null) _quizQuestions[index]['difficultyName'] = dObj['paramValue'];
+                              }
+                            }
+                          });
                         }
                       } else {
                         ToastHelper.showError(ctx, 'Failed to update question.');
@@ -1281,6 +1447,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
 
   Widget _buildMainContentCard() {
     final String activeSectionTitle = widget.sections[widget.sectionIndex]['title'] as String;
+    final displayList = _quizQuestions.skip(_currentPage * _pageSize).take(_pageSize).toList();
 
     return Container(
       decoration: BoxDecoration(
@@ -1370,9 +1537,9 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                         : ListView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
-                            itemCount: _quizQuestions.length,
+                            itemCount: displayList.length,
                             itemBuilder: (context, index) {
-                              final q = _quizQuestions[index];
+                              final q = displayList[index];
                               final int displayNum = (_currentPage * _pageSize) + index + 1;
                               final String text = q['questionText'] ?? '';
                               final String catName = q['categoryName'] ?? 'Single Choice';
@@ -1460,7 +1627,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                                                   borderRadius: BorderRadius.circular(4),
                                                 ),
                                                 child: Text(
-                                                  catName == 'Multiple Choice' ? 'Multiple Choice' : 'Single Answer',
+                                                  catName == 'Multiple Choice' ? 'Multiple Question' : 'Single Answer',
                                                   style: const TextStyle(
                                                     fontSize: 10,
                                                     fontWeight: FontWeight.bold,
@@ -1574,7 +1741,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                               sectionId: widget.sections[widget.sectionIndex]['id'] as int,
                               sectionTitle: widget.sections[widget.sectionIndex]['title'] as String,
                               onQuestionCreated: (newQuestionIds) {
-                                _associateQuestionsToQuiz(newQuestionIds);
+                                _associateQuestionsToQuiz(newQuestionIds, []);
                               },
                             ),
                           ),
@@ -1629,7 +1796,11 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
               children: [
                 IconButton(
                   icon: const Icon(Icons.keyboard_arrow_left, size: 20),
-                  onPressed: _currentPage > 0 ? () => _loadQuizQuestions(_currentPage - 1) : null,
+                  onPressed: _currentPage > 0 ? () {
+                    setState(() {
+                      _currentPage--;
+                    });
+                  } : null,
                 ),
                 Container(
                   width: 32,
@@ -1651,7 +1822,11 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.keyboard_arrow_right, size: 20),
-                  onPressed: _currentPage < _totalPages - 1 ? () => _loadQuizQuestions(_currentPage + 1) : null,
+                  onPressed: _currentPage < _totalPages - 1 ? () {
+                    setState(() {
+                      _currentPage++;
+                    });
+                  } : null,
                 ),
               ],
             ),
@@ -1691,10 +1866,51 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
           const SizedBox(width: 12),
           ElevatedButton(
             onPressed: () async {
-              ToastHelper.showSuccess(context, 'Quiz questions saved successfully');
-              await widget.onSectionsChanged(widget.sections);
-              if (mounted) {
-                Navigator.pop(context);
+              try {
+                final token = await _authService.getToken();
+                if (token == null) return;
+
+                // Show loading indicator
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (ctx) => const Center(child: CircularProgressIndicator(color: Color(0xFF20B486))),
+                );
+
+                List<int> questionIds = _quizQuestions.map((q) {
+                  final id = q['id'];
+                  if (id is int) return id;
+                  if (id is String) return int.tryParse(id) ?? 0;
+                  return int.tryParse(id.toString()) ?? 0;
+                }).where((id) => id > 0).toList();
+
+                final postUri = Uri.parse('$apiBaseUrl/trainer/lessons/${widget.lessonId}/questions');
+                final postRes = await http.post(
+                  postUri,
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer $token',
+                  },
+                  body: jsonEncode({
+                    'questionIds': questionIds,
+                  }),
+                );
+
+                if (mounted) Navigator.pop(context); // Close loading indicator
+
+                if (postRes.statusCode == 200) {
+                  ToastHelper.showSuccess(context, 'Quiz questions saved successfully');
+                  await widget.onSectionsChanged(widget.sections);
+                  if (mounted) {
+                    Navigator.pop(context); // Close the page
+                  }
+                } else {
+                  ToastHelper.showError(context, 'Failed to save quiz questions: ${postRes.body}');
+                }
+              } catch (e) {
+                if (mounted) Navigator.pop(context); // Close loading indicator
+                debugPrint('Error saving quiz questions: $e');
+                ToastHelper.showError(context, 'Error saving quiz questions: $e');
               }
             },
             style: ElevatedButton.styleFrom(
@@ -1715,6 +1931,136 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _showQuestionDetailsDialog(int qId, bool isGroup) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator(color: Color(0xFF20B486))),
+    );
+
+    try {
+      final token = await _authService.getToken();
+      if (token == null) {
+        Navigator.pop(context);
+        return;
+      }
+
+      final uri = Uri.parse('$apiBaseUrl/trainer/question-bank/detail/$qId?isGroup=$isGroup');
+      final res = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      Navigator.pop(context); // Close loading dialog
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(res.bodyBytes));
+        _showDetailsContentDialog(data, isGroup);
+      } else {
+        ToastHelper.showError(context, 'Failed to fetch question details.');
+      }
+    } catch (e) {
+      Navigator.pop(context); // Close loading dialog
+      debugPrint('Error fetching question details: $e');
+      ToastHelper.showError(context, 'Error loading details.');
+    }
+  }
+
+  void _showDetailsContentDialog(Map<String, dynamic> data, bool isGroup) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final subQs = data['subQuestions'] as List<dynamic>? ?? [];
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Question Details', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF1E293B))),
+              IconButton(
+                icon: const Icon(Icons.close, color: Color(0xFF64748B)),
+                onPressed: () => Navigator.pop(ctx),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 600,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isGroup && data['passageText'] != null && data['passageText'].toString().isNotEmpty) ...[
+                    const Text('Passage', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF20B486), fontFamily: 'Outfit')),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      width: double.infinity,
+                      decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFE2E8F0))),
+                      child: Text(data['passageText'], style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF1E293B))),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  ...subQs.asMap().entries.map((entry) {
+                    final idx = entry.key;
+                    final sub = entry.value;
+                    final options = sub['options'] as List<dynamic>? ?? [];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(isGroup ? 'Question ${idx + 1}:' : 'Question:', style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF1E293B))),
+                          const SizedBox(height: 8),
+                          Text(sub['questionText'] ?? '', style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, color: Color(0xFF475569))),
+                          const SizedBox(height: 12),
+                          ...options.map((opt) {
+                            final isCorrect = opt['isCorrect'] == true;
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: isCorrect ? const Color(0xFF20B486) : const Color(0xFFE2E8F0)),
+                                borderRadius: BorderRadius.circular(8),
+                                color: isCorrect ? const Color(0xFFE2F9F3) : Colors.white,
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(isCorrect ? Icons.check_circle : Icons.circle_outlined, color: isCorrect ? const Color(0xFF20B486) : const Color(0xFFCBD5E1), size: 18),
+                                  const SizedBox(width: 8),
+                                  Expanded(child: Text(opt['optionText'] ?? '', style: TextStyle(fontFamily: 'Outfit', fontSize: 13, color: isCorrect ? const Color(0xFF047857) : const Color(0xFF475569), fontWeight: isCorrect ? FontWeight.w500 : FontWeight.normal))),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          if (sub['explanation'] != null && sub['explanation'].toString().isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            const Text('Explanation:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, fontFamily: 'Outfit', color: Color(0xFF64748B))),
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              width: double.infinity,
+                              decoration: BoxDecoration(color: const Color(0xFFFFFBEB), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFFDE68A))),
+                              child: Text(sub['explanation'], style: const TextStyle(fontFamily: 'Outfit', fontSize: 13, color: Color(0xFF92400E))),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
     );
   }
 }

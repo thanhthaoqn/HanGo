@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:hango/presentation/widgets/image_cropper_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../../../data/services/auth_service.dart';
@@ -12,7 +13,7 @@ import '../../../utils/toast_helper.dart';
 import '../../../utils/language_manager.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/shared_footer.dart';
-import 'learner_home_page.dart';
+import 'learner_shell_page.dart';
 import '../course/course_detail_page.dart';
 
 class MyInformationPage extends StatefulWidget {
@@ -613,7 +614,7 @@ class _MyInformationPageState extends State<MyInformationPage> {
               _authService.logout();
               Navigator.pushAndRemoveUntil(
                 context,
-                MaterialPageRoute(builder: (context) => LearnerHomePage()),
+                MaterialPageRoute(builder: (context) => const LearnerShellPage()),
                 (route) => false,
               );
             });
@@ -700,7 +701,16 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
   Future<void> _pickAndUploadAvatar() async {
     try {
       final pickedFile = await pickImage();
-      if (pickedFile == null) return;
+      if (pickedFile == null || pickedFile.bytes.isEmpty) return;
+
+      final croppedBytes = await ImageCropperDialog.show(
+        context,
+        imageBytes: Uint8List.fromList(pickedFile.bytes),
+        title: LanguageManager.isVi
+            ? 'Chỉnh sửa ảnh đại diện'
+            : 'Adjust Avatar Photo',
+      );
+      if (croppedBytes == null) return;
 
       setState(() {
         _isUploading = true;
@@ -714,8 +724,8 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
         ..files.add(
           http.MultipartFile.fromBytes(
             'file',
-            pickedFile.bytes,
-            filename: pickedFile.name,
+            croppedBytes,
+            filename: 'avatar_${DateTime.now().millisecondsSinceEpoch}.png',
           ),
         );
 

@@ -1,9 +1,9 @@
-version: '3.8'
-
 services:
   backend:
+    image: ${BACKEND_IMAGE:-hango-backend:latest}
     build:
       context: ./hango-backend
+      dockerfile: Dockerfile
     container_name: hango-backend
     ports:
       - "8080:8080"
@@ -17,14 +17,41 @@ services:
       - PAYOS_API_KEY=${PAYOS_API_KEY}
       - PAYOS_CHECKSUM_KEY=${PAYOS_CHECKSUM_KEY}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx256m
+    mem_reservation: 384m
+    mem_limit: 600m
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 45s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     restart: always
 
   frontend:
+    image: ${FRONTEND_IMAGE:-hango-frontend:latest}
     build:
-      context: ./hango-frontend
+      context: .
+      dockerfile: hango-frontend/Dockerfile
     container_name: hango-frontend
     expose:
       - "80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/ > /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     restart: always
 
   nginx:
@@ -38,8 +65,15 @@ services:
       - ./nginx/certbot/conf:/etc/letsencrypt
       - ./nginx/certbot/www:/var/www/certbot
     depends_on:
-      - backend
-      - frontend
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     restart: always
 
   certbot:
@@ -49,3 +83,8 @@ services:
       - ./nginx/certbot/conf:/etc/letsencrypt
       - ./nginx/certbot/www:/var/www/certbot
     entrypoint: "/bin/sh -c 'trap exit 0; while true; do sleep 12h & wait $${!}; certbot renew; done'"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

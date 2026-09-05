@@ -81,6 +81,8 @@ class _ExamResultPageState extends State<ExamResultPage> {
   }
 
   void _analyzeSkills() {
+    // Phan tich diem yeu NGAY TREN CLIENT: dem ti le dung/sai theo tung skill
+    // tu correctnessMap do TakeExamPage truyen sang; skill co accuracy thap nhat = weakest
     Map<String, int> totalPerSkill = {};
     Map<String, int> correctPerSkill = {};
 
@@ -126,8 +128,8 @@ class _ExamResultPageState extends State<ExamResultPage> {
   }
 
   Future<void> _loadAiRecommendations() async {
-    // Tạo “bong bóng phân tích AI + khóa học gợi ý”
-    // Dựa trên examAttemptId lấy từ attempt history gần nhất.
+    // Goi API AI recommend: gui examAttemptId (lay tu attempt vua nop) + weakestSkill (client tinh)
+    // Neu AI that bai thi fallback ve rule-based recommendations ben duoi
     try {
       final latestAttemptId = (() {
         if (widget.attempt['id'] != null)
@@ -736,26 +738,51 @@ class _ExamResultPageState extends State<ExamResultPage> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFE0F2FE),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      (category.isNotEmpty
-                                              ? category
-                                              : 'AI Recommended')
-                                          .toUpperCase(),
-                                      style: const TextStyle(
-                                        color: Color(0xFF0369A1),
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.bold,
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFE0F2FE),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          (category.isNotEmpty
+                                                  ? category
+                                                  : 'AI Recommended')
+                                              .toUpperCase(),
+                                          style: const TextStyle(
+                                            color: Color(0xFF0369A1),
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                      if (difficulty.isNotEmpty) ...[
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFF3F4F6),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            difficulty.toUpperCase(),
+                                            style: const TextStyle(
+                                              color: Color(0xFF4B5563),
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                   const SizedBox(height: 6),
                                   Text(

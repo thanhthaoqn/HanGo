@@ -10,6 +10,7 @@ import '../../../domain/entities/learning_pathway.dart';
 import '../../../data/repositories/pathway_repository.dart';
 import '../../../utils/language_manager.dart';
 import '../course/course_detail_page.dart';
+import 'mastery_quiz_page.dart';
 
 class LearningPathwayPage extends StatefulWidget {
   final bool isEmbedded;
@@ -40,14 +41,27 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
     });
 
     try {
+      // GET /pathways/me - backend tra pathway ACTIVE duy nhat cua user
       final pathway = _preparePathwayForDisplay(await _repository.getMyPathway());
       if (!mounted) return;
-      setState(() {
-        _pathway = pathway;
-        _selectedNode = _initialSelectedNode(pathway.nodes);
-      });
+        setState(() {
+          _pathway = pathway;
+          if (_selectedNode != null) {
+            try {
+              _selectedNode = pathway.nodes.firstWhere((n) => n.step == _selectedNode!.step);
+            } catch (_) {
+              _selectedNode = _initialSelectedNode(pathway.nodes);
+            }
+          } else {
+            _selectedNode = _initialSelectedNode(pathway.nodes);
+          }
+        });
+      // C3 (spec 20): tu dong lay pending reroute suggestion sau moi lan load
+      // (thay cho viec persist suggestion vao database)
+      _refreshRerouteSuggestion();
     } catch (e) {
       if (!mounted) return;
+      // 404 = user chua co pathway nao (chua lam exam) -> hien man hinh empty state
       setState(() {
         _pathway = null;
         _errorMessage = e.toString().contains('404')
@@ -134,36 +148,57 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
     );
   }
 
-  Future<void> _submitMastery(int nodeId, int score) async {
-    if (_pathway == null) return;
+  /// C3 (spec 20): goi lai policy suggestions sau khi load pathway de card
+  /// "Pathway update suggestion" luon hien dung du khi user refresh trang.
+  Future<void> _refreshRerouteSuggestion() async {
+    final current = _pathway;
+    if (current == null) return;
     try {
-      final updatedPathway = await _repository.submitNodeMastery(
-        pathwayId: _pathway!.pathwayId,
-        nodeId: nodeId,
-        score: score,
-      );
+      final updated = await _repository.suggestReroute(pathwayId: current.pathwayId);
+      if (!mounted || _pathway == null || _pathway!.pathwayId != updated.pathwayId) return;
       setState(() {
-        _pathway = updatedPathway;
+        // Giu node dang chon, chi cap nhat suggestion moi
+        _pathway = _preparePathwayForDisplay(updated);
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Mastery updated successfully! Score: $score'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to update mastery: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+    } catch (_) {
+      // Khong co suggestion / loi mang: bo qua im lang
     }
   }
+
+  /// B4 (spec 20): mo man hinh Mastery Quiz that thay cho mock score 90/100.
+  Future<void> _openMasteryQuiz(PathwayNode node) async {
+    if (_pathway == null) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MasteryQuizPage(
+          pathwayId: _pathway!.pathwayId,
+          node: node,
+          isDarkMode: _isDarkMode,
+          onCompleted: (updatedPathway) {
+            if (!mounted) return;
+            setState(() {
+              _pathway = _preparePathwayForDisplay(updatedPathway);
+            });
+          },
+        ),
+      ),
+    );
+    // E1 (spec 20): refresh tien do sau khi quay ve tu man hinh quiz
+    if (mounted) _loadPathway();
+  }
+
+  /// E1 (spec 20): mo khoa hoc va refresh pathway khi quay ve de tien do/status khong bi stale.
+  Future<void> _openCourseAndRefresh(PathwayNode node) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CourseDetailPage(courseId: node.courseId),
+      ),
+    );
+    if (mounted) _loadPathway();
+  }
+
 
   void _showSkillAnalysis() {
     final pathway = _pathway;
@@ -182,7 +217,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
         child: SkillAnalysisPanel(
           weakSkills: pathway.weakSkills,
           latestWeakSkills: pathway.latestWeakSkills,
-          attemptsUsed: 10,
+          attemptsUsed: pathway.analyzedAttempts,
           isDarkMode: _isDarkMode,
         ),
       ),
@@ -194,7 +229,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Fast-track Course'),
-        content: const Text('You are about to skip this course in your learning pathway. Are you sure you want to proceed?'),
+        content: const Text('To fast-track this course, you must take the Mastery Quiz to prove your knowledge. Are you ready?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -205,7 +240,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFFF59E0B),
             ),
-            child: const Text('Yes, Fast-track'),
+            child: const Text('Take Mastery Quiz'),
           ),
         ],
       ),
@@ -213,34 +248,8 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
     
     if (confirm != true) return;
     
-    if (_pathway == null) return;
-    try {
-      final updatedPathway = await _repository.sendMentorAction(
-        pathwayId: _pathway!.pathwayId,
-        actionType: 'FAST_TRACK',
-      );
-      setState(() {
-        _pathway = _preparePathwayForDisplay(updatedPathway);
-        _selectedNode = _initialSelectedNode(updatedPathway.nodes);
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Course fast-tracked successfully!'),
-            backgroundColor: Color(0xFF28B79B),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to fast-track: ${e.toString()}'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
-    }
+    // Redirect to Mastery Quiz instead of skipping via backend API
+    await _openMasteryQuiz(node);
   }
 
   Future<void> _showRegenerateFreeWarningDialog() async {
@@ -331,6 +340,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
               pathway: _pathway!,
               selectedNode: _selectedNode,
               onPathwayUpdated: _handlePathwayUpdated,
+              onRegenerateFree: _showRegenerateFreeWarningDialog,
               isDarkMode: _isDarkMode,
             ) : const SizedBox(),
           ),
@@ -385,7 +395,9 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
                 child: InteractiveNodeTree(
                   nodes: _pathway!.nodes,
                   onNodeTap: _handleNodeTap,
+                  onStartLearningTap: _openCourseAndRefresh,
                   onFastTrackTap: _handleFastTrack,
+                  onMasteryTap: _openMasteryQuiz,
                   selectedNode: _selectedNode,
                   isDarkMode: _isDarkMode,
                   contentPadding: const EdgeInsets.only(right: 480), // Padding to not hide nodes under mentor
@@ -393,15 +405,10 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
                     pathway: _pathway!,
                     isDarkMode: _isDarkMode,
                     onStartLearning: (node) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => CourseDetailPage(courseId: node.courseId),
-                        ),
-                      );
+                      _openCourseAndRefresh(node);
                     },
-                    onTakeMastery: (node) => _submitMastery(node.id, 90), // Mock score
-                    onReview: (node) => _submitMastery(node.id, 100), // Mock score
+                    onTakeMastery: _openMasteryQuiz,
+                    onReview: _openMasteryQuiz,
                   ),
                 ),
               ),
@@ -416,6 +423,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
                     pathway: _pathway!,
                     selectedNode: _selectedNode,
                     onPathwayUpdated: _handlePathwayUpdated,
+                    onRegenerateFree: _showRegenerateFreeWarningDialog,
                     isDarkMode: _isDarkMode,
                   ),
                 ),
@@ -441,7 +449,9 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
           child: InteractiveNodeTree(
             nodes: _pathway!.nodes,
             onNodeTap: _handleNodeTap,
+            onStartLearningTap: _openCourseAndRefresh,
             onFastTrackTap: _handleFastTrack,
+            onMasteryTap: _openMasteryQuiz,
             selectedNode: _selectedNode,
             isDarkMode: _isDarkMode,
             contentPadding: const EdgeInsets.only(bottom: 100),
@@ -449,15 +459,10 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
               pathway: _pathway!,
               isDarkMode: _isDarkMode,
               onStartLearning: (node) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => CourseDetailPage(courseId: node.courseId),
-                  ),
-                );
+                _openCourseAndRefresh(node);
               },
-              onTakeMastery: (node) => _submitMastery(node.id, 90), // Mock score
-              onReview: (node) => _submitMastery(node.id, 100), // Mock score
+              onTakeMastery: _openMasteryQuiz,
+              onReview: _openMasteryQuiz,
             ),
           ),
         ),

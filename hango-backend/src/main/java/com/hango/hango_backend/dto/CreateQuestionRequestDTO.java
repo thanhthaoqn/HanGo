@@ -21,4 +21,5 @@ public class CreateQuestionRequestDTO {
     private Long groupId;
     private Long groupTypeParamId;
     private List<CreateOptionDTO> options;
+    private Integer usageType;
 }

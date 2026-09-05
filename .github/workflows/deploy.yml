@@ -3,73 +3,130 @@ name: CI/CD Pipeline - Deploy to AWS EC2
 on:
   push:
     branches:
-      - dev   # Triggers on push to dev branch
+      - dev
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout codebase
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Set up Java JDK 21 for Backend Compilation
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
+      - name: Resolve image names
+        id: images
+        shell: bash
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "backend=ghcr.io/${owner}/hango-backend:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "frontend=ghcr.io/${owner}/hango-frontend:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
         with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: maven
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 3. Build Backend JAR
-      - name: Build Backend JAR
-        run: |
-          cd hango-backend
-          chmod +x mvnw
-          ./mvnw clean package -DskipTests
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
 
-      # 4. Set up Flutter SDK for Frontend Compilation
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+      - name: Build and push backend image
+        uses: docker/build-push-action@v7
         with:
-          channel: 'stable'
-          cache: true
+          context: ./hango-backend
+          file: ./hango-backend/Dockerfile
+          push: true
+          tags: ${{ steps.images.outputs.backend }}
+          cache-from: type=gha,scope=hango-backend
+          cache-to: type=gha,mode=max,scope=hango-backend
 
-      # 5. Build Flutter Web
-      - name: Build Flutter Web
-        run: |
-          cd hango-frontend
-          flutter pub get
-          flutter build web --release
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./hango-frontend/Dockerfile
+          push: true
+          tags: ${{ steps.images.outputs.frontend }}
+          cache-from: type=gha,scope=hango-frontend
+          cache-to: type=gha,mode=max,scope=hango-frontend
 
-      # 6. Create Deployment Package
-      - name: Create Deploy Zip
-        run: |
-          zip -r deploy.zip docker-compose.yml hango-backend/Dockerfile hango-backend/target/hango-backend-0.0.1-SNAPSHOT.jar hango-frontend/Dockerfile hango-frontend/build/web nginx
+      - name: Package deployment configuration
+        run: zip -r deploy.zip docker-compose.yml nginx/conf.d
 
-      # 7. Copy package to AWS EC2 via SCP
-      - name: Copy Deploy Package to EC2
-        uses: appleboy/scp-action@master
+      - name: Copy deployment configuration to EC2
+        uses: appleboy/scp-action@v1.0.0
         with:
           host: ec2-43-210-219-121.ap-southeast-7.compute.amazonaws.com
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: "deploy.zip"
-          target: "~/"
+          source: deploy.zip
+          target: /home/ubuntu
+          overwrite: true
+          command_timeout: 15m
 
-      # 8. Deploy and Restart Containers on EC2 via SSH
-      - name: SSH and Restart Containers
-        uses: appleboy/ssh-action@master
+      - name: Pull images and deploy on EC2
+        uses: appleboy/ssh-action@v1.2.5
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+          BACKEND_IMAGE: ${{ steps.images.outputs.backend }}
+          FRONTEND_IMAGE: ${{ steps.images.outputs.frontend }}
         with:
           host: ec2-43-210-219-121.ap-southeast-7.compute.amazonaws.com
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 30m
+          envs: GHCR_TOKEN,GHCR_USER,BACKEND_IMAGE,FRONTEND_IMAGE
           script: |
-            cd ~/
-            unzip -o deploy.zip -d ~/hango
-            cd ~/hango
-            chmod -R 755 ~/hango
-            docker-compose up -d --build backend frontend
-            docker-compose restart nginx
+            set -eu
+            mkdir -p /home/ubuntu/hango
+            unzip -o /home/ubuntu/deploy.zip -d /home/ubuntu/hango
+            rm -f /home/ubuntu/deploy.zip
+            cd /home/ubuntu/hango
+            test -s .env
+
+            if docker inspect hango-nginx >/dev/null 2>&1; then
+              docker exec hango-nginx nginx -t
+            fi
+
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+
+            previous_backend="$(sed -n 's/^BACKEND_IMAGE=//p' .env | tail -n 1)"
+            previous_frontend="$(sed -n 's/^FRONTEND_IMAGE=//p' .env | tail -n 1)"
+            previous_backend="${previous_backend:-hango-backend:latest}"
+            previous_frontend="${previous_frontend:-hango-frontend:latest}"
+
+            sed -i '/^BACKEND_IMAGE=/d;/^FRONTEND_IMAGE=/d' .env
+            printf 'BACKEND_IMAGE=%s\nFRONTEND_IMAGE=%s\n' "$BACKEND_IMAGE" "$FRONTEND_IMAGE" >> .env
+            chmod 600 .env
+
+            # Pre-pull cleanup: Dọn dẹp layer rác trước khi pull để tránh đầy đĩa
             docker image prune -f
+
+            docker-compose pull backend frontend
+            if ! docker-compose up -d --no-build --wait --wait-timeout 180; then
+              echo "Deployment health check failed; restoring previous images."
+              sed -i '/^BACKEND_IMAGE=/d;/^FRONTEND_IMAGE=/d' .env
+              printf 'BACKEND_IMAGE=%s\nFRONTEND_IMAGE=%s\n' "$previous_backend" "$previous_frontend" >> .env
+              docker-compose up -d --no-build --wait --wait-timeout 180
+              exit 1
+            fi
+
+            docker exec hango-nginx nginx -t
+            docker exec hango-nginx nginx -s reload
+            # Giữ lại image cũ tối đa 24h thay vì 168h (7 ngày)
+            docker image prune -af --filter "until=24h"
+            docker-compose ps
+            free -h
+            df -h /home/ubuntu

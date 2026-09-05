@@ -22,4 +22,7 @@ public interface LessonRepository extends JpaRepository<Lesson, Long> {
 
     @org.springframework.data.jpa.repository.Query("SELECT COUNT(l) FROM Lesson l WHERE l.section.course.id = :courseId AND l.deletedAt IS NULL")
     long countByCourseId(@org.springframework.data.repository.query.Param("courseId") Long courseId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT l FROM Lesson l WHERE l.section.course.id = :courseId AND l.lessonType IN ('QUIZ', 'FINAL_QUIZ') AND l.deletedAt IS NULL ORDER BY l.section.displayOrder DESC, l.displayOrder DESC")
+    List<Lesson> findLastQuizByCourseId(@org.springframework.data.repository.query.Param("courseId") Long courseId, org.springframework.data.domain.Pageable pageable);
 }

@@ -48,6 +48,9 @@ public class LearningPathwayResponseDTO {
     @JsonProperty("weak_skills") // Historical
     private List<String> weakSkills;
 
+    @JsonProperty("analyzed_attempts")
+    private Integer analyzedAttempts;
+
     @JsonProperty("latest_weak_skills") // Latest Exam
     private List<String> latestWeakSkills;
 

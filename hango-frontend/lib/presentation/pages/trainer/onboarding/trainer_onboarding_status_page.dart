@@ -4,6 +4,7 @@ import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../utils/language_manager.dart';
 import '../../../../utils/toast_helper.dart';
+import '../../../../utils/trainer_onboarding_stage.dart';
 import '../../../../data/services/auth_service.dart';
 import '../../login_page.dart';
 import '../../learner/learner_home_page.dart';
@@ -11,6 +12,7 @@ import 'trainer_onboarding_details_page.dart';
 import 'trainer_onboarding_agreement_page.dart';
 import 'trainer_payout_details_page.dart';
 import 'trainer_onboarding_shell_page.dart';
+import 'package:hango/presentation/widgets/document_preview_dialog.dart';
 import '../trainer_dashboard_page.dart';
 
 class TrainerOnboardingStatusPage extends StatefulWidget {
@@ -24,10 +26,12 @@ class TrainerOnboardingStatusPage extends StatefulWidget {
   });
 
   @override
-  State<TrainerOnboardingStatusPage> createState() => _TrainerOnboardingStatusPageState();
+  State<TrainerOnboardingStatusPage> createState() =>
+      _TrainerOnboardingStatusPageState();
 }
 
-class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPage> {
+class _TrainerOnboardingStatusPageState
+    extends State<TrainerOnboardingStatusPage> {
   final _authService = AuthService();
   String _trainerName = '';
   String _trainerInitials = 'T';
@@ -71,7 +75,10 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
   void _showMyApplicationDialog(BuildContext context, bool isVi) {
     final fullName = widget.initialProfile['fullName'] ?? _trainerName;
     final email = widget.initialProfile['email'] ?? '';
-    final phone = widget.initialProfile['phoneNumber'] ?? widget.initialProfile['phone'] ?? '';
+    final phone =
+        widget.initialProfile['phoneNumber'] ??
+        widget.initialProfile['phone'] ??
+        '';
     final bio = widget.initialProfile['bio'] ?? '';
     final type = widget.initialProfile['trainerType'] ?? 'PROFESSIONAL';
 
@@ -81,37 +88,48 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
     List<Map<String, String>> certList = [];
     final rawCerts = widget.initialProfile['certificates'];
     if (rawCerts != null && rawCerts is List && rawCerts.isNotEmpty) {
-      certList = (rawCerts as List).map((c) => Map<String, String>.from(c as Map)).toList();
+      certList = (rawCerts as List)
+          .map((c) => Map<String, String>.from(c as Map))
+          .toList();
     } else if (score != null && score.toString().isNotEmpty) {
       final sStr = score.toString();
       if (sStr.startsWith('[')) {
         try {
           final List parsed = jsonDecode(sStr);
-          certList = parsed.map((c) => Map<String, String>.from(c as Map)).toList();
+          certList = parsed
+              .map((c) => Map<String, String>.from(c as Map))
+              .toList();
         } catch (_) {}
       } else {
-        certList.add({'name': isVi ? 'Minh chứng khác' : 'Score Report / Credential', 'url': sStr});
+        certList.add({
+          'name': isVi ? 'Minh chứng khác' : 'Score Report / Credential',
+          'url': sStr,
+        });
       }
     }
-
 
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
           backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 isVi ? 'Đơn đăng ký của tôi' : 'My Application',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Outfit',
+                ),
               ),
               IconButton(
                 icon: const Icon(Icons.close),
                 onPressed: () => Navigator.pop(context),
-              )
+              ),
             ],
           ),
           content: Container(
@@ -125,13 +143,20 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
                       CircleAvatar(
                         radius: 32,
                         backgroundColor: const Color(0xFFE2E8F0),
-                        backgroundImage: (avatarUrl != null && avatarUrl.toString().isNotEmpty)
+                        backgroundImage:
+                            (avatarUrl != null &&
+                                avatarUrl.toString().isNotEmpty)
                             ? NetworkImage(avatarUrl.toString())
                             : null,
-                        child: (avatarUrl == null || avatarUrl.toString().isEmpty)
+                        child:
+                            (avatarUrl == null || avatarUrl.toString().isEmpty)
                             ? Text(
                                 _trainerInitials,
-                                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF64748B),
+                                ),
                               )
                             : null,
                       ),
@@ -142,14 +167,23 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
                           children: [
                             Text(
                               fullName,
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A), fontFamily: 'Outfit'),
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A),
+                                fontFamily: 'Outfit',
+                              ),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               type == 'PROFESSIONAL'
                                   ? (isVi ? 'Giáo viên' : 'Teacher')
                                   : (isVi ? 'Gia sư' : 'Tutor'),
-                              style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontFamily: 'Outfit'),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF64748B),
+                                fontFamily: 'Outfit',
+                              ),
                             ),
                           ],
                         ),
@@ -165,8 +199,11 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
                   const Divider(),
                   const SizedBox(height: 12),
                   Text(
-                    isVi ? 'Kinh nghiệm giảng dạy & Bio' : 'Experience & Bio',
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                    isVi ? 'Giới thiệu bản thân' : 'Bio',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF334155),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Container(
@@ -179,7 +216,11 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
                     ),
                     child: Text(
                       bio,
-                      style: const TextStyle(color: Color(0xFF475569), height: 1.4, fontSize: 13),
+                      style: const TextStyle(
+                        color: Color(0xFF475569),
+                        height: 1.4,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -187,7 +228,10 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
                   const SizedBox(height: 12),
                   Text(
                     isVi ? 'Tài liệu minh chứng' : 'Uploaded Credentials',
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF334155),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Wrap(
@@ -196,12 +240,20 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
                     children: certList.isEmpty
                         ? [
                             Text(
-                              isVi ? 'Chưa tải lên minh chứng.' : 'No credentials uploaded.',
-                              style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Color(0xFF94A3B8)),
-                            )
+                              isVi
+                                  ? 'Chưa tải lên minh chứng.'
+                                  : 'No credentials uploaded.',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontStyle: FontStyle.italic,
+                                color: Color(0xFF94A3B8),
+                              ),
+                            ),
                           ]
                         : certList.map((item) {
-                            final label = item['name'] ?? (isVi ? 'Minh chứng' : 'Credential');
+                            final label =
+                                item['name'] ??
+                                (isVi ? 'Minh chứng' : 'Credential');
                             final url = item['url'] ?? '';
                             return _buildFileThumbnail(context, label, url);
                           }).toList(),
@@ -221,58 +273,39 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Color(0xFF64748B), fontSize: 13)),
-          Text(value.isNotEmpty ? value : '...', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A), fontSize: 13)),
+          Text(
+            label,
+            style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+          ),
+          Text(
+            value.isNotEmpty ? value : '...',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0F172A),
+              fontSize: 13,
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildFileThumbnail(BuildContext context, String label, String url) {
+    final cleanUrl = url.trim();
+    final isPdf =
+        cleanUrl.toLowerCase().endsWith('.pdf') ||
+        cleanUrl.toLowerCase().contains('.pdf?') ||
+        cleanUrl.toLowerCase().contains('/pdf/');
+
     return InkWell(
       onTap: () {
-        showDialog(
-          context: context,
-          builder: (context) => Dialog(
-            backgroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 700, maxHeight: 600),
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        url,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) => Center(
-                          child: SelectableText(url),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
+        showDocumentPreviewDialog(context, label, cleanUrl);
       },
       child: Container(
-        width: 100,
+        width: 110,
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9),
+          color: const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: const Color(0xFFE2E8F0)),
         ),
@@ -280,20 +313,45 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
-              child: Image.network(
-                url,
-                width: 80,
-                height: 60,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => const Icon(Icons.insert_drive_file, color: Colors.grey),
-              ),
+              child: isPdf
+                  ? Container(
+                      width: 80,
+                      height: 60,
+                      color: const Color(0xFFEFF6FF),
+                      child: const Center(
+                        child: Icon(
+                          Icons.picture_as_pdf_rounded,
+                          color: Color(0xFFDC2626),
+                          size: 32,
+                        ),
+                      ),
+                    )
+                  : Image.network(
+                      cleanUrl,
+                      width: 80,
+                      height: 60,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        width: 80,
+                        height: 60,
+                        color: const Color(0xFFF1F5F9),
+                        child: const Icon(
+                          Icons.insert_drive_file_outlined,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF475569),
+              ),
             ),
           ],
         ),
@@ -367,7 +425,6 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
 
                 // If rejected/revision needed, show admin feedback
                 if (adminNotes != null && adminNotes.toString().isNotEmpty) ...[
-
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
@@ -381,10 +438,20 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.feedback_rounded, color: Color(0xFFD97706), size: 16),
+                            const Icon(
+                              Icons.feedback_rounded,
+                              color: Color(0xFFD97706),
+                              size: 16,
+                            ),
                             const SizedBox(width: 8),
                             Text(
-                              isVi ? 'Phản hồi từ Ban quản trị:' : 'Feedback from Administrator:',
+                              status == 'AWAITING_APPROVAL'
+                                  ? (isVi
+                                        ? 'Ghi chú phản hồi đợt duyệt trước (Đang chờ thẩm định lại):'
+                                        : 'Previous Admin Feedback (Currently under re-review):')
+                                  : (isVi
+                                        ? 'Phản hồi từ Ban quản trị:'
+                                        : 'Feedback from Administrator:'),
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,
@@ -433,9 +500,7 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
             padding: const EdgeInsets.symmetric(horizontal: 12.0),
             child: Row(
               children: [
-
                 Image.network(
-
                   'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
 
                   height: 36,
@@ -443,45 +508,34 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
                   fit: BoxFit.contain,
 
                   errorBuilder: (context, error, stackTrace) {
-
                     return Row(
-
                       children: [
-
                         Container(
-
                           width: 32,
 
                           height: 32,
 
                           decoration: const BoxDecoration(
-
                             color: Color(0xFFE6FFFA),
 
                             shape: BoxShape.circle,
-
                           ),
 
                           child: const Icon(
-
                             Icons.school,
 
                             size: 18,
 
                             color: Color(0xFF20B486),
-
                           ),
-
                         ),
 
                         const SizedBox(width: 8),
 
                         const Text(
-
                           'HanGo',
 
                           style: TextStyle(
-
                             fontSize: 20,
 
                             fontWeight: FontWeight.bold,
@@ -489,46 +543,79 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
                             color: Color(0xFF1F2937),
 
                             fontFamily: 'Outfit',
-
                           ),
-
                         ),
-
                       ],
-
                     );
-
                   },
-
                 ),
-
               ],
             ),
           ),
           const SizedBox(height: 40),
           // Sidebar menu items (Disabled during awaiting review except Logout)
-          _buildSidebarItem(Icons.dashboard_outlined, isVi ? 'Bảng điều khiển' : 'Dashboard', isActive: true),
-          _buildSidebarItem(Icons.book_outlined, isVi ? 'Khóa học' : 'Courses', isEnabled: false),
-          _buildSidebarItem(Icons.assignment_outlined, isVi ? 'Đề thi' : 'Exam', isEnabled: false),
-          _buildSidebarItem(Icons.people_outline, isVi ? 'Học sinh' : 'Learner', isEnabled: false),
-          _buildSidebarItem(Icons.question_answer_outlined, isVi ? 'Ngân hàng câu hỏi' : 'Question Bank', isEnabled: false),
+          _buildSidebarItem(
+            Icons.dashboard_outlined,
+            isVi ? 'Bảng điều khiển' : 'Dashboard',
+            isActive: true,
+          ),
+          _buildSidebarItem(
+            Icons.book_outlined,
+            isVi ? 'Khóa học' : 'Courses',
+            isEnabled: false,
+          ),
+          _buildSidebarItem(
+            Icons.assignment_outlined,
+            isVi ? 'Đề thi' : 'Exam',
+            isEnabled: false,
+          ),
+          _buildSidebarItem(
+            Icons.people_outline,
+            isVi ? 'Học sinh' : 'Learner',
+            isEnabled: false,
+          ),
+          _buildSidebarItem(
+            Icons.question_answer_outlined,
+            isVi ? 'Ngân hàng câu hỏi' : 'Question Bank',
+            isEnabled: false,
+          ),
           const Spacer(),
           const Divider(color: Color(0xFFE2E8F0)),
           const SizedBox(height: 12),
-          _buildSidebarItem(Icons.logout, isVi ? 'Đăng xuất' : 'Logout', color: Colors.redAccent, isEnabled: true, onTap: _handleLogout),
+          _buildSidebarItem(
+            Icons.logout,
+            isVi ? 'Đăng xuất' : 'Logout',
+            color: Colors.redAccent,
+            isEnabled: true,
+            onTap: _handleLogout,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildSidebarItem(IconData icon, String title, {bool isActive = false, bool isEnabled = true, Color? color, VoidCallback? onTap}) {
+  Widget _buildSidebarItem(
+    IconData icon,
+    String title, {
+    bool isActive = false,
+    bool isEnabled = true,
+    Color? color,
+    VoidCallback? onTap,
+  }) {
     final activeColor = const Color(0xFF20B486);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
       child: InkWell(
-        onTap: isEnabled ? (onTap ?? () {}) : () {
-          ToastHelper.show(context, LanguageManager.isVi ? 'Tài khoản của bạn đang chờ phê duyệt' : 'Your account is awaiting approval');
-        },
+        onTap: isEnabled
+            ? (onTap ?? () {})
+            : () {
+                ToastHelper.show(
+                  context,
+                  LanguageManager.isVi
+                      ? 'Tài khoản của bạn đang chờ phê duyệt'
+                      : 'Your account is awaiting approval',
+                );
+              },
         borderRadius: BorderRadius.circular(8),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -540,14 +627,22 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
             children: [
               Icon(
                 icon,
-                color: isActive ? Colors.white : (isEnabled ? (color ?? const Color(0xFF4B5563)) : Colors.grey.shade400),
+                color: isActive
+                    ? Colors.white
+                    : (isEnabled
+                          ? (color ?? const Color(0xFF4B5563))
+                          : Colors.grey.shade400),
                 size: 20,
               ),
               const SizedBox(width: 12),
               Text(
                 title,
                 style: TextStyle(
-                  color: isActive ? Colors.white : (isEnabled ? (color ?? const Color(0xFF1F2937)) : Colors.grey.shade400),
+                  color: isActive
+                      ? Colors.white
+                      : (isEnabled
+                            ? (color ?? const Color(0xFF1F2937))
+                            : Colors.grey.shade400),
                   fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
                   fontSize: 14,
                   fontFamily: 'Outfit',
@@ -625,15 +720,16 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
                               width: 32,
                               height: 32,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Text(
-                                _trainerInitials,
-                                style: const TextStyle(
-                                  color: Color(0xFF20B486),
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  fontFamily: 'Outfit',
-                                ),
-                              ),
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Text(
+                                    _trainerInitials,
+                                    style: const TextStyle(
+                                      color: Color(0xFF20B486),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      fontFamily: 'Outfit',
+                                    ),
+                                  ),
                             ),
                           )
                         : Text(
@@ -680,21 +776,15 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
 
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: bgColor,
-        shape: BoxShape.circle,
-      ),
-      child: Icon(
-        icon,
-        size: 48,
-        color: color,
-      ),
+      decoration: BoxDecoration(color: bgColor, shape: BoxShape.circle),
+      child: Icon(icon, size: 48, color: color),
     );
   }
 
   String _getStatusTitle(String status, bool isVi) {
     final adminNotes = widget.initialProfile['adminNotes'];
-    final hasEditsRequested = adminNotes != null && adminNotes.toString().trim().isNotEmpty;
+    final hasEditsRequested =
+        adminNotes != null && adminNotes.toString().trim().isNotEmpty;
 
     if (status == 'AWAITING_APPROVAL') {
       return isVi ? 'Hồ sơ đang được thẩm định' : 'Application Under Review';
@@ -703,7 +793,9 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
     } else if (status == 'VERIFIED') {
       return isVi ? 'Hồ sơ đã được phê duyệt!' : 'Application Approved!';
     } else if (hasEditsRequested) {
-      return isVi ? 'Hồ sơ cần cập nhật & bổ sung' : 'Application Revisions Requested';
+      return isVi
+          ? 'Hồ sơ cần cập nhật & bổ sung'
+          : 'Application Revisions Requested';
     } else {
       return isVi ? 'Chưa hoàn thiện hồ sơ' : 'Incomplete Registration';
     }
@@ -711,7 +803,8 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
 
   String _getStatusDescription(String status, bool isVi) {
     final adminNotes = widget.initialProfile['adminNotes'];
-    final hasEditsRequested = adminNotes != null && adminNotes.toString().trim().isNotEmpty;
+    final hasEditsRequested =
+        adminNotes != null && adminNotes.toString().trim().isNotEmpty;
 
     if (status == 'AWAITING_APPROVAL') {
       return isVi
@@ -751,15 +844,20 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
     final shellState = TrainerOnboardingShellPage.of(context);
 
     if (status == 'VERIFIED') {
-      final agreementSigned = widget.initialProfile['agreementSigned'] ?? false;
+      final agreementAccepted =
+          widget.initialProfile['agreementSigned'] == true &&
+          widget.initialProfile['agreementVersion'] == trainerAgreementVersion;
       final bankAccount = widget.initialProfile['bankAccount'] ?? '';
-      final trainerType = widget.initialProfile['trainerType'] ?? 'PROFESSIONAL';
+      final trainerType =
+          widget.initialProfile['trainerType'] ?? 'PROFESSIONAL';
 
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      return Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        spacing: 12,
+        runSpacing: 12,
         children: [
           viewApplicationButton,
-          if (!agreementSigned)
+          if (!agreementAccepted)
             ElevatedButton.icon(
               onPressed: () {
                 final nextPage = TrainerOnboardingAgreementPage(
@@ -773,7 +871,8 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => TrainerOnboardingShellPage(initialBody: nextPage),
+                      builder: (context) =>
+                          TrainerOnboardingShellPage(initialBody: nextPage),
                     ),
                   );
                 }
@@ -783,8 +882,13 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF28B79B),
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 16,
+                ),
               ),
             )
           else if (bankAccount.toString().trim().isEmpty)
@@ -800,7 +904,8 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => TrainerOnboardingShellPage(initialBody: nextPage),
+                      builder: (context) =>
+                          TrainerOnboardingShellPage(initialBody: nextPage),
                     ),
                   );
                 }
@@ -810,8 +915,13 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF28B79B),
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 16,
+                ),
               ),
             )
           else
@@ -819,7 +929,9 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
               onPressed: () {
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (context) => const TrainerDashboardPage()),
+                  MaterialPageRoute(
+                    builder: (context) => const TrainerDashboardPage(),
+                  ),
                 );
               },
               icon: const Icon(Icons.dashboard_rounded, size: 16),
@@ -827,8 +939,13 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF28B79B),
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 16,
+                ),
               ),
             ),
         ],
@@ -836,16 +953,21 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
     }
 
     if (status == 'PENDING_VERIFICATION') {
-      final agreementSigned = widget.initialProfile['agreementSigned'] ?? false;
-      final trainerType = widget.initialProfile['trainerType'] ?? 'PROFESSIONAL';
+      final agreementAccepted =
+          widget.initialProfile['agreementSigned'] == true &&
+          widget.initialProfile['agreementVersion'] == trainerAgreementVersion;
+      final trainerType =
+          widget.initialProfile['trainerType'] ?? 'PROFESSIONAL';
 
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      return Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        spacing: 12,
+        runSpacing: 12,
         children: [
           viewApplicationButton,
           ElevatedButton.icon(
             onPressed: () {
-              final nextPage = (!agreementSigned)
+              final nextPage = (!agreementAccepted)
                   ? TrainerOnboardingAgreementPage(
                       profilePayload: widget.initialProfile,
                       trainerType: trainerType,
@@ -861,19 +983,27 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => TrainerOnboardingShellPage(initialBody: nextPage),
+                    builder: (context) =>
+                        TrainerOnboardingShellPage(initialBody: nextPage),
                   ),
                 );
               }
             },
-            icon: Icon(!agreementSigned ? Icons.draw_rounded : Icons.edit_rounded, size: 16),
-            label: Text(!agreementSigned
-                ? (isVi ? 'Ký thỏa thuận' : 'Sign Agreement')
-                : (isVi ? 'Chỉnh sửa hồ sơ' : 'Edit profile')),
+            icon: Icon(
+              !agreementAccepted ? Icons.draw_rounded : Icons.edit_rounded,
+              size: 16,
+            ),
+            label: Text(
+              !agreementAccepted
+                  ? (isVi ? 'Ký thỏa thuận' : 'Sign Agreement')
+                  : (isVi ? 'Chỉnh sửa hồ sơ' : 'Edit profile'),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF28B79B),
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             ),
           ),
@@ -881,9 +1011,6 @@ class _TrainerOnboardingStatusPageState extends State<TrainerOnboardingStatusPag
       );
     }
 
-    return SizedBox(
-      width: double.infinity,
-      child: viewApplicationButton,
-    );
+    return SizedBox(width: double.infinity, child: viewApplicationButton);
   }
 }

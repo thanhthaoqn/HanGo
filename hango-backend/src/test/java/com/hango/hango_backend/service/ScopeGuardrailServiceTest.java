@@ -13,6 +13,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -56,7 +57,7 @@ class ScopeGuardrailServiceTest {
     @Test
     void checkScopeShouldReturnInScopeWhenSimilarityAboveThreshold() {
         service = new ScopeGuardrailService(geminiClientService, lessonEmbeddingService, properties(0.7));
-        when(geminiClientService.generateEmbedding("content")).thenReturn(List.of(1.0, 0.0));
+        when(lessonEmbeddingService.getOrComputeEmbedding(any(Lesson.class))).thenReturn(List.of(1.0, 0.0));
         when(geminiClientService.generateEmbedding("What is present perfect tense?")).thenReturn(List.of(1.0, 0.0));
 
         ScopeGuardrailService.ScopeCheckResult result = service.checkScope(lesson("content"), "What is present perfect tense?");
@@ -68,7 +69,7 @@ class ScopeGuardrailServiceTest {
     @Test
     void checkScopeShouldReturnOutOfScopeWhenSimilarityBelowThreshold() {
         service = new ScopeGuardrailService(geminiClientService, lessonEmbeddingService, properties(0.7));
-        when(geminiClientService.generateEmbedding("content")).thenReturn(List.of(1.0, 0.0));
+        when(lessonEmbeddingService.getOrComputeEmbedding(any(Lesson.class))).thenReturn(List.of(1.0, 0.0));
         when(geminiClientService.generateEmbedding("What's the weather today?")).thenReturn(List.of(0.0, 1.0));
 
         ScopeGuardrailService.ScopeCheckResult result = service.checkScope(lesson("content"), "What's the weather today?");
@@ -88,7 +89,7 @@ class ScopeGuardrailServiceTest {
     }
 
     @Test
-    void checkScopeShouldIncludePracticeQuestionTextInScopeEmbeddingInput() {
+    void checkScopeShouldUseCachedLessonEmbedding() {
         service = new ScopeGuardrailService(geminiClientService, lessonEmbeddingService, properties(0.7));
         QuizQuestionDTO practiceQuestion = QuizQuestionDTO.builder()
                 .questionText("Fill in the blank with correct tense")
@@ -96,16 +97,19 @@ class ScopeGuardrailServiceTest {
                 .options(List.of("A", "B"))
                 .explanation("explanation text")
                 .build();
+        when(lessonEmbeddingService.getOrComputeEmbedding(any(Lesson.class))).thenReturn(List.of(1.0, 0.0));
         when(geminiClientService.generateEmbedding(anyString())).thenReturn(List.of(1.0, 0.0));
 
         service.checkScope(lesson("content"), "What is present perfect tense?", List.of(practiceQuestion));
 
-        verify(geminiClientService).generateEmbedding(org.mockito.ArgumentMatchers.contains("Fill in the blank with correct tense"));
+        verify(lessonEmbeddingService).getOrComputeEmbedding(any(Lesson.class));
+        verify(geminiClientService).generateEmbedding("What is present perfect tense?");
     }
 
     @Test
     void checkScopeTwoArgOverloadShouldUseEmptyPracticeQuestionsList() {
         service = new ScopeGuardrailService(geminiClientService, lessonEmbeddingService, properties(0.7));
+        when(lessonEmbeddingService.getOrComputeEmbedding(any(Lesson.class))).thenReturn(List.of(1.0, 0.0));
         when(geminiClientService.generateEmbedding(anyString())).thenReturn(List.of(1.0, 0.0));
 
         ScopeGuardrailService.ScopeCheckResult result = service.checkScope(lesson("content"), "What is present perfect tense?");
@@ -116,6 +120,7 @@ class ScopeGuardrailServiceTest {
     @Test
     void checkScopeShouldTreatSimilarityExactlyAtThresholdAsInScope() {
         service = new ScopeGuardrailService(geminiClientService, lessonEmbeddingService, properties(1.0));
+        when(lessonEmbeddingService.getOrComputeEmbedding(any(Lesson.class))).thenReturn(List.of(1.0, 0.0));
         when(geminiClientService.generateEmbedding(anyString())).thenReturn(List.of(1.0, 0.0));
 
         ScopeGuardrailService.ScopeCheckResult result = service.checkScope(lesson("content"), "What is present perfect tense?");

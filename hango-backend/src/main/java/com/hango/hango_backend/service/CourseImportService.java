@@ -20,6 +20,7 @@ import com.hango.hango_backend.repository.TrainerProfileRepository;
 import com.hango.hango_backend.repository.UserRepository;
 import com.hango.hango_backend.repository.QuestionGroupRepository;
 import com.hango.hango_backend.entity.TrainerProfile;
+import com.hango.hango_backend.exception.CourseImportValidationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import java.math.BigDecimal;
@@ -82,51 +83,387 @@ public class CourseImportService {
         TrainerProfile trainerProfile = trainerProfileRepository.findById(trainer.getId()).orElse(null);
 
         WorkbookData workbook = readWorkbook(file);
-        List<Map<String, String>> courseRowsRaw = workbook.rowsBySheet.getOrDefault("COURSE", List.of());
-        List<Map<String, String>> syllabusRows = workbook.rowsBySheet.getOrDefault("SYLLABUS", List.of());
-        List<Map<String, String>> questionRows = workbook.rowsBySheet.getOrDefault("QUESTIONS", List.of());
 
-        if (courseRowsRaw.isEmpty()) {
-            throw new IllegalArgumentException("COURSE sheet must contain at least one row");
+        // §3 / §2: Accept both old and new sheet names (backward compatible)
+        List<SheetRow> courseRowsRaw = workbook.rowsBySheet.getOrDefault("COURSE", List.of());
+        List<SheetRow> syllabusRows = workbook.rowsBySheet.getOrDefault("SYLLABUS",
+                workbook.rowsBySheet.getOrDefault("SYLLABUS", List.of()));
+        List<SheetRow> questionRows = workbook.rowsBySheet.getOrDefault("QUESTIONS", List.of());
+
+        List<Map<String, Object>> errors = new ArrayList<>();
+        List<String> warnings = new ArrayList<>();
+
+        // ════════════════════════════════════════════════════════════════════════
+        // PHASE 1: VALIDATE (read-only, no DB writes)
+        // All problems reported in one pass per §23 / §32.
+        // ════════════════════════════════════════════════════════════════════════
+
+        // ── §2: Required Sheets ──
+        boolean hasCourseSheet = !courseRowsRaw.isEmpty();
+        boolean hasSyllabusSheet = !syllabusRows.isEmpty();
+        boolean hasQuestionsSheet = !questionRows.isEmpty();
+        if (!hasCourseSheet) {
+            addError(errors, "COURSE", null, null, "MISSING_SHEET", null,
+                    "Required sheet COURSE is missing or empty.");
+        }
+        if (!hasSyllabusSheet) {
+            addError(errors, "SYLLABUS", null, null, "MISSING_SHEET", null,
+                    "Required sheet CURRICULUM (or SYLLABUS) is missing or empty.");
+        }
+        if (!hasQuestionsSheet) {
+            addError(errors, "QUESTIONS", null, null, "MISSING_SHEET", null,
+                    "Required sheet QUESTIONS is missing or empty.");
         }
 
+        // ── §3-4: Parse & validate COURSE fields ──
         Map<String, String> courseData = new java.util.HashMap<>();
-        for (Map<String, String> row : courseRowsRaw) {
-            String field = valueOrDefault(row, "Information Field", "").trim();
-            String data = valueOrDefault(row, "Fill Data", "").trim();
-            if (!field.isEmpty()) {
-                courseData.put(field, data);
+        if (hasCourseSheet) {
+            for (SheetRow r : courseRowsRaw) {
+                String field = valueOrDefault(r.data(), "Information Field", valueOrDefault(r.data(), "Field", "")).trim();
+                String data = valueOrDefault(r.data(), "Fill Data", valueOrDefault(r.data(), "Value", "")).trim();
+                if (!field.isEmpty()) {
+                    courseData.put(field, data);
+                }
             }
         }
 
-        String courseTitle = courseData.get("Title");
+        // §4: Course Name — normalize whitespace
+        String rawCourseTitle = courseData.get("Title");
+        if (rawCourseTitle == null || rawCourseTitle.isBlank()) {
+            rawCourseTitle = courseData.get("Course Name");
+        }
+        String courseTitle = normalizeCourseName(rawCourseTitle);
         if (courseTitle == null || courseTitle.isBlank()) {
-            throw new IllegalArgumentException("COURSE sheet is missing required value: Title");
+            addError(errors, "COURSE", null, "Title", "MISSING_FIELD", null,
+                    "Course Name (Title) is required.");
         }
 
-        List<String> warnings = new ArrayList<>();
-        if (courseRepository.existsByTitleIgnoreCaseAndDeletedAtIsNull(courseTitle)) {
-            throw new IllegalArgumentException("Course with title '" + courseTitle + "' already exists.");
-        }
-
+        // §6: Course Code — format validation
         String courseCodeRaw = courseData.get("Course Code");
         if (courseCodeRaw == null || courseCodeRaw.isBlank()) {
-            throw new IllegalArgumentException("COURSE sheet is missing required value: Course Code");
+            addError(errors, "COURSE", null, "Course Code", "MISSING_FIELD", courseCodeRaw,
+                    "Course Code is required.");
+        } else {
+            String codeUpper = courseCodeRaw.trim().toUpperCase(Locale.ROOT);
+            if (!codeUpper.matches("^[A-Z0-9_]+$")) {
+                addError(errors, "COURSE", null, "Course Code", "INVALID_FORMAT", courseCodeRaw,
+                        "Course Code must contain only uppercase letters, digits, and underscores (e.g. ENGLISH_GRAMMAR_01). Got: '" + courseCodeRaw + "'");
+            }
         }
 
-        Set<String> reservedPersistedCourseCodes = new java.util.HashSet<>();
-        String persistedCourseCode = resolveUniqueCourseCode(courseCodeRaw, reservedPersistedCourseCodes, warnings);
+        // §8: Category — required, must exist in DB
+        String rawCategory = valueOrDefault(courseData, "Category", valueOrDefault(courseData, "Primary Category", "")).trim();
+        SystemParameter category = null;
+        if (rawCategory.isBlank()) {
+            addError(errors, "COURSE", null, "Category", "MISSING_FIELD", rawCategory,
+                    "Primary Category is required.");
+        } else {
+            try {
+                category = resolveParameter("COURSE_CATEGORY", rawCategory, null, warnings);
+            } catch (Exception e) {
+                addError(errors, "COURSE", null, "Category", "INVALID_VALUE", rawCategory,
+                        "Category '" + rawCategory + "' does not exist in the system.");
+            }
+        }
 
-        SystemParameter category = resolveParameter(
-                "COURSE_CATEGORY",
-                valueOrDefault(courseData, "Category", "GRAMMAR"),
-                "GRAMMAR",
-                warnings);
-        SystemParameter difficulty = resolveParameter(
-                "ACADEMIC_LEVEL",
-                valueOrDefault(courseData, "Academic Level", "BASIC"),
-                "BASIC",
-                warnings);
+        // §9: Difficulty — required, must be BASIC/INTERMEDIATE/ADVANCED
+        String rawDifficulty = valueOrDefault(courseData, "Difficulty", valueOrDefault(courseData, "Academic Level", "")).trim();
+        SystemParameter difficulty = null;
+        if (rawDifficulty.isBlank()) {
+            addError(errors, "COURSE", null, "Difficulty", "MISSING_FIELD", rawDifficulty,
+                    "Difficulty level is required (BASIC, INTERMEDIATE, or ADVANCED).");
+        } else {
+            try {
+                difficulty = resolveParameter("ACADEMIC_LEVEL", rawDifficulty, null, warnings);
+            } catch (Exception e) {
+                addError(errors, "COURSE", null, "Difficulty", "INVALID_VALUE", rawDifficulty,
+                        "Difficulty '" + rawDifficulty + "' is invalid. Must be BASIC, INTERMEDIATE, or ADVANCED.");
+            }
+        }
+
+        // §5/§34: Composite uniqueness — Trainer + Name + Category + Difficulty
+        if (courseTitle != null && !courseTitle.isBlank() && category != null && difficulty != null) {
+            if (courseRepository.existsByCompositeIdentity(
+                    trainer.getId(), courseTitle, category.getId(), difficulty.getId())) {
+                addError(errors, "COURSE", null, "Title", "DUPLICATE_COURSE", courseTitle,
+                        "Duplicate Course: You already have a course named '" + courseTitle
+                                + "' with category '" + category.getParamValue()
+                                + "' and difficulty '" + difficulty.getParamValue()
+                                + "'. Change at least one of: Course Name, Category, or Difficulty.");
+            }
+        }
+
+        // ════════════════════════════════════════════════════════════════════════
+        // §10-17: CURRICULUM structure validation
+        // ════════════════════════════════════════════════════════════════════════
+
+        // First pass: parse curriculum into structured data for validation
+        List<CurriculumSection> parsedSections = new ArrayList<>();
+        CurriculumSection currentParsedSection = null;
+        Set<String> knownSectionTitlesCheck = new java.util.HashSet<>();
+        Set<String> knownLessonTitlesCheck = new java.util.HashSet<>();
+
+        for (SheetRow sr : syllabusRows) {
+            Map<String, String> row = sr.data();
+            String type = valueOrDefault(row, "Type", "").trim().toLowerCase(Locale.ROOT);
+            String title = valueOrDefault(row, "Title", "").trim();
+            String contentUrl = valueOrDefault(row, "Content / Media URL", "").trim();
+            if (type.isEmpty()) {
+                continue;
+            }
+
+            if (type.equals("section")) {
+                // §11: Section title required
+                if (title.isEmpty()) {
+                    addError(errors, "SYLLABUS", sr.rowNumber(), "Title", "MISSING_FIELD", title,
+                            "Section title is required.");
+                    continue;
+                }
+                // §11: Duplicate section title
+                if (!knownSectionTitlesCheck.add(title.toLowerCase(Locale.ROOT))) {
+                    addError(errors, "SYLLABUS", sr.rowNumber(), "Title", "DUPLICATE_VALUE", title,
+                            "Duplicate Section title: '" + title + "'.");
+                }
+                // §21: SECTION must have empty content
+                if (!contentUrl.isEmpty()) {
+                    addError(errors, "SYLLABUS", sr.rowNumber(), "Content / Media URL", "INVALID_VALUE", contentUrl,
+                            "SECTION rows must not have Content/Media URL.");
+                }
+                currentParsedSection = new CurriculumSection(title, sr.rowNumber());
+                parsedSections.add(currentParsedSection);
+            } else if (isLessonType(type)) {
+                // §14: Lesson before first section
+                if (currentParsedSection == null) {
+                    addError(errors, "SYLLABUS", sr.rowNumber(), "Type", "INVALID_ORDER", type,
+                            "Lesson/Quiz found before any Section: '" + title + "'. All lessons must belong to a Section.");
+                    continue;
+                }
+                // Title required for all lesson types
+                if (title.isEmpty()) {
+                    addError(errors, "SYLLABUS", sr.rowNumber(), "Title", "MISSING_FIELD", title,
+                            "Lesson/Quiz title is required.");
+                    continue;
+                }
+                // Duplicate lesson title
+                if (!knownLessonTitlesCheck.add(title.toLowerCase(Locale.ROOT))) {
+                    addError(errors, "SYLLABUS", sr.rowNumber(), "Title", "DUPLICATE_VALUE", title,
+                            "Duplicate Lesson/Quiz title: '" + title + "'.");
+                }
+
+                // §13/§21: Media/Content validation per type
+                if (type.equals("pdf")) {
+                    if (contentUrl.isEmpty()) {
+                        addError(errors, "SYLLABUS", sr.rowNumber(), "Content / Media URL", "MISSING_FIELD", contentUrl,
+                                "PDF lesson '" + title + "' requires a valid Media URL.");
+                    }
+                } else if (type.equals("text")) {
+                    if (contentUrl.isEmpty()) {
+                        addError(errors, "SYLLABUS", sr.rowNumber(), "Content / Media URL", "MISSING_FIELD", contentUrl,
+                                "TEXT lesson '" + title + "' requires content.");
+                    }
+                } else if (type.equals("quiz")) {
+                    if (!contentUrl.isEmpty()) {
+                        addError(errors, "SYLLABUS", sr.rowNumber(), "Content / Media URL", "INVALID_VALUE", contentUrl,
+                                "QUIZ '" + title + "' must not have Content/Media URL.");
+                    }
+                }
+                // Video lessons are intentionally allowed to have empty URLs during import.
+                // Trainers will upload/import the actual video files later through the platform UI.
+
+                // Track in section
+                if (type.equals("quiz")) {
+                    currentParsedSection.quizTitles.add(title);
+                    currentParsedSection.quizCount++;
+                } else {
+                    currentParsedSection.regularLessonCount++;
+                }
+                currentParsedSection.allItems.add(new CurriculumItem(type, title, sr.rowNumber()));
+            } else {
+                addError(errors, "SYLLABUS", sr.rowNumber(), "Type", "INVALID_VALUE", type,
+                        "Unknown lesson type: '" + type + "'. Supported types: SECTION, VIDEO, TEXT, PDF, QUIZ.");
+            }
+        }
+
+        // §10: Minimum 2 sections
+        if (parsedSections.size() < 2) {
+            addError(errors, "SYLLABUS", null, null, "INSUFFICIENT_SECTIONS", String.valueOf(parsedSections.size()),
+                    "Course must contain at least 2 Sections. Found: " + parsedSections.size() + ".");
+        }
+
+        // §11-12: Per-section structure validation
+        for (CurriculumSection section : parsedSections) {
+            // §12: Minimum 2 regular lessons per section
+            if (section.regularLessonCount < 2) {
+                addError(errors, "SYLLABUS", section.rowNumber, null, "INSUFFICIENT_LESSONS",
+                        String.valueOf(section.regularLessonCount),
+                        "Section '" + section.title + "' must contain at least 2 regular Lessons (VIDEO/TEXT/PDF). Found: "
+                                + section.regularLessonCount + ".");
+            }
+            // §10: Minimum 1 quiz per section
+            if (section.quizCount < 1) {
+                addError(errors, "SYLLABUS", section.rowNumber, null, "MISSING_QUIZ", "0",
+                        "Section '" + section.title + "' must contain at least 1 Quiz. Found: 0.");
+            }
+            // §11: Section cannot be empty
+            if (section.allItems.isEmpty()) {
+                addError(errors, "SYLLABUS", section.rowNumber, null, "EMPTY_SECTION", null,
+                        "Section '" + section.title + "' is empty — it must contain lessons and at least one quiz.");
+            }
+        }
+
+        // §16-17: Final Quiz validation (Option B — last quiz of last section)
+        String finalQuizTitle = null;
+        if (!parsedSections.isEmpty()) {
+            CurriculumSection lastSection = parsedSections.get(parsedSections.size() - 1);
+            if (!lastSection.allItems.isEmpty()) {
+                CurriculumItem lastItem = lastSection.allItems.get(lastSection.allItems.size() - 1);
+                if (!"quiz".equals(lastItem.type)) {
+                    addError(errors, "SYLLABUS", lastItem.rowNumber, "Type", "FINAL_QUIZ_NOT_LAST", lastItem.type,
+                            "The Final Quiz must be the last item of the last Section. Last item is '" + lastItem.title
+                                    + "' (type: " + lastItem.type.toUpperCase(Locale.ROOT) + ").");
+                } else {
+                    finalQuizTitle = lastItem.title;
+                }
+            }
+
+            // Check exactly 1 final quiz (no other section's last item should be named as a "final quiz")
+            // Per Option B, final quiz is auto-detected as last quiz of last section, so we just need
+            // to verify the last item is indeed a quiz (handled above).
+        } else if (hasSyllabusSheet) {
+            addError(errors, "SYLLABUS", null, null, "NO_FINAL_QUIZ", null,
+                    "Course must contain exactly one Final Quiz.");
+        }
+
+        // ════════════════════════════════════════════════════════════════════════
+        // §15/§18-20: QUESTIONS sheet validation
+        // ════════════════════════════════════════════════════════════════════════
+
+        // Build a map of quiz title → question count for validation
+        Map<String, List<SheetRow>> questionsByQuizTitle = new java.util.LinkedHashMap<>();
+        Set<String> allQuizTitlesInCurriculum = new java.util.HashSet<>();
+        for (CurriculumSection s : parsedSections) {
+            for (String qt : s.quizTitles) {
+                allQuizTitlesInCurriculum.add(qt.toLowerCase(Locale.ROOT));
+            }
+        }
+
+        for (SheetRow qr : questionRows) {
+            Map<String, String> row = qr.data();
+            String questionText = valueOrDefault(row, "Question Text", "");
+            if (questionText.isBlank()) {
+                continue;
+            }
+
+            String questionTitle = valueOrDefault(row, "Question Title", "").trim();
+            if (questionTitle.isBlank()) {
+                addError(errors, "QUESTIONS", qr.rowNumber(), "Question Title", "MISSING_FIELD", questionTitle,
+                        "Question Title (quiz mapping) is required for every question.");
+                continue;
+            }
+
+            // §18: Skill Type required
+            String skillType = valueOrDefault(row, "Skill Type", "");
+            if (skillType.isBlank()) {
+                addError(errors, "QUESTIONS", qr.rowNumber(), "Skill Type", "MISSING_FIELD", skillType,
+                        "Question row is missing required value: Skill Type.");
+            }
+
+            // §18: Validate correct answer matches an option
+            String correctAnswer = valueOrDefault(row, "Correct Answer", "").trim();
+            String[] optionColumns = {"Option A", "Option B", "Option C", "Option D"};
+            String[] optionKeys = {"A", "B", "C", "D"};
+            List<String> presentOptions = new ArrayList<>();
+            for (int i = 0; i < optionColumns.length; i++) {
+                String optionText = valueOrDefault(row, optionColumns[i], "");
+                if (!optionText.isBlank()) {
+                    presentOptions.add(optionKeys[i]);
+                }
+            }
+
+            if (presentOptions.size() < 2) {
+                addError(errors, "QUESTIONS", qr.rowNumber(), "Options", "INSUFFICIENT_OPTIONS",
+                        String.valueOf(presentOptions.size()),
+                        "Question must have at least 2 answer options. Found: " + presentOptions.size() + ".");
+            }
+
+            if (!correctAnswer.isBlank() && !presentOptions.isEmpty()) {
+                boolean matchesOption = false;
+                for (String key : presentOptions) {
+                    if (correctAnswer.equalsIgnoreCase(key)) {
+                        matchesOption = true;
+                        break;
+                    }
+                }
+                if (!matchesOption) {
+                    // Also check numeric format (1=A, 2=B, etc.)
+                    try {
+                        int idx = Integer.parseInt(correctAnswer);
+                        if (idx >= 1 && idx <= presentOptions.size()) {
+                            matchesOption = true;
+                        }
+                    } catch (NumberFormatException ignored) {
+                    }
+                }
+                if (!matchesOption) {
+                    addError(errors, "QUESTIONS", qr.rowNumber(), "Correct Answer", "INVALID_CORRECT_ANSWER",
+                            correctAnswer,
+                            "Correct Answer '" + correctAnswer + "' does not match any option ("
+                                    + String.join(", ", presentOptions) + ").");
+                }
+            } else if (correctAnswer.isBlank() && !presentOptions.isEmpty()) {
+                addError(errors, "QUESTIONS", qr.rowNumber(), "Correct Answer", "MISSING_FIELD", correctAnswer,
+                        "Correct Answer is required.");
+            }
+
+            questionsByQuizTitle
+                    .computeIfAbsent(questionTitle.toLowerCase(Locale.ROOT), k -> new ArrayList<>())
+                    .add(qr);
+        }
+
+        // §15/§20: Every quiz in CURRICULUM must have matching questions in QUESTIONS
+        for (CurriculumSection s : parsedSections) {
+            for (String quizTitle : s.quizTitles) {
+                String key = quizTitle.toLowerCase(Locale.ROOT);
+                List<SheetRow> matchedQuestions = questionsByQuizTitle.get(key);
+                if (matchedQuestions == null || matchedQuestions.isEmpty()) {
+                    addError(errors, "QUESTIONS", null, "Question Title", "NO_QUESTION_MAPPING", quizTitle,
+                            "Quiz '" + quizTitle + "' in CURRICULUM has no matching questions in QUESTIONS sheet.");
+                }
+            }
+        }
+
+        // §19: Final Quiz must have ≥30 questions
+        if (finalQuizTitle != null) {
+            String finalKey = finalQuizTitle.toLowerCase(Locale.ROOT);
+            List<SheetRow> finalQuizQuestions = questionsByQuizTitle.getOrDefault(finalKey, List.of());
+            if (finalQuizQuestions.size() < 30) {
+                addError(errors, "QUESTIONS", null, "Question Count", "INSUFFICIENT_FINAL_QUIZ_QUESTIONS",
+                        String.valueOf(finalQuizQuestions.size()),
+                        "Final Quiz '" + finalQuizTitle + "' must contain at least 30 questions. Found: "
+                                + finalQuizQuestions.size() + ".");
+            }
+        }
+
+        // Warn about orphaned questions (in QUESTIONS but not mapped to any quiz in CURRICULUM)
+        for (Map.Entry<String, List<SheetRow>> entry : questionsByQuizTitle.entrySet()) {
+            if (!allQuizTitlesInCurriculum.contains(entry.getKey())) {
+                warnings.add("Questions mapped to '" + entry.getValue().get(0).data().get("Question Title")
+                        + "' have no matching Quiz in CURRICULUM — these questions will be skipped.");
+            }
+        }
+
+        // ── If any errors, reject entire import (§22: Atomic) ──
+        if (!errors.isEmpty()) {
+            throw new CourseImportValidationException((String) errors.get(0).get("message"), errors);
+        }
+
+        // ════════════════════════════════════════════════════════════════════════
+        // PHASE 2: INSERT (only reached when validation found zero errors)
+        // ════════════════════════════════════════════════════════════════════════
+
+        Set<String> reservedPersistedCourseCodes = new java.util.HashSet<>();
+        String persistedCourseCode = resolveUniqueCourseCode(
+                courseCodeRaw.trim().toUpperCase(Locale.ROOT), reservedPersistedCourseCodes, warnings);
 
         String requestedStatus = valueOrDefault(courseData, "Status", "DRAFT").toUpperCase(Locale.ROOT);
         if (!"DRAFT".equals(requestedStatus)) {
@@ -136,7 +473,8 @@ public class CourseImportService {
 
         int lessonCount = 0;
         int durationMinutes = 0;
-        for (Map<String, String> row : syllabusRows) {
+        for (SheetRow sr : syllabusRows) {
+            Map<String, String> row = sr.data();
             String type = valueOrDefault(row, "Type", "").trim().toLowerCase(Locale.ROOT);
             if (type.equals("video") || type.equals("text") || type.equals("quiz") || type.equals("pdf")) {
                 lessonCount++;
@@ -144,8 +482,9 @@ public class CourseImportService {
             }
         }
 
-        BigDecimal calculatedPrice = calculateCoursePrice(trainer.getId(), persistedCourseCode, trainerProfile,
-                difficulty, lessonCount, durationMinutes);
+        BigDecimal suggestedPrice = calculateSuggestedPrice(trainerProfile, difficulty, lessonCount, durationMinutes);
+        Long importedPriceRaw = parseLong(courseData.get("Price"), null);
+        BigDecimal importedPrice = importedPriceRaw != null ? BigDecimal.valueOf(importedPriceRaw) : suggestedPrice;
 
         Course course = Course.builder()
                 .title(courseTitle)
@@ -155,8 +494,8 @@ public class CourseImportService {
                 .difficulty(difficulty)
                 .thumbnailUrl(valueOrDefault(courseData, "Thumbnail URL", ""))
                 .code(persistedCourseCode)
-                .price(calculatedPrice)
-                .suggestedPrice(calculatedPrice)
+                .price(importedPrice)
+                .suggestedPrice(suggestedPrice)
                 .priceNote("")
                 .version(valueOrDefault(courseData, "Version", ""))
                 .objectives(valueOrDefault(courseData, "Objectives", ""))
@@ -172,11 +511,9 @@ public class CourseImportService {
 
         Section currentSection = null;
         Map<String, Lesson> lessonsByTitle = new java.util.HashMap<>();
-        Set<String> knownSectionTitles = new java.util.HashSet<>();
-        Set<String> knownLessonTitles = new java.util.HashSet<>();
 
-        for (int i = 0; i < syllabusRows.size(); i++) {
-            Map<String, String> row = syllabusRows.get(i);
+        for (SheetRow sr : syllabusRows) {
+            Map<String, String> row = sr.data();
             String type = valueOrDefault(row, "Type", "").trim().toLowerCase(Locale.ROOT);
             String title = valueOrDefault(row, "Title", "").trim();
             if (type.isEmpty() || title.isEmpty()) {
@@ -184,9 +521,6 @@ public class CourseImportService {
             }
 
             if (type.equals("section")) {
-                if (!knownSectionTitles.add(title.toLowerCase(Locale.ROOT))) {
-                    throw new IllegalArgumentException("Duplicate Section Title in syllabus: " + title);
-                }
                 Section section = Section.builder()
                         .course(savedCourse)
                         .code(persistedCourseCode + "_S" + (importedSections + 1))
@@ -197,14 +531,7 @@ public class CourseImportService {
                         .build();
                 currentSection = sectionRepository.save(section);
                 importedSections++;
-            } else if (type.equals("video") || type.equals("text") || type.equals("quiz") || type.equals("pdf")) {
-                if (currentSection == null) {
-                    throw new IllegalArgumentException("Found a lesson before any section in SYLLABUS sheet: " + title);
-                }
-                if (!knownLessonTitles.add(title.toLowerCase(Locale.ROOT))) {
-                    throw new IllegalArgumentException("Duplicate Lesson Title in syllabus: " + title);
-                }
-
+            } else if (isLessonType(type)) {
                 String lessonType = normalizeLessonType(type);
                 String contentUrl = valueOrDefault(row, "Content / Media URL", "");
 
@@ -245,7 +572,8 @@ public class CourseImportService {
 
         Map<String, com.hango.hango_backend.entity.QuestionGroup> questionGroupsByPassage = new java.util.HashMap<>();
 
-        for (Map<String, String> questionRow : questionRows) {
+        for (SheetRow qr : questionRows) {
+            Map<String, String> questionRow = qr.data();
             String questionText = valueOrDefault(questionRow, "Question Text", "");
             if (questionText.isBlank()) {
                 continue;
@@ -253,14 +581,12 @@ public class CourseImportService {
 
             String questionTitle = valueOrDefault(questionRow, "Question Title", "").trim();
             if (questionTitle.isBlank()) {
-                warnings.add("Question row skipped because Question Title is missing.");
-                continue;
+                continue; // Already validated in Phase 1
             }
 
             Lesson targetLesson = lessonsByTitle.get(questionTitle.toLowerCase(Locale.ROOT));
             if (targetLesson == null) {
-                warnings.add("Question row skipped because lesson with title '" + questionTitle
-                        + "' was not found in SYLLABUS.");
+                // Orphaned question — skip (already warned in Phase 1)
                 continue;
             }
 
@@ -292,9 +618,10 @@ public class CourseImportService {
             question.setSection(targetLesson.getSection());
             question.setQuestionGroup(questionGroup);
             question.setStatus("APPROVED");
+            question.setUsageType(1);
 
             Question savedQuestion = questionRepository.save(question);
-            saveQuestionOptions(savedQuestion, questionRow);
+            saveQuestionOptions(savedQuestion, questionRow, warnings);
 
             int displayOrder = parseInt(valueOrDefault(questionRow, "Order Index", ""), importedQuestions + 1);
             jdbcTemplate.update(
@@ -346,7 +673,7 @@ public class CourseImportService {
         List<String> sharedStrings = readSharedStrings(entries.get("xl/sharedStrings.xml"));
         Map<String, String> relTargets = readRelationshipTargets(relsXml);
 
-        Map<String, List<Map<String, String>>> rowsBySheet = new HashMap<>();
+        Map<String, List<SheetRow>> rowsBySheet = new HashMap<>();
         NodeList sheetNodes = workbookXml.getElementsByTagNameNS("*", "sheet");
         for (int i = 0; i < sheetNodes.getLength(); i++) {
             Element sheet = (Element) sheetNodes.item(i);
@@ -475,11 +802,11 @@ public class CourseImportService {
         return "xl/worksheets/" + normalized;
     }
 
-    private List<Map<String, String>> readSheetRows(Document worksheetXml, List<String> sharedStrings) {
+    private List<SheetRow> readSheetRows(Document worksheetXml, List<String> sharedStrings) {
         NodeList rowNodes = worksheetXml.getElementsByTagNameNS("*", "row");
         Map<Integer, String> headers = new LinkedHashMap<>();
         int headerRow = 2;
-        List<Map<String, String>> rows = new ArrayList<>();
+        List<SheetRow> rows = new ArrayList<>();
 
         for (int i = 0; i < rowNodes.getLength(); i++) {
             Element row = (Element) rowNodes.item(i);
@@ -507,7 +834,7 @@ public class CourseImportService {
                 }
             }
             if (hasValue) {
-                rows.add(mappedRow);
+                rows.add(new SheetRow(rowNumber, mappedRow));
             }
         }
         return rows;
@@ -667,21 +994,44 @@ public class CourseImportService {
                 warnings);
     }
 
-    private void saveQuestionOptions(Question question, Map<String, String> questionRow) {
+    private void saveQuestionOptions(Question question, Map<String, String> questionRow, List<String> warnings) {
         String correctAnswer = valueOrDefault(questionRow, "Correct Answer", "A").trim();
         String[] optionColumns = { "Option A", "Option B", "Option C", "Option D" };
         String[] optionKeys = { "A", "B", "C", "D" };
 
+        // Phat hien loi du lieu THAT SU tung bi AN DI: neu cot "Correct Answer"
+        // trong Excel co gia tri khong khop bat ky option nao (vd go nham "E",
+        // hoac mot so ngoai pham vi A-D), TRUOC DAY khong co option nao duoc
+        // danh dau is_correct=true - cau hoi do bi nhap vao he thong ma KHONG CO
+        // dap an dung nao ca (hoc vien khong the nao lam dung cau do), va Trainer
+        // khong he duoc canh bao ve viec nay. O day KHONG doi logic xac dinh dap
+        // an dung (isCorrectAnswer giu nguyen 100%, tranh rui ro doi hanh vi tren
+        // 1 file chua co unit test nao) - chi THEM canh bao de Trainer biet ma tu
+        // vao sua lai cau hoi trong Question Bank.
+        List<String> presentKeys = new ArrayList<>();
+        boolean anyMarkedCorrect = false;
         for (int i = 0; i < optionColumns.length; i++) {
             String optionText = valueOrDefault(questionRow, optionColumns[i], "");
             if (optionText.isBlank()) {
                 continue;
             }
+            presentKeys.add(optionKeys[i]);
+            boolean isCorrect = isCorrectAnswer(correctAnswer, optionKeys[i], i);
+            if (isCorrect) {
+                anyMarkedCorrect = true;
+            }
             QuestionOption option = new QuestionOption();
             option.setQuestion(question);
             option.setOptionText(optionText);
-            option.setIsCorrect(isCorrectAnswer(correctAnswer, optionKeys[i], i));
+            option.setIsCorrect(isCorrect);
             questionOptionRepository.save(option);
+        }
+
+        if (!anyMarkedCorrect && !presentKeys.isEmpty()) {
+            warnings.add("Question '" + valueOrDefault(questionRow, "Question Title", "(untitled)")
+                    + "': Correct Answer value '" + correctAnswer + "' did not match any option ("
+                    + String.join(", ", presentKeys)
+                    + "); this question was imported with NO correct answer set - please fix it in the Question Bank.");
         }
     }
 
@@ -705,17 +1055,21 @@ public class CourseImportService {
         return systemParameterRepository.findByParamTypeAndParamKey(type, normalizedKey)
                 .or(() -> systemParameterRepository.findByParamTypeAndParamKey(type,
                         aliasParameterKey(type, normalizedKey)))
-                .or(() -> systemParameterRepository.findByParamTypeAndParamKey(type, fallbackKey))
+                .or(() -> fallbackKey != null
+                        ? systemParameterRepository.findByParamTypeAndParamKey(type, fallbackKey)
+                        : java.util.Optional.empty())
                 .map(parameter -> {
                     String selectedKey = parameter.getParamKey();
                     if (!selectedKey.equals(normalizedKey)
                             && !selectedKey.equals(aliasParameterKey(type, normalizedKey))) {
                         warnings.add(
-                                "Unknown " + type + " value '" + rawValue + "' was replaced with " + fallbackKey + ".");
+                                "Unknown " + type + " value '" + rawValue + "' was replaced with "
+                                        + (fallbackKey != null ? fallbackKey : selectedKey) + ".");
                     }
                     return parameter;
                 })
-                .orElseThrow(() -> new RuntimeException("System parameter not found: " + type + "/" + fallbackKey));
+                .orElseThrow(() -> new RuntimeException("System parameter not found: " + type + "/"
+                        + (fallbackKey != null ? fallbackKey : normalizedKey)));
     }
 
     private String normalizeParameterKey(String value) {
@@ -744,6 +1098,23 @@ public class CourseImportService {
             }
         }
         return key;
+    }
+
+    /** Whether a SYLLABUS row's (lowercased) Type is one of the supported lesson content types. */
+    private boolean isLessonType(String type) {
+        return type.equals("video") || type.equals("text") || type.equals("quiz") || type.equals("pdf");
+    }
+
+    private void addError(List<Map<String, Object>> errors, String sheet, Integer row, String field,
+            String errorType, String value, String message) {
+        Map<String, Object> err = new LinkedHashMap<>();
+        err.put("sheet", sheet);
+        err.put("row", row);
+        err.put("field", field);
+        err.put("errorType", errorType);
+        err.put("value", value);
+        err.put("message", message);
+        errors.add(err);
     }
 
     private String normalizeLessonType(String lessonType) {
@@ -871,7 +1242,13 @@ public class CourseImportService {
         }
     }
 
-    private BigDecimal calculateCoursePrice(Long creatorId, String courseCode, TrainerProfile profile,
+    // Gia THAM KHAO cho khoa hoc import tu Excel - dung CHINH XAC cong thuc va
+    // gioi han (lam tron boi so 50.000d, ke trong 300.000d-700.000d) nhu
+    // TrainerDashboardServiceImpl.calculateSuggestedPrice, de nhat quan giua
+    // 2 con duong tao course (thu cong qua UI vs import hang loat). Gia BAN
+    // THAT SU khong con tinh o day nua - xem importWorkbook() (doc cot "Price"
+    // tuy chon, hoac mac dinh ve dung gia tham khao nay).
+    private BigDecimal calculateSuggestedPrice(TrainerProfile profile,
             SystemParameter difficulty, int lessonCount, int durationMinutes) {
         long price = 0;
         if (profile != null) {
@@ -897,13 +1274,54 @@ public class CourseImportService {
         price += (lessonCount * 10000L);
         price += (durationMinutes * 1000L);
 
-        if (courseRepository.isEligibleForFirstCoursePromotion(creatorId, courseCode)) {
-            return BigDecimal.ZERO;
+        long roundingStepVnd = 50000L;
+        long rounded = Math.round(price / (double) roundingStepVnd) * roundingStepVnd;
+        BigDecimal result = BigDecimal.valueOf(rounded);
+        BigDecimal min = BigDecimal.valueOf(300000);
+        BigDecimal max = BigDecimal.valueOf(700000);
+        if (result.compareTo(min) < 0) {
+            return min;
         }
-
-        return BigDecimal.valueOf(price);
+        if (result.compareTo(max) > 0) {
+            return max;
+        }
+        return result;
     }
 
-    private record WorkbookData(Map<String, List<Map<String, String>>> rowsBySheet) {
+    /**
+     * §4: Normalize course name — trim leading/trailing whitespace, collapse
+     * multiple internal spaces into a single space, preserve original case.
+     */
+    private String normalizeCourseName(String name) {
+        if (name == null) return null;
+        String trimmed = name.trim();
+        if (trimmed.isEmpty()) return trimmed;
+        return trimmed.replaceAll("\\s+", " ");
+    }
+
+    private record WorkbookData(Map<String, List<SheetRow>> rowsBySheet) {
+    }
+
+    /** One data row from a sheet, paired with its original Excel row number (1-indexed) for error reporting. */
+    private record SheetRow(int rowNumber, Map<String, String> data) {
+    }
+
+    /** Parsed section from CURRICULUM for structure validation (§10-12). */
+    private static class CurriculumSection {
+        final String title;
+        final int rowNumber;
+        int regularLessonCount = 0;
+        int quizCount = 0;
+        final List<String> quizTitles = new ArrayList<>();
+        final List<CurriculumItem> allItems = new ArrayList<>();
+
+        CurriculumSection(String title, int rowNumber) {
+            this.title = title;
+            this.rowNumber = rowNumber;
+        }
+    }
+
+    /** Parsed item (lesson/quiz) within a CurriculumSection. */
+    private record CurriculumItem(String type, String title, int rowNumber) {
     }
 }

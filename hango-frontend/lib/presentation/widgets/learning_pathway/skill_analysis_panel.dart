@@ -33,8 +33,16 @@ class SkillAnalysisPanel extends StatelessWidget {
     return {'icon': Icons.school_rounded, 'color': const Color(0xFF64748B)};
   }
 
-  static int _genWeakPercent(int index) {
-    return (45 - (index * 7)).clamp(15, 65);
+  static String _getSeverityLabel(int index, bool isVi) {
+    if (index == 0) return isVi ? 'Nghiêm trọng' : 'Critical';
+    if (index <= 2) return isVi ? 'Cần cải thiện' : 'Needs work';
+    return isVi ? 'Lưu ý' : 'Review';
+  }
+
+  static double _getSeverityBarValue(int index) {
+    if (index == 0) return 0.8;
+    if (index <= 2) return 0.5;
+    return 0.3;
   }
 
   @override
@@ -92,7 +100,7 @@ class SkillAnalysisPanel extends StatelessWidget {
                       ),
                       if (attemptsUsed > 0)
                         Text(
-                          isVi ? 'Dựa trên $attemptsUsed bài thi gần nhất' : 'Based on $attemptsUsed recent exams',
+                          isVi ? 'Dựa trên $attemptsUsed bài thi thực tế' : 'Based on $attemptsUsed analyzed attempt(s)',
                           style: TextStyle(fontSize: 12, color: subColor, fontFamily: 'Outfit'),
                         ),
                     ],
@@ -134,7 +142,8 @@ class SkillAnalysisPanel extends StatelessWidget {
                     final meta = _getSkillMeta(entry.value);
                     return _SkillBar(
                       skill: entry.value,
-                      percent: _genWeakPercent(entry.key) + 15, // Mức độ khẩn cấp cao hơn
+                      severityLabel: isVi ? 'Nghiêm trọng (Bài thi cuối)' : 'Critical (Latest Exam)',
+                      barValue: 0.9,
                       color: const Color(0xFFEF4444), // Đỏ cảnh báo
                       icon: meta['icon'] as IconData,
                       isDarkMode: isDarkMode,
@@ -160,8 +169,9 @@ class SkillAnalysisPanel extends StatelessWidget {
                     final meta = _getSkillMeta(entry.value);
                     return _SkillBar(
                       skill: entry.value,
-                      percent: _genWeakPercent(entry.key),
-                      color: const Color(0xFF8B5CF6), // Tím củng cố
+                      severityLabel: _getSeverityLabel(entry.key, isVi),
+                      barValue: _getSeverityBarValue(entry.key),
+                      color: meta['color'] as Color,
                       icon: meta['icon'] as IconData,
                       isDarkMode: isDarkMode,
                       delay: Duration(milliseconds: entry.key * 100),
@@ -225,14 +235,15 @@ class SkillAnalysisPanel extends StatelessWidget {
 
 class _SkillBar extends StatefulWidget {
   final String skill;
-  final int percent;
+  final String severityLabel;
+  final double barValue;
   final Color color;
   final IconData icon;
   final bool isDarkMode;
   final Duration delay;
 
   const _SkillBar({
-    required this.skill, required this.percent, required this.color,
+    required this.skill, required this.severityLabel, required this.barValue, required this.color,
     required this.icon, required this.isDarkMode, required this.delay,
   });
 
@@ -276,7 +287,7 @@ class _SkillBarState extends State<_SkillBar> with SingleTickerProviderStateMixi
                 child: Text(widget.skill, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: labelColor, fontFamily: 'Outfit')),
               ),
               Text(
-                '${widget.percent}% ${LanguageManager.isVi ? 'yếu' : 'weak'}',
+                widget.severityLabel,
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: widget.color, fontFamily: 'Outfit'),
               ),
             ],
@@ -287,7 +298,7 @@ class _SkillBarState extends State<_SkillBar> with SingleTickerProviderStateMixi
             child: AnimatedBuilder(
               animation: _anim,
               builder: (_, __) => LinearProgressIndicator(
-                value: widget.percent / 100.0 * _anim.value,
+                value: widget.barValue * _anim.value,
                 backgroundColor: trackColor,
                 valueColor: AlwaysStoppedAnimation<Color>(widget.color),
                 minHeight: 8,

@@ -1,0 +1,6 @@
+.git
+.idea
+target
+*.iml
+java_procs.txt
+response.json

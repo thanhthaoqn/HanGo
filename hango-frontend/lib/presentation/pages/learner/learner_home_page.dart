@@ -29,6 +29,331 @@ import '../../../data/services/trainer_onboarding_service.dart';
 import '../../../utils/toast_helper.dart';
 import '../../../utils/permission_utils.dart';
 
+class _EntryExamPromoDialog extends StatefulWidget {
+  final VoidCallback onTakeNow;
+  final VoidCallback onLater;
+
+  const _EntryExamPromoDialog({required this.onTakeNow, required this.onLater});
+
+  @override
+  State<_EntryExamPromoDialog> createState() => _EntryExamPromoDialogState();
+}
+
+class _EntryExamPromoDialogState extends State<_EntryExamPromoDialog>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulseController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  Widget _buildPerk(String text) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: const BoxDecoration(
+            color: Color(0xFFE6FBF6),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.check_rounded,
+            color: Color(0xFF28B79B),
+            size: 14,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontSize: 13.5,
+              color: Color(0xFF334155),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isVi = LanguageManager.isVi;
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF28B79B).withOpacity(0.35),
+                  blurRadius: 40,
+                  spreadRadius: 4,
+                  offset: const Offset(0, 16),
+                ),
+              ],
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      height: 150,
+                      width: double.infinity,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color(0xFF0EA5A0),
+                            Color(0xFF28B79B),
+                            Color(0xFF135D4E),
+                          ],
+                        ),
+                      ),
+                      child: Stack(
+                        children: [
+                          Positioned(
+                            top: -30,
+                            right: -30,
+                            child: Container(
+                              width: 120,
+                              height: 120,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white.withOpacity(0.12),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: -40,
+                            left: -20,
+                            child: Container(
+                              width: 100,
+                              height: 100,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white.withOpacity(0.10),
+                              ),
+                            ),
+                          ),
+                          Center(
+                            child: TweenAnimationBuilder<double>(
+                              tween: Tween(begin: 0.9, end: 1.05),
+                              duration: const Duration(milliseconds: 900),
+                              curve: Curves.easeInOut,
+                              builder: (_, scale, child) =>
+                                  Transform.scale(scale: scale, child: child),
+                              child: Container(
+                                padding: const EdgeInsets.all(18),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.18),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.6),
+                                    width: 2,
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.quiz_rounded,
+                                  color: Colors.white,
+                                  size: 44,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Positioned(
+                      top: 14,
+                      left: 14,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF3B30),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.15),
+                              blurRadius: 6,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          isVi ? '🔥 MIỄN PHÍ' : '🔥 FREE',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: widget.onLater,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.25),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.close_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(26, 24, 26, 26),
+                  child: Column(
+                    children: [
+                      Text(
+                        isVi
+                            ? 'MỞ KHOÁ LỘ TRÌNH HỌC\nDÀNH RIÊNG CHO BẠN!'
+                            : 'UNLOCK YOUR PERSONAL\nLEARNING PATHWAY!',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 21,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F172A),
+                          height: 1.3,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        isVi
+                            ? 'Làm bài Entry Exam để hệ thống AI phân tích năng lực và đề xuất lộ trình học phù hợp nhất với bạn.'
+                            : 'Take the Entry Exam so our AI can analyze your level and build a pathway made just for you.',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF64748B),
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      _buildPerk(
+                        isVi
+                            ? 'Cá nhân hoá 100% theo năng lực'
+                            : '100% personalized to your level',
+                      ),
+                      const SizedBox(height: 8),
+                      _buildPerk(
+                        isVi
+                            ? 'Chỉ mất khoảng 50 phút'
+                            : 'Takes about 50 minutes',
+                      ),
+                      const SizedBox(height: 8),
+                      _buildPerk(
+                        isVi
+                            ? 'Hoàn toàn miễn phí, không giới hạn'
+                            : 'Completely free, no limits',
+                      ),
+                      const SizedBox(height: 24),
+                      AnimatedBuilder(
+                        animation: _pulseController,
+                        builder: (context, child) {
+                          final scale = 1.0 + (_pulseController.value * 0.04);
+                          return Transform.scale(scale: scale, child: child);
+                        },
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: widget.onTakeNow,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF28B79B),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              elevation: 6,
+                              shadowColor: const Color(
+                                0xFF28B79B,
+                              ).withOpacity(0.5),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  isVi
+                                      ? 'LÀM NGAY - MIỄN PHÍ'
+                                      : 'START NOW - FREE',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Icon(
+                                  Icons.arrow_forward_rounded,
+                                  size: 20,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: widget.onLater,
+                        child: Text(
+                          isVi ? 'Để sau' : 'Maybe later',
+                          style: const TextStyle(
+                            color: Color(0xFF94A3B8),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class LearnerHomePage extends StatefulWidget {
   final bool isEmbedded;
   const LearnerHomePage({super.key, this.isEmbedded = false});
@@ -83,7 +408,9 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
         Uri.parse('${EnvConfig.v1BaseUrl}/metadata/public-stats'),
       );
       if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(utf8.decode(response.bodyBytes));
+        final Map<String, dynamic> data = json.decode(
+          utf8.decode(response.bodyBytes),
+        );
         if (mounted) {
           setState(() {
             _totalCoursesCount = (data['coursesCount'] ?? 0) as int;
@@ -309,12 +636,11 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       final userId = prefs.getInt('user_id') ?? 0;
       if (prefs.getBool('dismissed_entry_exam_$userId') == true) return;
 
-      final attempts = await _examRepository.fetchMyExamAttempts();
-      final hasCompleted = attempts.any(
-        (a) => a['examId'] == 1035 || a['examId'] == '1035',
-      );
+      final status = await _examRepository.fetchEntryExamStatus();
+      final configured = status['configured'] == true;
+      final hasCompleted = status['completed'] == true;
 
-      if (!hasCompleted) {
+      if (configured && !hasCompleted) {
         _showEntryExamSuggestion();
       }
     } catch (e) {
@@ -323,102 +649,32 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
   }
 
   void _showEntryExamSuggestion() {
-    showDialog(
+    showGeneralDialog(
       context: context,
       barrierDismissible: true,
-      builder: (ctx) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          elevation: 12,
-          backgroundColor: Colors.white,
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 400),
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFEFF6FF),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.assignment_outlined,
-                    color: Colors.blueAccent,
-                    size: 36,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Entry Exam!',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Take the entry exam so the system can generate a personalized learning pathway specifically for you.',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF64748B),
-                    height: 1.5,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 28),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () async {
-                          final prefs = await SharedPreferences.getInstance();
-                          final userId = prefs.getInt('user_id') ?? 0;
-                          await prefs.setBool(
-                            'dismissed_entry_exam_$userId',
-                            true,
-                          );
-                          if (!mounted) return;
-                          Navigator.pop(ctx);
-                        },
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          side: const BorderSide(color: Color(0xFFCBD5E1)),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: const Text('Later'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          _navigateToEntryExam();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF28B79B),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: const Text('Take now'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+      barrierLabel: 'Entry Exam Promo',
+      barrierColor: Colors.black.withOpacity(0.55),
+      transitionDuration: const Duration(milliseconds: 350),
+      pageBuilder: (ctx, anim1, anim2) {
+        return _EntryExamPromoDialog(
+          onLater: () async {
+            final prefs = await SharedPreferences.getInstance();
+            final userId = prefs.getInt('user_id') ?? 0;
+            await prefs.setBool('dismissed_entry_exam_$userId', true);
+            if (!mounted) return;
+            Navigator.pop(ctx);
+          },
+          onTakeNow: () {
+            Navigator.pop(ctx);
+            _navigateToEntryExam();
+          },
+        );
+      },
+      transitionBuilder: (ctx, anim, secondaryAnim, child) {
+        final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutBack);
+        return FadeTransition(
+          opacity: anim,
+          child: ScaleTransition(scale: curved, child: child),
         );
       },
     );
@@ -435,23 +691,17 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       ),
     );
     try {
-      final exams = await _examRepository.fetchExams();
+      final entryExam = await _examRepository.fetchEntryExam();
       if (!mounted) return;
       Navigator.pop(context); // Close loading
 
-      final entryExam = exams.firstWhere(
-        (e) => e.id == '1035',
-        orElse: () => Exam(
-          id: '1035',
-          title: 'Global Entry Placement Test',
-          description: 'A comprehensive exam to assess all 25 skill domains and provide a personalized learning pathway.',
-          creatorName: 'System',
-          questionCount: 40,
-          durationMinutes: 50,
-          rating: 5.0,
-          learnerCountFormatted: '1k Learner',
-        ),
-      );
+      if (entryExam == null) {
+        ToastHelper.showError(
+          context,
+          'No Entry Exam is configured yet. Please check back later.',
+        );
+        return;
+      }
 
       Navigator.push(
         context,
@@ -462,7 +712,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context);
-      ToastHelper.showError(context, 'Lỗi kết nối máy chủ');
+      ToastHelper.showError(context, 'Error to server');
     }
   }
 
@@ -590,8 +840,6 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                           const SizedBox(height: 60),
                         ],
 
-
-
                         // 6. CTA Banner
                         _buildCtaBannerSection(isDesktop),
                         const SizedBox(height: 40),
@@ -643,7 +891,9 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                 Navigator.pop(context); // close drawer
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const ListExamsPage()),
+                  MaterialPageRoute(
+                    builder: (context) => const ListExamsPage(),
+                  ),
                 );
               },
             ),
@@ -1041,7 +1291,9 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                       _buildHeroStat(
                         _totalCoursesCount > 0
                             ? '$_totalCoursesCount+'
-                            : (_courses.isNotEmpty ? '${_courses.length}+' : '0+'),
+                            : (_courses.isNotEmpty
+                                  ? '${_courses.length}+'
+                                  : '0+'),
                         isVi ? 'Khóa học' : 'Courses',
                       ),
                       _buildHeroStat(
@@ -1754,7 +2006,9 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                               color: Color(0xFF0F172A),
                               size: 26,
                             ),
-                            tooltip: isVi ? '4 khóa học trước' : 'Previous 4 courses',
+                            tooltip: isVi
+                                ? '4 khóa học trước'
+                                : 'Previous 4 courses',
                             onPressed: () => _scrollCourses(false, isDesktop),
                           ),
                         ),
@@ -1776,7 +2030,9 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                               color: Color(0xFF0F172A),
                               size: 26,
                             ),
-                            tooltip: isVi ? '4 khóa học tiếp' : 'Next 4 courses',
+                            tooltip: isVi
+                                ? '4 khóa học tiếp'
+                                : 'Next 4 courses',
                             onPressed: () => _scrollCourses(true, isDesktop),
                           ),
                         ),
@@ -1828,25 +2084,6 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
     return 'Mr. $name';
   }
 
-  String _getOriginalPrice(String currentPrice) {
-    if (currentPrice == 'Miễn phí') return '';
-    try {
-      final clean = currentPrice.replaceAll(RegExp(r'[^0-9]'), '');
-      if (clean.isEmpty) return '';
-      final val = double.parse(clean);
-      final original = val * 1.3;
-      final formatted = original
-          .toStringAsFixed(0)
-          .replaceAllMapped(
-            RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-            (m) => '${m[1]}.',
-          );
-      return '$formattedđ';
-    } catch (_) {
-      return '';
-    }
-  }
-
   Widget _buildCourseCardHeaderPlaceholder(Map<String, dynamic> theme) {
     return Stack(
       alignment: Alignment.center,
@@ -1869,7 +2106,6 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
     final isVi = LanguageManager.isVi;
     final theme = _getCourseTheme(course);
     final priceStr = _getCoursePrice(course);
-    final originalPriceStr = _getOriginalPrice(priceStr);
     final isFree = priceStr == 'Miễn phí';
     final displayPrice = isFree ? (isVi ? 'Miễn phí' : 'Free') : priceStr;
     final teacherName = _getTeacherSalutation(course.creatorName);
@@ -2051,34 +2287,16 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                         ),
                       ],
                       const Spacer(),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Text(
-                            displayPrice,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: isFree
-                                  ? const Color(0xFF28B79B)
-                                  : const Color(0xFF0F172A),
-                              fontFamily: 'Outfit',
-                            ),
-                          ),
-                          if (!isFree) ...[
-                            const SizedBox(width: 8),
-                            Text(
-                              originalPriceStr,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF94A3B8),
-                                decoration: TextDecoration.lineThrough,
-                                fontFamily: 'Outfit',
-                              ),
-                            ),
-                          ],
-                        ],
+                      Text(
+                        displayPrice,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isFree
+                              ? const Color(0xFF28B79B)
+                              : const Color(0xFF0F172A),
+                          fontFamily: 'Outfit',
+                        ),
                       ),
                     ],
                   ),
@@ -2407,7 +2625,9 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                                 color: Color(0xFF0F172A),
                                 size: 26,
                               ),
-                              tooltip: isVi ? '4 đề thi trước' : 'Previous 4 exams',
+                              tooltip: isVi
+                                  ? '4 đề thi trước'
+                                  : 'Previous 4 exams',
                               onPressed: () => _scrollExams(false, isDesktop),
                             ),
                           ),
@@ -2846,8 +3066,6 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
             ),
     );
   }
-
-
 
   Widget _buildCtaBannerSection(bool isDesktop) {
     final isVi = LanguageManager.isVi;

@@ -1,5 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hango/utils/trainer_document_utils.dart';
+import 'package:hango/utils/trainer_onboarding_payload_utils.dart';
+import 'package:hango/utils/trainer_onboarding_stage.dart';
+import 'package:hango/utils/trainer_onboarding_validation_utils.dart';
+import 'package:hango/utils/trainer_revision_notes.dart';
 
 void main() {
   group('Trainer Onboarding Business Logic & Rules', () {
@@ -44,32 +48,36 @@ void main() {
         ) {
           final isTeacher = trainerType == 'PROFESSIONAL';
           if (isTeacher) {
-            return certificates.any((c) {
-              final name = (c['name'] ?? '').toLowerCase();
-              return name.contains('pedagog') ||
-                  name.contains('su pham') ||
-                  name.contains('supham') ||
-                  name.contains('bachelor') ||
-                  name.contains('teaching');
-            });
+            return certificates.any(
+              (certificate) =>
+                  isPedagogicalTrainerDocument(certificate['type']),
+            );
           }
           return certificates.isNotEmpty;
         }
 
         final teacherWithDegree = [
           {
+            'type': trainerDocTypePedagogicalDegree,
             'name': 'Bachelor of English Pedagogy',
             'url': 'https://cloudinary.com/degree.pdf',
           },
         ];
         final teacherWithoutDegree = [
           {
+            'type': trainerDocTypeCv,
+            'name': 'Professional Teaching CV',
+            'url': 'https://cloudinary.com/cv.pdf',
+          },
+          {
+            'type': trainerDocTypeLanguageProficiency,
             'name': 'High School Transcript',
             'url': 'https://cloudinary.com/transcript.pdf',
           },
         ];
         final tutorWithCertificate = [
           {
+            'type': trainerDocTypeLanguageProficiency,
             'name': 'IELTS 8.0 Certificate',
             'url': 'https://cloudinary.com/ielts.pdf',
           },
@@ -90,7 +98,7 @@ void main() {
       },
     );
 
-    test('Bio experience minimum length validation', () {
+    test('Bio minimum length validation', () {
       bool isValidBio(String bio) {
         final trimmed = bio.trim();
         return trimmed.isNotEmpty && trimmed.length >= 50;
@@ -105,7 +113,97 @@ void main() {
       );
     });
 
-    test('Normalizes trainer documents into stable document types', () {
+    test('Routes a verified trainer without bank details to payout', () {
+      final stage = resolveTrainerOnboardingStage({
+        'status': 'VERIFIED',
+        'trainerType': 'PROFESSIONAL',
+        'agreementSigned': true,
+        'agreementVersion': trainerAgreementVersion,
+        'bankAccount': '',
+      });
+
+      expect(stage, TrainerOnboardingStage.payout);
+    });
+
+    test('Routes a verified trainer with payout details to trainer home', () {
+      final stage = resolveTrainerOnboardingStage({
+        'status': 'VERIFIED',
+        'trainerType': 'PROFESSIONAL',
+        'agreementSigned': true,
+        'agreementVersion': trainerAgreementVersion,
+        'bankAccount': '0123456789',
+      });
+
+      expect(stage, TrainerOnboardingStage.complete);
+    });
+
+    test('Requires a new agreement when the accepted version is legacy', () {
+      final stage = resolveTrainerOnboardingStage({
+        'status': 'VERIFIED',
+        'trainerType': 'PROFESSIONAL',
+        'agreementSigned': true,
+        'agreementVersion': 'legacy-before-20260823',
+        'bankAccount': '0123456789',
+      });
+
+      expect(stage, TrainerOnboardingStage.agreement);
+    });
+
+    test('Agreement save does not resend stale profile fields', () {
+      final payload = buildTrainerAgreementDraftPayload();
+
+      expect(payload, {'agreementSigned': true});
+      expect(payload.containsKey('phoneNumber'), isFalse);
+      expect(payload.containsKey('bankAccount'), isFalse);
+      expect(payload.containsKey('certificates'), isFalse);
+    });
+
+    test('Explains gateway upload limit errors', () {
+      expect(
+        trainerUploadFailureMessage(
+          statusCode: 413,
+          fallbackMessage: 'Unable to upload the trainer document.',
+        ),
+        'The upload request is too large. Maximum file size is 5MB.',
+      );
+      expect(
+        trainerUploadFailureMessage(
+          statusCode: 500,
+          fallbackMessage: 'Unable to upload the trainer document.',
+        ),
+        'Unable to upload the trainer document.',
+      );
+    });
+
+    test('Keeps trainer revision feedback in its requested section only', () {
+      final bioOnly = parseTrainerRevisionNotes('Bio: Add more details');
+      expect(bioOnly.bio, 'Add more details');
+      expect(bioOnly.certificates, isNull);
+      expect(bioOnly.general, isNull);
+
+      final certificatesOnly = parseTrainerRevisionNotes(
+        'Certificates: Upload a clearer scan',
+      );
+      expect(certificatesOnly.bio, isNull);
+      expect(certificatesOnly.certificates, 'Upload a clearer scan');
+      expect(certificatesOnly.general, isNull);
+
+      final both = parseTrainerRevisionNotes(
+        'Bio: Add teaching details | Certificates: Upload a clearer scan',
+      );
+      expect(both.bio, 'Add teaching details');
+      expect(both.certificates, 'Upload a clearer scan');
+    });
+
+    test('Treats legacy unlabelled revision feedback as one general note', () {
+      final notes = parseTrainerRevisionNotes('Please update your profile');
+
+      expect(notes.bio, isNull);
+      expect(notes.certificates, isNull);
+      expect(notes.general, 'Please update your profile');
+    });
+
+    test('Does not infer document types from uploaded file names', () {
       final documents = normalizeTrainerDocuments([
         {'name': 'Nguyen Van A CV.pdf', 'url': 'https://cloudinary.com/cv.pdf'},
         {
@@ -118,9 +216,9 @@ void main() {
         },
       ]);
 
-      expect(documents[0]['type'], trainerDocTypeCv);
-      expect(documents[1]['type'], trainerDocTypeLanguageProficiency);
-      expect(documents[2]['type'], trainerDocTypePedagogicalDegree);
+      expect(documents[0]['type'], trainerDocTypeOther);
+      expect(documents[1]['type'], trainerDocTypeOther);
+      expect(documents[2]['type'], trainerDocTypeOther);
     });
 
     test('Keeps manual document type selected by the user', () {
@@ -163,88 +261,100 @@ void main() {
       },
     );
 
-    test(
-      'Infers degree and IELTS types from strong institution and document clues',
-      () {
-        expect(
-          inferTrainerDocumentType(
-            name:
-                'Vietnam National University Hanoi College of Foreign Languages diploma',
-          ),
-          trainerDocTypePedagogicalDegree,
-        );
+    test('Validates Tax ID and Citizen ID as separate fields', () {
+      bool isValidTaxCode(String taxCode) {
+        final trimmed = taxCode.trim();
+        return trimmed.isEmpty || RegExp(r'^\d{10}(\d{3})?$').hasMatch(trimmed);
+      }
 
-        expect(
-          inferTrainerDocumentType(
-            name: 'British Council IELTS Test Report Form',
-          ),
-          trainerDocTypeLanguageProficiency,
-        );
-      },
-    );
+      bool isValidCitizenId(String citizenId) {
+        return RegExp(r'^\d{12}$').hasMatch(citizenId.trim());
+      }
 
-    test('Prefers TEFL evidence over a wrong AI degree guess', () {
-      expect(
-        inferTrainerDocumentType(
-          explicitType: trainerDocTypePedagogicalDegree,
-          name: 'Bachelor of English Pedagogy Degree',
-          ocrText: 'TEFL International TESOL Certification',
-          evidenceText:
-              'TEFL International TESOL Certification Lead Trainer Course Director',
-          issuingInstitution: 'Harvard University',
-          isPedagogical: true,
-        ),
-        trainerDocTypeTeachingCertificate,
-      );
+      expect(isValidTaxCode(''), isTrue);
+      expect(isValidTaxCode('0101234567'), isTrue);
+      expect(isValidTaxCode('0101234567001'), isTrue);
+      expect(isValidTaxCode('01012345671'), isFalse);
+      expect(isValidCitizenId('001198001234'), isTrue);
+      expect(isValidCitizenId('0101234567'), isFalse);
     });
 
-    test('Requires manual selection when the suggestion is too weak', () {
-      final suggestion = suggestTrainerDocumentType(
-        explicitType: trainerDocTypeOther,
-        name: 'Other Credential Proof',
-      );
-
-      expect(suggestion.type, trainerDocTypeOther);
-      expect(suggestion.requiresManualSelection, isTrue);
-      expect(suggestion.isConfident, isFalse);
-    });
-
-    test('Does not require manual selection for strong TEFL evidence', () {
-      final suggestion = suggestTrainerDocumentType(
-        name: 'TEFL International TESOL Certification',
-        ocrText: 'TESL TESOL TEFL',
-        evidenceText: 'TEFL International TESOL Certification',
-      );
-
-      expect(suggestion.type, trainerDocTypeTeachingCertificate);
-      expect(suggestion.requiresManualSelection, isFalse);
-      expect(suggestion.isConfident, isTrue);
-    });
-
-    test(
-      'Validates Tax Code / Citizen ID rules (requires strictly 12 digits)',
-      () {
-        bool isValidTaxCodeOrCccd(String taxCode) {
-          final trimmed = taxCode.trim();
-          if (trimmed.isEmpty) return false;
-          final numRegex = RegExp(r'^\d+$');
-          if (!numRegex.hasMatch(trimmed)) return false;
-          if (trimmed.length != 12) {
-            return false;
-          }
-          final allSame = RegExp(r'^(\d)\1+$').hasMatch(trimmed);
-          final dummySeq =
-              trimmed == '123456789012' ||
-              trimmed == '012345678901';
-          return !allSame && !dummySeq;
+    test('Validates section-specific changes on rejected application', () {
+      bool validateRevisions({
+        required String adminNotes,
+        required bool bioChanged,
+        required bool certsChanged,
+      }) {
+        final revisionNotes = parseTrainerRevisionNotes(adminNotes);
+        if (revisionNotes.bio != null && !bioChanged) return false;
+        if (revisionNotes.certificates != null && !certsChanged) return false;
+        if (revisionNotes.general != null && !bioChanged && !certsChanged) {
+          return false;
         }
+        return true;
+      }
 
-        expect(isValidTaxCodeOrCccd('001198001234'), isTrue); // 12 digits CCCD
-        expect(isValidTaxCodeOrCccd('0101234567'), isFalse); // 10 digits (invalid)
-        expect(isValidTaxCodeOrCccd('0101234567001'), isFalse); // 13 digits (invalid)
-        expect(isValidTaxCodeOrCccd('01012345671'), isFalse); // 11 digits (invalid)
-        expect(isValidTaxCodeOrCccd('000000000000'), isFalse); // dummy sequence
-      },
-    );
+      // Bio only rejected: must change bio, changing certs alone is not enough
+      expect(
+        validateRevisions(
+          adminNotes: 'Bio: I dont understand',
+          bioChanged: false,
+          certsChanged: true,
+        ),
+        isFalse,
+      );
+      expect(
+        validateRevisions(
+          adminNotes: 'Bio: I dont understand',
+          bioChanged: true,
+          certsChanged: false,
+        ),
+        isTrue,
+      );
+
+      // Certificates only rejected: must change certs, changing bio alone is not enough
+      expect(
+        validateRevisions(
+          adminNotes: 'Certificates: Missing degree',
+          bioChanged: true,
+          certsChanged: false,
+        ),
+        isFalse,
+      );
+      expect(
+        validateRevisions(
+          adminNotes: 'Certificates: Missing degree',
+          bioChanged: false,
+          certsChanged: true,
+        ),
+        isTrue,
+      );
+
+      // Both rejected: must change both
+      expect(
+        validateRevisions(
+          adminNotes: 'Bio: Fix bio | Certificates: Fix cert',
+          bioChanged: true,
+          certsChanged: false,
+        ),
+        isFalse,
+      );
+      expect(
+        validateRevisions(
+          adminNotes: 'Bio: Fix bio | Certificates: Fix cert',
+          bioChanged: false,
+          certsChanged: true,
+        ),
+        isFalse,
+      );
+      expect(
+        validateRevisions(
+          adminNotes: 'Bio: Fix bio | Certificates: Fix cert',
+          bioChanged: true,
+          certsChanged: true,
+        ),
+        isTrue,
+      );
+    });
   });
 }

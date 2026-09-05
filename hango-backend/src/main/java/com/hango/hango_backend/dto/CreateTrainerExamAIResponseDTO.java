@@ -28,6 +28,7 @@ public class CreateTrainerExamAIResponseDTO {
     public static class BlockDTO {
         private Boolean isQuestionGroup;
         private String passageText;
+        private String sourceCitation;
         private Long categoryId; // GroupType
         private Long skillParamId; // SkillType
         private Long difficultyId;

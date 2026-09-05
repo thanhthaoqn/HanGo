@@ -25,10 +25,10 @@ public class Comment {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "course_id")
-    @NotFound(action = NotFoundAction.IGNORE)
-    private Course course;
+    // @ManyToOne(fetch = FetchType.LAZY)
+    // @JoinColumn(name = "course_id")
+    // @NotFound(action = NotFoundAction.IGNORE)
+    // private Course course;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "lesson_id")
@@ -39,11 +39,7 @@ public class Comment {
     private Comment parentComment;
 
     @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-        name = "comment_likes",
-        joinColumns = @JoinColumn(name = "comment_id"),
-        inverseJoinColumns = @JoinColumn(name = "user_id")
-    )
+    @JoinTable(name = "comment_likes", joinColumns = @JoinColumn(name = "comment_id"), inverseJoinColumns = @JoinColumn(name = "user_id"))
     @Builder.Default
     private Set<User> likedUsers = new HashSet<>();
 

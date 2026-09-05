@@ -2,8 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/services/auth_service.dart';
+import '../../utils/register_verification_guard.dart';
 import '../../utils/toast_helper.dart';
-import 'learner/learner_home_page.dart';
+import 'learner/learner_shell_page.dart';
 import 'terms_and_privacy_page.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -27,6 +28,7 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _showCheckEmailScreen = false;
   bool _isVerifying = false;
   bool _isResending = false;
+  final _verificationGuard = RegisterVerificationGuard();
   Timer? _verificationTimer;
   String _selectedRole = 'LEARNER'; // 'LEARNER' or 'TRAINER'
 
@@ -41,7 +43,8 @@ class _RegisterPageState extends State<RegisterPage> {
   void _checkPreselectedRole() async {
     final prefs = await SharedPreferences.getInstance();
     final preselected = prefs.getString('preselected_register_role');
-    if (preselected != null && (preselected == 'LEARNER' || preselected == 'TRAINER')) {
+    if (preselected != null &&
+        (preselected == 'LEARNER' || preselected == 'TRAINER')) {
       setState(() {
         _selectedRole = preselected;
       });
@@ -60,13 +63,28 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   void _goBackToHome() {
-    if (Navigator.of(context).canPop()) {
-      Navigator.of(context).pop();
+    if (!mounted) return;
+
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      _popCurrentRouteOnce();
     } else {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const LearnerHomePage()),
+      if (!_verificationGuard.tryClose()) return;
+      _verificationTimer?.cancel();
+      navigator.pushReplacement(
+        MaterialPageRoute(builder: (context) => const LearnerShellPage()),
       );
     }
+  }
+
+  void _popCurrentRouteOnce() {
+    if (!mounted || !_verificationGuard.tryClose()) return;
+
+    _verificationTimer?.cancel();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.of(context).maybePop();
+    });
   }
 
   Widget _buildBackToHomeLink() {
@@ -96,7 +114,10 @@ class _RegisterPageState extends State<RegisterPage> {
   void _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
     if (!_agreeToTerms) {
-      ToastHelper.showError(context, 'You must agree to the Terms of Service and Privacy Policy');
+      ToastHelper.showError(
+        context,
+        'You must agree to the Terms of Service and Privacy Policy',
+      );
       return;
     }
 
@@ -124,13 +145,19 @@ class _RegisterPageState extends State<RegisterPage> {
 
     if (mounted) {
       if (result['success']) {
-        ToastHelper.showSuccess(context, 'Registration successful! Please check your email.');
+        ToastHelper.showSuccess(
+          context,
+          'Registration successful! Please check your email.',
+        );
         setState(() {
           _showCheckEmailScreen = true;
         });
         _startVerificationPolling();
       } else {
-        ToastHelper.showError(context, result['message'] ?? 'Registration failed. Please try again.');
+        ToastHelper.showError(
+          context,
+          result['message'] ?? 'Registration failed. Please try again.',
+        );
       }
     }
   }
@@ -140,45 +167,61 @@ class _RegisterPageState extends State<RegisterPage> {
     final email = _emailController.text.trim();
     if (email.isEmpty) return;
 
-    _verificationTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
-      final isVerified = await _authService.checkVerificationStatus(email);
-      if (isVerified && mounted) {
-        timer.cancel();
-        
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('is_new_registration_$email', true);
-        if (!mounted) return;
+    _verificationTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
+      if (!_verificationGuard.tryStartCheck()) return;
 
-        ToastHelper.showSuccess(context, 'Account verified successfully! Please sign in.');
-        Navigator.pop(context);
+      try {
+        final isVerified = await _authService.checkVerificationStatus(email);
+        if (isVerified) {
+          await _completeVerification(email);
+        }
+      } finally {
+        _verificationGuard.finishCheck();
       }
     });
   }
 
+  Future<void> _completeVerification(String email) async {
+    if (!mounted || !_verificationGuard.tryComplete()) return;
+
+    _verificationTimer?.cancel();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('is_new_registration_$email', true);
+    if (!mounted || _verificationGuard.isClosing) return;
+
+    ToastHelper.showSuccess(
+      context,
+      'Account verified successfully! Please sign in.',
+    );
+    _popCurrentRouteOnce();
+  }
+
   void _handleVerifyAccount() async {
+    if (!_verificationGuard.tryStartCheck()) return;
+
     setState(() {
       _isVerifying = true;
     });
 
     final email = _emailController.text.trim();
-    final isVerified = await _authService.checkVerificationStatus(email);
-
-    if (mounted) {
-      setState(() {
-        _isVerifying = false;
-      });
-
+    try {
+      final isVerified = await _authService.checkVerificationStatus(email);
+      if (!mounted || _verificationGuard.isClosing) return;
       if (isVerified) {
-        _verificationTimer?.cancel();
-
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('is_new_registration_$email', true);
-        if (!mounted) return;
-
-        ToastHelper.showSuccess(context, 'Account verified successfully! Please sign in.');
-        Navigator.pop(context);
+        await _completeVerification(email);
       } else {
-        ToastHelper.showError(context, 'Account is not verified yet. Please check your email and click the verification link.');
+        ToastHelper.showError(
+          context,
+          'Account is not verified yet. Please check your email and click the verification link.',
+        );
+      }
+    } finally {
+      _verificationGuard.finishCheck();
+      if (mounted && !_verificationGuard.isClosing) {
+        setState(() {
+          _isVerifying = false;
+        });
       }
     }
   }
@@ -199,9 +242,13 @@ class _RegisterPageState extends State<RegisterPage> {
       });
 
       if (result['success']) {
-        ToastHelper.showSuccess(context, 'Verification link has been resent! Please check your email.');
+        ToastHelper.showSuccess(
+          context,
+          'Verification link has been resent! Please check your email.',
+        );
       } else {
-        String errMsg = result['message'] ?? 'Failed to resend verification link.';
+        String errMsg =
+            result['message'] ?? 'Failed to resend verification link.';
         if (errMsg.startsWith('Error: ')) {
           errMsg = errMsg.substring(7);
         }
@@ -209,7 +256,6 @@ class _RegisterPageState extends State<RegisterPage> {
       }
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -362,24 +408,43 @@ class _RegisterPageState extends State<RegisterPage> {
                             keyboardType: TextInputType.name,
                             decoration: InputDecoration(
                               hintText: 'Enter your full name',
-                              hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
-                              prefixIcon: const Icon(Icons.person_outline, color: Color(0xFF9CA3AF), size: 20),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              hintStyle: const TextStyle(
+                                color: Color(0xFF9CA3AF),
+                                fontSize: 14,
+                              ),
+                              prefixIcon: const Icon(
+                                Icons.person_outline,
+                                color: Color(0xFF9CA3AF),
+                                size: 20,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFD1D5DB),
+                                ),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFE5E7EB),
+                                ),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF28B79B),
+                                  width: 1.5,
+                                ),
                               ),
                               errorBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Colors.redAccent),
+                                borderSide: const BorderSide(
+                                  color: Colors.redAccent,
+                                ),
                               ),
                               errorMaxLines: 6,
                             ),
@@ -407,24 +472,43 @@ class _RegisterPageState extends State<RegisterPage> {
                             keyboardType: TextInputType.emailAddress,
                             decoration: InputDecoration(
                               hintText: 'Enter your email address',
-                              hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
-                              prefixIcon: const Icon(Icons.mail_outline, color: Color(0xFF9CA3AF), size: 20),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              hintStyle: const TextStyle(
+                                color: Color(0xFF9CA3AF),
+                                fontSize: 14,
+                              ),
+                              prefixIcon: const Icon(
+                                Icons.mail_outline,
+                                color: Color(0xFF9CA3AF),
+                                size: 20,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFD1D5DB),
+                                ),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFE5E7EB),
+                                ),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF28B79B),
+                                  width: 1.5,
+                                ),
                               ),
                               errorBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Colors.redAccent),
+                                borderSide: const BorderSide(
+                                  color: Colors.redAccent,
+                                ),
                               ),
                               errorMaxLines: 6,
                             ),
@@ -432,7 +516,9 @@ class _RegisterPageState extends State<RegisterPage> {
                               if (value == null || value.trim().isEmpty) {
                                 return 'Email is required';
                               }
-                              final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+                              final emailRegex = RegExp(
+                                r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+                              );
                               if (!emailRegex.hasMatch(value.trim())) {
                                 return 'Please enter a valid email address';
                               }
@@ -456,11 +542,20 @@ class _RegisterPageState extends State<RegisterPage> {
                             obscureText: _obscurePassword,
                             decoration: InputDecoration(
                               hintText: 'Enter your password',
-                              hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
-                              prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF9CA3AF), size: 20),
+                              hintStyle: const TextStyle(
+                                color: Color(0xFF9CA3AF),
+                                fontSize: 14,
+                              ),
+                              prefixIcon: const Icon(
+                                Icons.lock_outline,
+                                color: Color(0xFF9CA3AF),
+                                size: 20,
+                              ),
                               suffixIcon: IconButton(
                                 icon: Icon(
-                                  _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                  _obscurePassword
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
                                   color: const Color(0xFF9CA3AF),
                                   size: 20,
                                 ),
@@ -470,22 +565,34 @@ class _RegisterPageState extends State<RegisterPage> {
                                   });
                                 },
                               ),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFD1D5DB),
+                                ),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFE5E7EB),
+                                ),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF28B79B),
+                                  width: 1.5,
+                                ),
                               ),
                               errorBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Colors.redAccent),
+                                borderSide: const BorderSide(
+                                  color: Colors.redAccent,
+                                ),
                               ),
                               errorMaxLines: 6,
                             ),
@@ -506,7 +613,9 @@ class _RegisterPageState extends State<RegisterPage> {
                               if (!RegExp(r'[0-9]').hasMatch(value)) {
                                 missing.add('at least 1 number');
                               }
-                              if (!RegExp(r'[!@#\$%^&*(),.?":{}|<>_\-+=~`[\]\\;/]').hasMatch(value)) {
+                              if (!RegExp(
+                                r'[!@#\$%^&*(),.?":{}|<>_\-+=~`[\]\\;/]',
+                              ).hasMatch(value)) {
                                 missing.add('at least 1 special character');
                               }
                               if (missing.isNotEmpty) {
@@ -532,36 +641,58 @@ class _RegisterPageState extends State<RegisterPage> {
                             obscureText: _obscureConfirmPassword,
                             decoration: InputDecoration(
                               hintText: 'Re-enter your password',
-                              hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
-                              prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF9CA3AF), size: 20),
+                              hintStyle: const TextStyle(
+                                color: Color(0xFF9CA3AF),
+                                fontSize: 14,
+                              ),
+                              prefixIcon: const Icon(
+                                Icons.lock_outline,
+                                color: Color(0xFF9CA3AF),
+                                size: 20,
+                              ),
                               suffixIcon: IconButton(
                                 icon: Icon(
-                                  _obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                  _obscureConfirmPassword
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
                                   color: const Color(0xFF9CA3AF),
                                   size: 20,
                                 ),
                                 onPressed: () {
                                   setState(() {
-                                    _obscureConfirmPassword = !_obscureConfirmPassword;
+                                    _obscureConfirmPassword =
+                                        !_obscureConfirmPassword;
                                   });
                                 },
                               ),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFD1D5DB),
+                                ),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFFE5E7EB),
+                                ),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF28B79B),
+                                  width: 1.5,
+                                ),
                               ),
                               errorBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: Colors.redAccent),
+                                borderSide: const BorderSide(
+                                  color: Colors.redAccent,
+                                ),
                               ),
                               errorMaxLines: 6,
                             ),
@@ -598,7 +729,8 @@ class _RegisterPageState extends State<RegisterPage> {
                               Expanded(
                                 child: RichText(
                                   text: TextSpan(
-                                    text: 'By creating an account, you agree to HanGo\'s ',
+                                    text:
+                                        'By creating an account, you agree to HanGo\'s ',
                                     style: const TextStyle(
                                       fontSize: 12,
                                       color: Color(0xFF6B7280),
@@ -611,7 +743,10 @@ class _RegisterPageState extends State<RegisterPage> {
                                             Navigator.push(
                                               context,
                                               MaterialPageRoute(
-                                                builder: (context) => const TermsAndPrivacyPage(initialTab: 0),
+                                                builder: (context) =>
+                                                    const TermsAndPrivacyPage(
+                                                      initialTab: 0,
+                                                    ),
                                               ),
                                             );
                                           },
@@ -632,7 +767,10 @@ class _RegisterPageState extends State<RegisterPage> {
                                             Navigator.push(
                                               context,
                                               MaterialPageRoute(
-                                                builder: (context) => const TermsAndPrivacyPage(initialTab: 1),
+                                                builder: (context) =>
+                                                    const TermsAndPrivacyPage(
+                                                      initialTab: 1,
+                                                    ),
                                               ),
                                             );
                                           },
@@ -678,7 +816,8 @@ class _RegisterPageState extends State<RegisterPage> {
                                       ),
                                     )
                                   : Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: const [
                                         Text(
                                           'Sign Up Now',
@@ -689,7 +828,11 @@ class _RegisterPageState extends State<RegisterPage> {
                                           ),
                                         ),
                                         SizedBox(width: 8),
-                                        Icon(Icons.arrow_forward, color: Colors.white, size: 18),
+                                        Icon(
+                                          Icons.arrow_forward,
+                                          color: Colors.white,
+                                          size: 18,
+                                        ),
                                       ],
                                     ),
                             ),
@@ -713,7 +856,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                       cursor: SystemMouseCursors.click,
                                       child: GestureDetector(
                                         onTap: () {
-                                          Navigator.pop(context);
+                                          _popCurrentRouteOnce();
                                         },
                                         child: const Text(
                                           'Sign In',
@@ -751,18 +894,14 @@ class _RegisterPageState extends State<RegisterPage> {
           alignment: Alignment.centerLeft,
           child: GestureDetector(
             onTap: () {
-              Navigator.pop(context);
+              _popCurrentRouteOnce();
             },
             child: MouseRegion(
               cursor: SystemMouseCursors.click,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: const [
-                  Icon(
-                    Icons.arrow_back,
-                    color: Color(0xFF28B79B),
-                    size: 16,
-                  ),
+                  Icon(Icons.arrow_back, color: Color(0xFF28B79B), size: 16),
                   SizedBox(width: 6),
                   Text(
                     'Back to Login',
@@ -847,11 +986,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 : Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: const [
-                      Icon(
-                        Icons.verified,
-                        size: 18,
-                        color: Colors.white,
-                      ),
+                      Icon(Icons.verified, size: 18, color: Colors.white),
                       SizedBox(width: 8),
                       Text(
                         'Verify Account',
@@ -886,11 +1021,15 @@ class _RegisterPageState extends State<RegisterPage> {
                   child: GestureDetector(
                     onTap: _isResending ? null : _handleResendVerificationLink,
                     child: MouseRegion(
-                      cursor: _isResending ? SystemMouseCursors.basic : SystemMouseCursors.click,
+                      cursor: _isResending
+                          ? SystemMouseCursors.basic
+                          : SystemMouseCursors.click,
                       child: Text(
                         'Resend link',
                         style: TextStyle(
-                          color: _isResending ? const Color(0xFF9CA3AF) : const Color(0xFF28B79B),
+                          color: _isResending
+                              ? const Color(0xFF9CA3AF)
+                              : const Color(0xFF28B79B),
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                           fontFamily: 'Outfit',
@@ -906,10 +1045,7 @@ class _RegisterPageState extends State<RegisterPage> {
         const SizedBox(height: 40),
 
         // 7. Divider
-        const Divider(
-          color: Color(0xFFE5E7EB),
-          thickness: 1,
-        ),
+        const Divider(color: Color(0xFFE5E7EB), thickness: 1),
         const SizedBox(height: 24),
 
         // 8. Footer Help Text
@@ -930,7 +1066,10 @@ class _RegisterPageState extends State<RegisterPage> {
                   baseline: TextBaseline.alphabetic,
                   child: GestureDetector(
                     onTap: () {
-                      ToastHelper.showSuccess(context, 'Contact support at support@hango.com');
+                      ToastHelper.showSuccess(
+                        context,
+                        'Contact support at support@hango.com',
+                      );
                     },
                     child: MouseRegion(
                       cursor: SystemMouseCursors.click,
@@ -995,7 +1134,7 @@ class RoleToggleSelector extends StatelessWidget {
                               color: Colors.black.withValues(alpha: 0.05),
                               blurRadius: 4,
                               offset: const Offset(0, 2),
-                            )
+                            ),
                           ]
                         : null,
                   ),
@@ -1032,7 +1171,7 @@ class RoleToggleSelector extends StatelessWidget {
                               color: Colors.black.withValues(alpha: 0.05),
                               blurRadius: 4,
                               offset: const Offset(0, 2),
-                            )
+                            ),
                           ]
                         : null,
                   ),

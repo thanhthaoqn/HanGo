@@ -29,6 +29,8 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.multipart.MultipartFile;
 import com.hango.hango_backend.service.CloudinaryService;
 import com.hango.hango_backend.dto.TrainerCreateCourseRequestDTO;
+import com.hango.hango_backend.exception.ApiException;
+import com.hango.hango_backend.exception.CourseImportValidationException;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
@@ -54,7 +56,8 @@ public class TrainerDashboardController {
             return ResponseEntity.ok(java.util.Map.of("transcript", transcript));
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage() != null ? e.getMessage() : "Unknown error"));
+            return ResponseEntity.badRequest()
+                    .body(java.util.Map.of("error", e.getMessage() != null ? e.getMessage() : "Unknown error"));
         }
     }
 
@@ -88,8 +91,10 @@ public class TrainerDashboardController {
         try {
             byte[] workbook = courseImportService.buildTemplateWorkbook();
             return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"Hango_Course_Import_Template.xlsx\"")
-                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"Hango_Course_Import_Template.xlsx\"")
+                    .contentType(MediaType
+                            .parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                     .body(workbook);
         } catch (Exception e) {
             e.printStackTrace();
@@ -108,6 +113,11 @@ public class TrainerDashboardController {
             }
             CourseImportResultDTO result = courseImportService.importWorkbook(userDetails.getUsername(), file);
             return ResponseEntity.ok(result);
+        } catch (CourseImportValidationException e) {
+            java.util.Map<String, Object> body = new java.util.HashMap<>();
+            body.put("error", e.getMessage());
+            body.put("errors", e.getErrors());
+            return ResponseEntity.badRequest().body(body);
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
@@ -125,6 +135,10 @@ public class TrainerDashboardController {
         }
     }
 
+    // Buoc 1 cua flow "Content Building": Trainer tao khoa hoc moi.
+    // Khoa hoc luon duoc tao voi status = "DRAFT" (xem TrainerDashboardServiceImpl
+    // .createTrainerCourse) - chua co Section/Lesson nao, chi la thong tin chung
+    // (tieu de, mo ta, danh muc, do kho, gia goi y).
     @PostMapping("/courses")
     @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> createCourse(
@@ -136,6 +150,8 @@ public class TrainerDashboardController {
             }
             trainerDashboardService.createTrainerCourse(userDetails.getUsername(), request);
             return ResponseEntity.ok("{\"message\": \"Course created successfully in DRAFT status\"}");
+        } catch (ApiException e) {
+            return ResponseEntity.status(e.getStatus()).body("{\"error\": \"" + e.getMessage() + "\"}");
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
@@ -153,12 +169,20 @@ public class TrainerDashboardController {
             }
             trainerDashboardService.deleteTrainerCourse(id, userDetails.getUsername());
             return ResponseEntity.ok("{\"message\": \"Course deleted successfully\"}");
+        } catch (ApiException e) {
+            return ResponseEntity.status(e.getStatus()).body("{\"error\": \"" + e.getMessage() + "\"}");
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
         }
     }
 
+    // Buoc 2: Trainer chinh sua noi dung (Section/Lesson) cua khoa hoc.
+    // Endpoint nay dung CHUNG cho ca "Save draft" va "Auto-save" ben Frontend
+    // (xem edit_course_page.dart _saveCourse/_autoSaveCourse - ca hai deu goi PUT nay).
+    // Neu khoa hoc dang o trang thai PUBLISHED, Service se KHONG sua truc tiep
+    // ma tao ra 1 ban DRAFT phien ban moi (xem updateTrainerCourse trong
+    // TrainerDashboardServiceImpl) de khong lam thay doi noi dung hoc vien dang hoc.
     @PutMapping("/courses/{id}")
     @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> updateCourse(
@@ -174,6 +198,8 @@ public class TrainerDashboardController {
             response.put("message", "Course updated successfully");
             response.put("courseId", updatedCourseId);
             return ResponseEntity.ok(response);
+        } catch (ApiException e) {
+            return ResponseEntity.status(e.getStatus()).body("{\"error\": \"" + e.getMessage() + "\"}");
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
@@ -191,12 +217,19 @@ public class TrainerDashboardController {
             }
             trainerDashboardService.publishTrainerCourse(id, userDetails.getUsername());
             return ResponseEntity.ok("{\"message\": \"Course published successfully\"}");
+        } catch (ApiException e) {
+            return ResponseEntity.status(e.getStatus()).body("{\"error\": \"" + e.getMessage() + "\"}");
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
         }
     }
 
+    // Buoc 3: Trainer bam "Submit for review" -> chuyen khoa hoc sang trang thai
+    // cho duyet. Neu nguoi tao la Trainer thuong: status -> PENDING_APPROVAL,
+    // cho Course Manager duyet (xem CourseManagerDashboardController.publishCourse).
+    // Neu nguoi tao von da la COURSE_MANAGER/ADMINISTRATOR: tu dong PUBLISHED
+    // luon, khong can ai duyet (xem logic isManager trong submitTrainerCourse).
     @PostMapping("/courses/{id}/submit")
     @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> submitCourseForReview(
@@ -208,6 +241,8 @@ public class TrainerDashboardController {
             }
             trainerDashboardService.submitTrainerCourse(id, userDetails.getUsername());
             return ResponseEntity.ok("{\"message\": \"Course submitted for review\"}");
+        } catch (ApiException e) {
+            return ResponseEntity.status(e.getStatus()).body("{\"error\": \"" + e.getMessage() + "\"}");
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
@@ -225,6 +260,8 @@ public class TrainerDashboardController {
             }
             trainerDashboardService.reEvaluateCoursePrice(id, userDetails.getUsername());
             return ResponseEntity.ok("{\"message\": \"Course price re-evaluated successfully\"}");
+        } catch (ApiException e) {
+            return ResponseEntity.status(e.getStatus()).body("{\"error\": \"" + e.getMessage() + "\"}");
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
@@ -238,8 +275,56 @@ public class TrainerDashboardController {
             if (userDetails == null) {
                 return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
             }
-            TrainerDashboardSummaryDTO summary = trainerDashboardService.getTrainerDashboardSummary(userDetails.getUsername());
+            TrainerDashboardSummaryDTO summary = trainerDashboardService
+                    .getTrainerDashboardSummary(userDetails.getUsername());
             return ResponseEntity.ok(summary);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
+    @PostMapping("/dashboard/seed")
+    public ResponseEntity<?> seedMockData(@RequestParam Long trainerId) {
+        try {
+            trainerDashboardService.seedMockPayments(trainerId);
+            return ResponseEntity.ok(java.util.Map.of("message", "Mock data seeded successfully for trainer: " + trainerId));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
+    @GetMapping("/revenue/weekly")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<?> getWeeklyRevenue(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(defaultValue = "0") int weekOffset) {
+        try {
+            if (userDetails == null) {
+                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            }
+            java.util.List<com.hango.hango_backend.dto.DailyRevenueDTO> revenue = trainerDashboardService
+                    .getWeeklyRevenue(userDetails.getUsername(), weekOffset);
+            return ResponseEntity.ok(revenue);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
+    @GetMapping("/revenue/monthly")
+    @PreAuthorize("hasAuthority('MANAGE_OWN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<?> getMonthlyRevenue(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam int year) {
+        try {
+            if (userDetails == null) {
+                return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            }
+            java.util.List<com.hango.hango_backend.dto.MonthlyRevenueDTO> revenue = trainerDashboardService
+                    .getMonthlyRevenue(userDetails.getUsername(), year);
+            return ResponseEntity.ok(revenue);
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
@@ -274,7 +359,8 @@ public class TrainerDashboardController {
             if (userDetails == null) {
                 return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
             }
-            java.util.List<com.hango.hango_backend.dto.TrainerExamResponseDTO> response = trainerDashboardService.getTrainerExams(userDetails.getUsername());
+            java.util.List<com.hango.hango_backend.dto.TrainerExamResponseDTO> response = trainerDashboardService
+                    .getTrainerExams(userDetails.getUsername());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             e.printStackTrace();
@@ -310,7 +396,8 @@ public class TrainerDashboardController {
                 return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
             }
             Long newId = trainerDashboardService.createTrainerExam(userDetails.getUsername(), request);
-            return ResponseEntity.ok("{\"id\": " + newId + ", \"message\": \"Exam created successfully in DRAFT status\"}");
+            return ResponseEntity
+                    .ok("{\"id\": " + newId + ", \"message\": \"Exam created successfully in DRAFT status\"}");
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
@@ -362,7 +449,8 @@ public class TrainerDashboardController {
             if (userDetails == null) {
                 return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
             }
-            com.hango.hango_backend.dto.TrainerSaveExamQuestionsRequestDTO response = trainerDashboardService.getExamQuestions(id, userDetails.getUsername());
+            com.hango.hango_backend.dto.TrainerSaveExamQuestionsRequestDTO response = trainerDashboardService
+                    .getExamQuestions(id, userDetails.getUsername());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             e.printStackTrace();
@@ -407,7 +495,8 @@ public class TrainerDashboardController {
                 return ResponseEntity.badRequest().body("{\"error\": \"Visibility is required\"}");
             }
             trainerDashboardService.updateExamVisibility(id, userDetails.getUsername(), newVisibility.toUpperCase());
-            return ResponseEntity.ok("{\"message\": \"Exam visibility updated to " + newVisibility.toUpperCase() + "\"}");
+            return ResponseEntity
+                    .ok("{\"message\": \"Exam visibility updated to " + newVisibility.toUpperCase() + "\"}");
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");

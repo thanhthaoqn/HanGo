@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../data/models/ticket_model.dart';
 import '../../../data/services/ticket_service.dart';
@@ -31,7 +30,6 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
   bool _isSendingReply = false;
   String? _rejectionReasonError;
   String? _adminReplyError;
-  Timer? _pollingTimer;
 
   @override
   void initState() {
@@ -44,11 +42,6 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
       _adminResponseController.text = widget.ticket.adminResponse ?? '';
     }
     _loadTicketDetail();
-
-    // Start 3-second live auto-polling for chat messages
-    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      _loadTicketDetail(isSilent: true);
-    });
   }
 
   Future<void> _loadTicketDetail({bool isSilent = false}) async {
@@ -66,38 +59,10 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
     }
   }
 
-  void _sendAdminReply() async {
-    final text = _adminReplyController.text.trim();
-    if (text.isEmpty) {
-      setState(() {
-        _adminReplyError = 'Please enter a message to reply.';
-      });
-      return;
-    } else {
-      setState(() {
-        _adminReplyError = null;
-      });
-    }
-
-    setState(() => _isSendingReply = true);
-    final res = await _ticketService.addMessage(widget.ticket.id, text);
-    if (mounted) {
-      setState(() => _isSendingReply = false);
-      if (res['success'] == true) {
-        _adminReplyController.clear();
-        setState(() => _adminReplyError = null);
-        ToastHelper.showSuccess(context, 'Message sent to Trainer!');
-        _loadTicketDetail(isSilent: true);
-        widget.onSuccess();
-      } else {
-        ToastHelper.showError(context, res['message'] ?? 'Failed to send message.');
-      }
-    }
-  }
+  void _sendAdminReply() {}
 
   @override
   void dispose() {
-    _pollingTimer?.cancel();
     _rejectionReasonController.dispose();
     _adminResponseController.dispose();
     _adminReplyController.dispose();
@@ -105,7 +70,8 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
   }
 
   void _submit() async {
-    if (_selectedAction == 'REJECT' && _rejectionReasonController.text.trim().isEmpty) {
+    if (_selectedAction == 'REJECT' &&
+        _rejectionReasonController.text.trim().isEmpty) {
       setState(() {
         _rejectionReasonError = 'Rejection reason is required.';
       });
@@ -123,8 +89,12 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
     final res = await _ticketService.processTicket(
       widget.ticket.id,
       action: _selectedAction,
-      rejectionReason: _selectedAction == 'REJECT' ? _rejectionReasonController.text.trim() : null,
-      adminResponse: _adminResponseController.text.trim().isNotEmpty ? _adminResponseController.text.trim() : null,
+      rejectionReason: _selectedAction == 'REJECT'
+          ? _rejectionReasonController.text.trim()
+          : null,
+      adminResponse: _adminResponseController.text.trim().isNotEmpty
+          ? _adminResponseController.text.trim()
+          : null,
     );
 
     if (mounted) {
@@ -136,14 +106,31 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
         ToastHelper.showSuccess(
           context,
           _selectedAction == 'APPROVE'
-              ? 'Ticket #${widget.ticket.ticketCode} approved successfully!'
+              ? 'Ticket #${widget.ticket.ticketCode} accepted successfully!'
               : 'Ticket #${widget.ticket.ticketCode} rejected.',
         );
         Navigator.pop(context);
         widget.onSuccess();
       } else {
-        ToastHelper.showError(context, res['message'] ?? 'Failed to process ticket.');
+        ToastHelper.showError(
+          context,
+          res['message'] ?? 'Failed to process ticket.',
+        );
       }
+    }
+  }
+
+  String _formatDateTime(String? raw) {
+    if (raw == null || raw.isEmpty) return 'N/A';
+    try {
+      final parsed = DateTime.parse(raw);
+      return '${parsed.year.toString().padLeft(4, '0')}-'
+          '${parsed.month.toString().padLeft(2, '0')}-'
+          '${parsed.day.toString().padLeft(2, '0')} '
+          '${parsed.hour.toString().padLeft(2, '0')}:'
+          '${parsed.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return raw.replaceAll('T', ' ').split('.').first;
     }
   }
 
@@ -155,7 +142,7 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
     if (status == 'APPROVED') {
       bg = const Color(0xFFDCFCE7);
       fg = const Color(0xFF15803D);
-      label = 'Approved';
+      label = 'Accepted';
     } else if (status == 'REJECTED') {
       bg = const Color(0xFFFEE2E2);
       fg = const Color(0xFFDC2626);
@@ -179,35 +166,29 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
     );
   }
 
-  String _formatDateTime(String? raw) {
-    if (raw == null || raw.isEmpty) return 'N/A';
-    try {
-      final parsed = DateTime.parse(raw);
-      final year = parsed.year.toString().padLeft(4, '0');
-      final month = parsed.month.toString().padLeft(2, '0');
-      final day = parsed.day.toString().padLeft(2, '0');
-      final hour = parsed.hour.toString().padLeft(2, '0');
-      final minute = parsed.minute.toString().padLeft(2, '0');
-      return '$year-$month-$day $hour:$minute';
-    } catch (_) {
-      String formatted = raw.replaceAll('T', ' ');
-      if (formatted.contains('.')) {
-        formatted = formatted.split('.').first;
-      }
-      return formatted;
-    }
-  }
-
   Widget _buildAuditRow(IconData icon, String label, String value) {
     return Row(
       children: [
         Icon(icon, size: 14, color: const Color(0xFF64748B)),
         const SizedBox(width: 8),
-        Text('$label: ', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B), fontFamily: 'Outfit')),
+        Text(
+          '$label: ',
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF64748B),
+            fontFamily: 'Outfit',
+          ),
+        ),
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E293B), fontFamily: 'Outfit'),
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E293B),
+              fontFamily: 'Outfit',
+            ),
             overflow: TextOverflow.ellipsis,
           ),
         ),
@@ -217,12 +198,18 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
 
   // Reusable Ticket Overview & Decision Form Fields
   Widget _buildLeftContent(bool isClosed, String senderName) {
+    final ticket = _fullTicket ?? widget.ticket;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          widget.ticket.title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A), fontFamily: 'Outfit'),
+          ticket.title,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0F172A),
+            fontFamily: 'Outfit',
+          ),
         ),
         const SizedBox(height: 6),
         Wrap(
@@ -230,9 +217,15 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
           runSpacing: 4,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Text('Code: ${widget.ticket.ticketCode}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-            Text('• Sender: $senderName (${widget.ticket.userRole})', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-            _buildStatusBadge(widget.ticket.status),
+            Text(
+              'Code: ${ticket.ticketCode}',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            ),
+            Text(
+              '• Sender: $senderName (${widget.ticket.userRole})',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            ),
+            _buildStatusBadge(ticket.status),
           ],
         ),
         const SizedBox(height: 14),
@@ -242,7 +235,12 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
         // 1. Description Block
         const Text(
           'Ticket Description / Content',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155), fontFamily: 'Outfit'),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+            color: Color(0xFF334155),
+            fontFamily: 'Outfit',
+          ),
         ),
         const SizedBox(height: 8),
         Container(
@@ -254,17 +252,28 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
             border: Border.all(color: const Color(0xFFE2E8F0)),
           ),
           child: Text(
-            widget.ticket.description,
-            style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), height: 1.5),
+            ticket.description,
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF0F172A),
+              height: 1.5,
+            ),
           ),
         ),
         const SizedBox(height: 16),
 
         // 2. Decision Result Callouts (if closed)
-        if (widget.ticket.status == 'APPROVED' && widget.ticket.adminResponse != null && widget.ticket.adminResponse!.isNotEmpty) ...[
+        if (ticket.status == 'APPROVED' &&
+            ticket.adminResponse != null &&
+            ticket.adminResponse!.isNotEmpty) ...[
           const Text(
             'Admin Response / Note',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155), fontFamily: 'Outfit'),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: Color(0xFF334155),
+              fontFamily: 'Outfit',
+            ),
           ),
           const SizedBox(height: 8),
           Container(
@@ -276,17 +285,28 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
               border: Border.all(color: const Color(0xFFBBF7D0)),
             ),
             child: Text(
-              widget.ticket.adminResponse!,
-              style: const TextStyle(fontSize: 13, color: Color(0xFF166534), height: 1.4),
+              ticket.adminResponse!,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF166534),
+                height: 1.4,
+              ),
             ),
           ),
           const SizedBox(height: 16),
         ],
 
-        if (widget.ticket.status == 'REJECTED' && widget.ticket.rejectionReason != null && widget.ticket.rejectionReason!.isNotEmpty) ...[
+        if (ticket.status == 'REJECTED' &&
+            ticket.rejectionReason != null &&
+            ticket.rejectionReason!.isNotEmpty) ...[
           const Text(
             'Rejection Reason',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFDC2626), fontFamily: 'Outfit'),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: Color(0xFFDC2626),
+              fontFamily: 'Outfit',
+            ),
           ),
           const SizedBox(height: 8),
           Container(
@@ -298,17 +318,26 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
               border: Border.all(color: const Color(0xFFFCA5A5)),
             ),
             child: Text(
-              widget.ticket.rejectionReason!,
-              style: const TextStyle(fontSize: 13, color: Color(0xFF991B1B), height: 1.4),
+              ticket.rejectionReason!,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF991B1B),
+                height: 1.4,
+              ),
             ),
           ),
           const SizedBox(height: 16),
         ],
 
-        // 3. Ticket Audit & Metadata Summary Card
+        // 3. Ticket Metadata Summary Card
         const Text(
-          'Ticket Information & Audit',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155), fontFamily: 'Outfit'),
+          'Ticket Information',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+            color: Color(0xFF334155),
+            fontFamily: 'Outfit',
+          ),
         ),
         const SizedBox(height: 8),
         Container(
@@ -320,12 +349,25 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
           ),
           child: Column(
             children: [
-              _buildAuditRow(Icons.calendar_today_rounded, 'Submitted Date', _formatDateTime(widget.ticket.createdAt)),
+              _buildAuditRow(
+                Icons.calendar_today_rounded,
+                'Submitted Date',
+                _formatDateTime(ticket.createdAt),
+              ),
               const Divider(height: 16, color: Color(0xFFF1F5F9)),
-              _buildAuditRow(Icons.history_rounded, 'Last Updated', _formatDateTime(widget.ticket.updatedAt)),
-              if (widget.ticket.processedByName != null && widget.ticket.processedByName!.isNotEmpty) ...[
+              _buildAuditRow(
+                Icons.history_rounded,
+                'Last Updated',
+                _formatDateTime(ticket.updatedAt),
+              ),
+              if (ticket.processedByName != null &&
+                  ticket.processedByName!.isNotEmpty) ...[
                 const Divider(height: 16, color: Color(0xFFF1F5F9)),
-                _buildAuditRow(Icons.admin_panel_settings_rounded, 'Processed By', widget.ticket.processedByName!),
+                _buildAuditRow(
+                  Icons.admin_panel_settings_rounded,
+                  'Processed By',
+                  ticket.processedByName!,
+                ),
               ],
             ],
           ),
@@ -336,7 +378,12 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
         if (!isClosed) ...[
           const Text(
             'Decision Action',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A), fontFamily: 'Outfit'),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: Color(0xFF0F172A),
+              fontFamily: 'Outfit',
+            ),
           ),
           const SizedBox(height: 10),
           Row(
@@ -344,13 +391,22 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
               ElevatedButton.icon(
                 onPressed: () => setState(() => _selectedAction = 'APPROVE'),
                 icon: const Icon(Icons.check_circle_outline, size: 18),
-                label: const Text('Approve'),
+                label: const Text('Accept'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _selectedAction == 'APPROVE' ? const Color(0xFF28B79B) : const Color(0xFFF1F5F9),
-                  foregroundColor: _selectedAction == 'APPROVE' ? Colors.white : const Color(0xFF475569),
+                  backgroundColor: _selectedAction == 'APPROVE'
+                      ? const Color(0xFF28B79B)
+                      : const Color(0xFFF1F5F9),
+                  foregroundColor: _selectedAction == 'APPROVE'
+                      ? Colors.white
+                      : const Color(0xFF475569),
                   elevation: _selectedAction == 'APPROVE' ? 2 : 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 10,
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
@@ -359,11 +415,20 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
                 icon: const Icon(Icons.cancel_outlined, size: 18),
                 label: const Text('Reject'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _selectedAction == 'REJECT' ? Colors.redAccent : const Color(0xFFF1F5F9),
-                  foregroundColor: _selectedAction == 'REJECT' ? Colors.white : const Color(0xFF475569),
+                  backgroundColor: _selectedAction == 'REJECT'
+                      ? Colors.redAccent
+                      : const Color(0xFFF1F5F9),
+                  foregroundColor: _selectedAction == 'REJECT'
+                      ? Colors.white
+                      : const Color(0xFF475569),
                   elevation: _selectedAction == 'REJECT' ? 2 : 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 10,
+                  ),
                 ),
               ),
             ],
@@ -373,7 +438,12 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
           if (_selectedAction == 'REJECT') ...[
             const Text(
               'Rejection Reason *',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFFDC2626), fontFamily: 'Outfit'),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                color: Color(0xFFDC2626),
+                fontFamily: 'Outfit',
+              ),
             ),
             const SizedBox(height: 6),
             TextField(
@@ -388,11 +458,22 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
               decoration: InputDecoration(
                 counterText: '',
                 hintText: 'State the detailed reason for rejection...',
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Colors.redAccent)),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Colors.redAccent),
+                ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: _rejectionReasonError != null ? Colors.red : const Color(0xFFFCA5A5), width: _rejectionReasonError != null ? 1.5 : 1.0),
+                  borderSide: BorderSide(
+                    color: _rejectionReasonError != null
+                        ? Colors.red
+                        : const Color(0xFFFCA5A5),
+                    width: _rejectionReasonError != null ? 1.5 : 1.0,
+                  ),
                 ),
                 fillColor: const Color(0xFFFEF2F2),
                 filled: true,
@@ -402,11 +483,20 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
               const SizedBox(height: 6),
               Row(
                 children: [
-                  const Icon(Icons.error_outline_rounded, size: 14, color: Color(0xFFDC2626)),
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    size: 14,
+                    color: Color(0xFFDC2626),
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     _rejectionReasonError!,
-                    style: const TextStyle(fontSize: 12, color: Color(0xFFDC2626), fontWeight: FontWeight.w500, fontFamily: 'Outfit'),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFFDC2626),
+                      fontWeight: FontWeight.w500,
+                      fontFamily: 'Outfit',
+                    ),
                   ),
                 ],
               ),
@@ -414,7 +504,12 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
           ] else ...[
             const Text(
               'Admin Response / Note',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF334155), fontFamily: 'Outfit'),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                color: Color(0xFF334155),
+                fontFamily: 'Outfit',
+              ),
             ),
             const SizedBox(height: 6),
             TextField(
@@ -422,8 +517,13 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
               maxLines: 3,
               decoration: InputDecoration(
                 hintText: 'Approval comments or instructions for user...',
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
                 fillColor: const Color(0xFFF8FAFC),
                 filled: true,
               ),
@@ -438,7 +538,12 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
   // Conversation Thread List Widget (Handles both Desktop & Mobile)
   Widget _buildConversationList({bool shrinkWrap = false}) {
     if (_isFetchingDetail) {
-      return const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF28B79B)));
+      return const Center(
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: Color(0xFF28B79B),
+        ),
+      );
     }
     if (_fullTicket == null || _fullTicket!.messages.isEmpty) {
       return Container(
@@ -450,25 +555,38 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
           border: Border.all(color: const Color(0xFFF1F5F9)),
         ),
         child: const Center(
-          child: Text('No additional responses yet.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontFamily: 'Outfit')),
+          child: Text(
+            'No additional responses yet.',
+            style: TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 12,
+              fontFamily: 'Outfit',
+            ),
+          ),
         ),
       );
     }
     return ListView.separated(
       shrinkWrap: shrinkWrap,
-      physics: shrinkWrap ? const NeverScrollableScrollPhysics() : const AlwaysScrollableScrollPhysics(),
+      physics: shrinkWrap
+          ? const NeverScrollableScrollPhysics()
+          : const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(right: 4),
       itemCount: _fullTicket!.messages.length,
       separatorBuilder: (context, index) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final msg = _fullTicket!.messages[index];
-        final isStaff = msg.senderRole == 'ADMINISTRATOR' || msg.senderRole == 'COURSE_MANAGER';
+        final isStaff = msg.senderRole == 'ADMINISTRATOR';
         return Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: isStaff ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: isStaff ? const Color(0xFFBBF7D0) : const Color(0xFFE2E8F0)),
+            border: Border.all(
+              color: isStaff
+                  ? const Color(0xFFBBF7D0)
+                  : const Color(0xFFE2E8F0),
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -478,13 +596,32 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
                 children: [
                   Text(
                     '${msg.senderName} (${msg.senderRole})',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isStaff ? const Color(0xFF166534) : const Color(0xFF0F172A)),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: isStaff
+                          ? const Color(0xFF166534)
+                          : const Color(0xFF0F172A),
+                    ),
                   ),
-                  Text(_formatDateTime(msg.createdAt), style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                  Text(
+                    _formatDateTime(msg.createdAt),
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: Color(0xFF94A3B8),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 6),
-              Text(msg.message, style: const TextStyle(fontSize: 13, color: Color(0xFF334155), height: 1.3)),
+              Text(
+                msg.message,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF334155),
+                  height: 1.3,
+                ),
+              ),
             ],
           ),
         );
@@ -494,7 +631,8 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
 
   // Live Chat Input Box / Closed Banner
   Widget _buildChatInputBox() {
-    if (widget.ticket.status == 'PENDING' || widget.ticket.status == 'PROCESSING') {
+    if (widget.ticket.status == 'PENDING' ||
+        widget.ticket.status == 'PROCESSING') {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -511,12 +649,25 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
                   },
                   decoration: InputDecoration(
                     hintText: 'Type your message to trainer...',
-                    hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    hintStyle: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF94A3B8),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: _adminReplyError != null ? Colors.red : const Color(0xFFCBD5E1), width: _adminReplyError != null ? 1.5 : 1.0),
+                      borderSide: BorderSide(
+                        color: _adminReplyError != null
+                            ? Colors.red
+                            : const Color(0xFFCBD5E1),
+                        width: _adminReplyError != null ? 1.5 : 1.0,
+                      ),
                     ),
                     fillColor: const Color(0xFFF8FAFC),
                     filled: true,
@@ -527,14 +678,26 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
               ElevatedButton.icon(
                 onPressed: _isSendingReply ? null : _sendAdminReply,
                 icon: _isSendingReply
-                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
                     : const Icon(Icons.send_rounded, size: 16),
                 label: const Text('Send'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF28B79B),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
               ),
             ],
@@ -543,11 +706,20 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
             const SizedBox(height: 6),
             Row(
               children: [
-                const Icon(Icons.error_outline_rounded, size: 14, color: Color(0xFFDC2626)),
+                const Icon(
+                  Icons.error_outline_rounded,
+                  size: 14,
+                  color: Color(0xFFDC2626),
+                ),
                 const SizedBox(width: 4),
                 Text(
                   _adminReplyError!,
-                  style: const TextStyle(fontSize: 12, color: Color(0xFFDC2626), fontWeight: FontWeight.w500, fontFamily: 'Outfit'),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFFDC2626),
+                    fontWeight: FontWeight.w500,
+                    fontFamily: 'Outfit',
+                  ),
                 ),
               ],
             ),
@@ -568,7 +740,14 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
         children: [
           Icon(Icons.lock_outline_rounded, size: 16, color: Color(0xFF64748B)),
           SizedBox(width: 8),
-          Text('This ticket is closed. No further replies required.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontFamily: 'Outfit')),
+          Text(
+            'This ticket is closed. No further replies required.',
+            style: TextStyle(
+              fontSize: 12,
+              color: Color(0xFF64748B),
+              fontFamily: 'Outfit',
+            ),
+          ),
         ],
       ),
     );
@@ -583,9 +762,14 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
           onPressed: () => Navigator.pop(context),
           style: OutlinedButton.styleFrom(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
-          child: const Text('Close', style: TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit')),
+          child: const Text(
+            'Close',
+            style: TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit'),
+          ),
         ),
         if (!isClosed) ...[
           const SizedBox(width: 10),
@@ -595,11 +779,23 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
               backgroundColor: const Color(0xFF28B79B),
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             child: _isLoading
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('Save Decision', style: TextStyle(fontFamily: 'Outfit')),
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Text(
+                    'Save Decision',
+                    style: TextStyle(fontFamily: 'Outfit'),
+                  ),
           ),
         ],
       ],
@@ -608,13 +804,18 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
 
   @override
   Widget build(BuildContext context) {
-    final senderName = widget.ticket.userName ?? widget.ticket.userEmail ?? 'User';
+    final ticket = _fullTicket ?? widget.ticket;
+    final senderName = ticket.userName ?? ticket.userEmail ?? 'User';
     final size = MediaQuery.of(context).size;
     final isDesktop = size.width > 900;
-    final isClosed = widget.ticket.status == 'APPROVED' || widget.ticket.status == 'REJECTED';
+    final isClosed = ticket.status == 'APPROVED' || ticket.status == 'REJECTED';
 
-    final dialogWidth = isDesktop ? 980.0 : (size.width * 0.94).clamp(300.0, 620.0);
-    final dialogHeight = isDesktop ? 680.0 : (size.height * 0.88).clamp(400.0, 780.0);
+    final dialogWidth = isDesktop
+        ? 980.0
+        : (size.width * 0.94).clamp(300.0, 620.0);
+    final dialogHeight = isDesktop
+        ? (isClosed ? 520.0 : 680.0)
+        : (size.height * (isClosed ? 0.72 : 0.88)).clamp(400.0, 780.0);
 
     // Desktop Layout (Side-by-Side 2 Columns)
     Widget desktopBody = Row(
@@ -624,29 +825,13 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
           flex: 5,
           child: Column(
             children: [
-              Expanded(child: SingleChildScrollView(child: _buildLeftContent(isClosed, senderName))),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: _buildLeftContent(isClosed, senderName),
+                ),
+              ),
               const SizedBox(height: 12),
               _buildFooterActions(isClosed),
-            ],
-          ),
-        ),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: VerticalDivider(width: 1, color: Color(0xFFE2E8F0)),
-        ),
-        Expanded(
-          flex: 6,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Responses & Conversation',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A), fontFamily: 'Outfit'),
-              ),
-              const SizedBox(height: 10),
-              Expanded(child: _buildConversationList(shrinkWrap: false)),
-              const SizedBox(height: 12),
-              _buildChatInputBox(),
             ],
           ),
         ),
@@ -663,16 +848,6 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
               children: [
                 _buildLeftContent(isClosed, senderName),
                 const SizedBox(height: 20),
-                const Divider(color: Color(0xFFE2E8F0)),
-                const SizedBox(height: 16),
-                const Text(
-                  'Responses & Conversation',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A), fontFamily: 'Outfit'),
-                ),
-                const SizedBox(height: 10),
-                _buildConversationList(shrinkWrap: true),
-                const SizedBox(height: 16),
-                _buildChatInputBox(),
               ],
             ),
           ),
@@ -697,7 +872,12 @@ class _ProcessTicketModalState extends State<ProcessTicketModal> {
               children: [
                 const Text(
                   'View & Process Support Ticket',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A), fontFamily: 'Outfit'),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                    fontFamily: 'Outfit',
+                  ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close, color: Color(0xFF64748B)),

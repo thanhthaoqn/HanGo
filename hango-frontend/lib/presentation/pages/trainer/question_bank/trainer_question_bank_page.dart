@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:excel/excel.dart';
+import 'package:spreadsheet_decoder/spreadsheet_decoder.dart';
 import '../../../../data/services/auth_service.dart';
 import '../../../../services/hango_api.dart';
 import '../../../../utils/config.dart';
 import '../../../../utils/toast_helper.dart';
 import '../../../../utils/download_helper.dart';
+import '../../../../domain/model/exam_import_error.dart';
+import '../../course_manager/exam_import_error_dialog.dart';
 import '../../course_manager/question_bank/course_manager_create_question_page.dart';
 import '../../course_manager/question_bank/models/course_manager_question.dart';
 import '../../course_manager/question_bank/widgets/question_search_bar.dart';
@@ -34,14 +36,15 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
   String _trainerName = 'Thảo';
   String _trainerInitials = 'T';
   String _trainerAvatarUrl = '';
-  
+
   bool _isLoading = true;
   String _errorMessage = '';
 
   // Filter States
-  String _selectedType = 'PUBLIC';
+  String _selectedType = 'ALL';
   String _searchQuery = '';
   String _sortBy = 'NEWEST';
+  int? _usageType; // null = All, 1 = Quiz, 2 = Exam
   int _currentPage = 1;
   static const int _pageSize = 5;
 
@@ -56,9 +59,11 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
   int? _selectedSkillId;
   int? _selectedGroupTypeId;
   int? _selectedDifficultyId;
+  bool? _selectedIsGroup;
 
   CourseManagerQuestion? _viewingQuestion;
   CourseManagerQuestion? _editingQuestion;
+  bool _isCreatingQuestion = false;
 
   String get apiBaseUrl => EnvConfig.apiBaseUrl;
 
@@ -133,8 +138,10 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
         search: _searchQuery,
         sortBy: _sortBy,
         skillId: _selectedSkillId,
-        categoryId: _selectedGroupTypeId,
+        groupTypeId: _selectedGroupTypeId,
         difficultyId: _selectedDifficultyId,
+        usageType: _usageType,
+        isGroup: _selectedIsGroup,
       );
 
       if (!mounted) return;
@@ -201,19 +208,23 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
         _isLoading = true;
       });
 
-      var excel = Excel.decodeBytes(List<int>.from(bytes));
-      var sheet = excel.tables['QUESTIONS'];
+      // Allow UI to render the loading indicator before heavy parsing blocks the thread
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      var decoder = SpreadsheetDecoder.decodeBytes(List<int>.from(bytes));
+      var sheet = decoder.tables['QUESTIONS'];
       if (sheet == null) {
-        var sheetName = excel.tables.keys.firstWhere(
+        var sheetName = decoder.tables.keys.firstWhere(
           (k) =>
               !k.toUpperCase().contains('RULES') &&
               !k.toUpperCase().contains('README'),
-          orElse: () => excel.tables.keys.last,
+          orElse: () => decoder.tables.keys.last,
         );
-        sheet = excel.tables[sheetName];
+        sheet = decoder.tables[sheetName];
       }
 
-      if (sheet == null || sheet.maxRows < 3) {
+      final allRows = sheet?.rows ?? [];
+      if (sheet == null || allRows.length < 3) {
         setState(() {
           _isLoading = false;
         });
@@ -222,10 +233,16 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
         return;
       }
 
-      var headerRow = sheet.rows[1];
+      var headerRow = allRows[1];
+      String headerCell0 = headerRow.isNotEmpty
+          ? (headerRow[0]?.toString() ?? '')
+          : '';
+      String headerCell1 = headerRow.length > 1
+          ? (headerRow[1]?.toString() ?? '')
+          : '';
       if (headerRow.length < 12 ||
-          !headerRow[0]!.value.toString().contains('Order Index') ||
-          !headerRow[1]!.value.toString().contains('Passage Text')) {
+          !headerCell0.contains('Order Index') ||
+          !headerCell1.contains('Passage Text')) {
         setState(() {
           _isLoading = false;
         });
@@ -237,29 +254,111 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
         return;
       }
 
+      // Ensure filters are loaded before validating
+      if ((_skills == null || _skills!.isEmpty) ||
+          (_difficulties == null || _difficulties!.isEmpty) ||
+          (_groupTypes == null || _groupTypes!.isEmpty)) {
+        await _fetchFilters();
+      }
+
+      final skillOptions = _skills ?? [];
+      final difficultyOptions = _difficulties ?? [];
+      final groupTypeOptions = _groupTypes ?? [];
+
+      bool paramExists(List<Map<String, dynamic>> options, String name) =>
+          options.isEmpty || // skip validation if options not yet loaded
+          options.any(
+            (o) =>
+                (o['paramValue']?.toString().toLowerCase() ?? '') ==
+                name.toLowerCase(),
+          );
+
       List<Map<String, dynamic>> groupsList = [];
       Map<String, Map<String, dynamic>> groupMap = {};
+      List<ExamImportError> errors = [];
 
-      for (int i = 2; i < sheet.maxRows; i++) {
-        var row = sheet.rows[i];
-        if (row.isEmpty ||
-            row.length < 3 ||
-            row[2] == null ||
-            row[2]?.value?.toString().trim().isEmpty == true)
-          continue;
+      for (int i = 2; i < allRows.length; i++) {
+        var row = allRows[i];
+        int rowNum = i + 1;
 
-        String passage = row[1]?.value?.toString().trim() ?? '';
-        String qText = row[2]?.value?.toString() ?? '';
-        String optA = row[3]?.value?.toString() ?? '';
-        String optB = row[4]?.value?.toString() ?? '';
-        String optC = row[5]?.value?.toString() ?? '';
-        String optD = row[6]?.value?.toString() ?? '';
-        String correctAns =
-            row[7]?.value?.toString().trim().toUpperCase() ?? 'A';
-        String explanation = row[8]?.value?.toString() ?? '';
-        String skillName = row[9]?.value?.toString() ?? '';
-        String diffName = row[10]?.value?.toString() ?? '';
-        String groupTypeName = row[11]?.value?.toString() ?? '';
+        String cell(int idx) =>
+            (idx < row.length ? row[idx]?.toString() : null)?.trim() ?? '';
+
+        String passage = cell(1);
+        String qText = cell(2);
+        String optA = cell(3);
+        String optB = cell(4);
+        String optC = cell(5);
+        String optD = cell(6);
+        String correctAns = cell(7).toUpperCase();
+        String explanation = cell(8);
+        String skillName = cell(9);
+        String diffName = cell(10);
+        String groupTypeName = cell(11);
+
+        bool rowHasData =
+            passage.isNotEmpty ||
+            qText.isNotEmpty ||
+            optA.isNotEmpty ||
+            optB.isNotEmpty ||
+            optC.isNotEmpty ||
+            optD.isNotEmpty ||
+            correctAns.isNotEmpty ||
+            skillName.isNotEmpty ||
+            diffName.isNotEmpty;
+        if (!rowHasData) continue;
+
+        if (qText.isEmpty) {
+          errors.add(
+            ExamImportError(
+              sheet: 'QUESTIONS',
+              row: rowNum,
+              field: 'Question Text',
+              errorType: 'MISSING_FIELD',
+              message: 'Question Text is required at row $rowNum',
+            ),
+          );
+        }
+
+        if (!RegExp(r'^[A-D]$').hasMatch(correctAns)) {
+          errors.add(
+            ExamImportError(
+              sheet: 'QUESTIONS',
+              row: rowNum,
+              field: 'Correct',
+              errorType: 'INVALID_FORMAT',
+              value: correctAns,
+              message: 'Correct Answer must be A, B, C, or D at row $rowNum',
+            ),
+          );
+        }
+
+        if (skillName.isEmpty || !paramExists(skillOptions, skillName)) {
+          errors.add(
+            ExamImportError(
+              sheet: 'QUESTIONS',
+              row: rowNum,
+              field: 'Skill',
+              errorType: skillName.isEmpty ? 'MISSING_FIELD' : 'INVALID_VALUE',
+              value: skillName,
+              message: "Invalid or missing Skill '$skillName' at row $rowNum",
+            ),
+          );
+        }
+
+        if (diffName.isEmpty || !paramExists(difficultyOptions, diffName)) {
+          errors.add(
+            ExamImportError(
+              sheet: 'QUESTIONS',
+              row: rowNum,
+              field: 'Difficulty',
+              errorType: diffName.isEmpty ? 'MISSING_FIELD' : 'INVALID_VALUE',
+              value: diffName,
+              message:
+                  "Invalid or missing Difficulty '$diffName' at row $rowNum",
+            ),
+          );
+        }
 
         Map<String, dynamic> subQ = {
           'questionText': qText,
@@ -283,6 +382,22 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
           });
         } else {
           if (!groupMap.containsKey(passage)) {
+            if (groupTypeName.isEmpty ||
+                !paramExists(groupTypeOptions, groupTypeName)) {
+              errors.add(
+                ExamImportError(
+                  sheet: 'QUESTIONS',
+                  row: rowNum,
+                  field: 'Group Type',
+                  errorType: groupTypeName.isEmpty
+                      ? 'MISSING_FIELD'
+                      : 'INVALID_VALUE',
+                  value: groupTypeName,
+                  message:
+                      "Invalid or missing Group Type '$groupTypeName' for passage at row $rowNum",
+                ),
+              );
+            }
             groupMap[passage] = {
               'isGroup': true,
               'passageText': passage,
@@ -295,19 +410,26 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
         }
       }
 
-      if (groupsList.isEmpty) {
-        setState(() {
-          _isLoading = false;
-        });
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (groupsList.isEmpty && errors.isEmpty) {
         if (mounted) ToastHelper.showError(context, 'No valid questions found');
         return;
       }
 
-      Map<String, dynamic> initialData = {'groups': groupsList};
+      if (errors.isNotEmpty) {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (_) => ExamImportErrorDialog(errors: errors),
+          );
+        }
+        return;
+      }
 
-      setState(() {
-        _isLoading = false;
-      });
+      Map<String, dynamic> initialData = {'groups': groupsList};
 
       if (mounted) {
         Navigator.push(
@@ -315,16 +437,22 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
           MaterialPageRoute(
             builder: (context) => CourseManagerCreateQuestionPage(
               initialData: initialData,
-              isCourseManager: true,
+              initialUsageType: _usageType ?? 3,
             ),
           ),
         ).then((_) => _fetchQuestions());
       }
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('=== IMPORT EXCEL ERROR ===');
+      debugPrint('Error: $e');
+      debugPrint('Error importing excel: $e');
+      debugPrint(st.toString());
       setState(() {
         _isLoading = false;
       });
-      if (mounted) ToastHelper.showError(context, 'System error, please try again later.');
+      if (mounted) {
+        ToastHelper.showError(context, 'System error, please try again later.');
+      }
     }
   }
 
@@ -340,7 +468,19 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
         ? []
         : _allQuestions.sublist(startIndex, endIndex);
 
-    final Widget content = _editingQuestion != null
+    final Widget content = _isCreatingQuestion
+        ? CourseManagerCreateQuestionPage(
+            isCourseManager: false,
+            isEmbedded: true,
+            initialUsageType: _usageType ?? 3,
+            onBack: () {
+              setState(() {
+                _isCreatingQuestion = false;
+              });
+              _fetchQuestions();
+            },
+          )
+        : _editingQuestion != null
         ? CourseManagerCreateQuestionPage(
             question: _editingQuestion,
             isEdit: true,
@@ -354,42 +494,45 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
             },
           )
         : _viewingQuestion != null
-            ? CourseManagerCreateQuestionPage(
-                question: _viewingQuestion,
-                isReadOnly: true,
-                isCourseManager: false,
-                isEmbedded: true,
-                onBack: () {
-                  setState(() {
-                    _viewingQuestion = null;
-                  });
-                },
-              )
-            : _buildBodyContent(isDesktop);
+        ? CourseManagerCreateQuestionPage(
+            question: _viewingQuestion,
+            isReadOnly: true,
+            isCourseManager: false,
+            isEmbedded: true,
+            onBack: () {
+              setState(() {
+                _viewingQuestion = null;
+              });
+            },
+          )
+        : _buildBodyContent(isDesktop);
 
     if (widget.isEmbedded) {
-      return content;
+      return DefaultTabController(length: 2, child: content);
     }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      drawer: !isDesktop
-          ? const Drawer(child: TrainerSidebar(activeIndex: 3))
-          : null,
-      body: Row(
-        children: [
-          if (isDesktop)
-            const SizedBox(width: 250, child: TrainerSidebar(activeIndex: 3)),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                InternalAppHeader(isMobile: !isDesktop, showLogo: !isDesktop),
-                Expanded(child: content),
-              ],
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        drawer: !isDesktop
+            ? const Drawer(child: TrainerSidebar(activeIndex: 3))
+            : null,
+        body: Row(
+          children: [
+            if (isDesktop)
+              const SizedBox(width: 250, child: TrainerSidebar(activeIndex: 3)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  InternalAppHeader(isMobile: !isDesktop, showLogo: !isDesktop),
+                  Expanded(child: content),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -401,6 +544,19 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildWelcomeSection(),
+          const SizedBox(height: 16),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildUsageTypePill('All', null),
+                const SizedBox(width: 8),
+                _buildUsageTypePill('Quiz Question', 1),
+                const SizedBox(width: 8),
+                _buildUsageTypePill('Exam Question', 2),
+              ],
+            ),
+          ),
           const SizedBox(height: 24),
           QuestionSearchBar(
             searchController: _searchController,
@@ -436,6 +592,14 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
             onDifficultyChanged: (val) {
               setState(() {
                 _selectedDifficultyId = val;
+                _currentPage = 1;
+              });
+              _fetchQuestions();
+            },
+            selectedIsGroup: _selectedIsGroup,
+            onIsGroupChanged: (val) {
+              setState(() {
+                _selectedIsGroup = val;
                 _currentPage = 1;
               });
               _fetchQuestions();
@@ -486,7 +650,10 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                   q.status = oldStatus;
                 });
                 if (context.mounted) {
-                  ToastHelper.showError(context, 'System error, please try again later.');
+                  ToastHelper.showError(
+                    context,
+                    'System error, please try again later.',
+                  );
                 }
               }
             },
@@ -511,121 +678,112 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
     );
 
     final actionButtons = Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            OutlinedButton.icon(
-              onPressed: () async {
-                try {
-                  final token = await _authService.getToken();
-                  if (token == null)
-                    throw Exception('Authentication token not found');
-                  final api = HangoApi(baseUrl: apiBaseUrl, token: token);
-                  final bytes = await api.downloadQuestionBankTemplate();
-                  downloadBytes(
-                    bytes: bytes,
-                    filename: 'Hango_Question_Bank_Import_Template.xlsx',
-                    mimeType:
-                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                  );
-                } catch (e) {
-                  if (context.mounted)
-                    ToastHelper.showError(
-                      context,
-                      'Could not download template: $e',
-                    );
-                }
-              },
-              icon: const Icon(
-                Icons.download_outlined,
-                color: Color(0xFF20B486),
-                size: 18,
-              ),
-              label: const Text(
-                'Download Template',
-                style: TextStyle(
-                  color: Color(0xFF20B486),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                side: const BorderSide(color: Color(0xFF20B486)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-            OutlinedButton.icon(
-              onPressed: _importFromExcel,
-              icon: const Icon(
-                Icons.file_upload_outlined,
-                color: Color(0xFF1E293B),
-                size: 18,
-              ),
-              label: const Text(
-                'Import Excel',
-                style: TextStyle(
-                  color: Color(0xFF1E293B),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                side: const BorderSide(color: Color(0xFFCBD5E1)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(
+      spacing: 12,
+      runSpacing: 12,
+      children: [
+        OutlinedButton.icon(
+          onPressed: () async {
+            try {
+              final token = await _authService.getToken();
+              if (token == null)
+                throw Exception('Authentication token not found');
+              final api = HangoApi(baseUrl: apiBaseUrl, token: token);
+              final bytes = await api.downloadQuestionBankTemplate();
+              downloadBytes(
+                bytes: bytes,
+                filename: 'Hango_Question_Bank_Import_Template.xlsx',
+                mimeType:
+                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+              );
+            } catch (e) {
+              if (context.mounted)
+                ToastHelper.showError(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => const CourseManagerCreateQuestionPage(
-                      isCourseManager: false,
-                    ),
-                  ),
-                ).then((_) => _fetchQuestions());
-              },
-              icon: const Icon(
-                Icons.add_circle_outline,
-                color: Colors.white,
-                size: 18,
-              ),
-              label: const Text(
-                'Create Question',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF20B486),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                elevation: 0,
-              ),
+                  'Could not download template: $e',
+                );
+            }
+          },
+          icon: const Icon(
+            Icons.download_outlined,
+            color: Color(0xFF20B486),
+            size: 18,
+          ),
+          label: const Text(
+            'Download Template',
+            style: TextStyle(
+              color: Color(0xFF20B486),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
             ),
-          ],
-        );
+          ),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            side: const BorderSide(color: Color(0xFF20B486)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+        OutlinedButton.icon(
+          onPressed: _importFromExcel,
+          icon: const Icon(
+            Icons.file_upload_outlined,
+            color: Color(0xFF1E293B),
+            size: 18,
+          ),
+          label: const Text(
+            'Import Excel',
+            style: TextStyle(
+              color: Color(0xFF1E293B),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            side: const BorderSide(color: Color(0xFFCBD5E1)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+        ElevatedButton.icon(
+          onPressed: () {
+            setState(() {
+              _isCreatingQuestion = true;
+            });
+          },
+          icon: const Icon(
+            Icons.add_circle_outline,
+            color: Colors.white,
+            size: 18,
+          ),
+          label: const Text(
+            'Create Question',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF20B486),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            elevation: 0,
+          ),
+        ),
+      ],
+    );
 
     final isCompact = MediaQuery.of(context).size.width < 820;
 
     if (isCompact) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          title,
-          const SizedBox(height: 16),
-          actionButtons,
-        ],
+        children: [title, const SizedBox(height: 16), actionButtons],
       );
     }
 
@@ -717,7 +875,11 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                 );
               } else if (val == 'logout') {
                 _authService.logout();
-                Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                Navigator.pushNamedAndRemoveUntil(
+                  context,
+                  '/login',
+                  (route) => false,
+                );
               }
             },
             offset: const Offset(0, 48),
@@ -729,11 +891,18 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                 value: 'dashboard',
                 child: Row(
                   children: const [
-                    Icon(Icons.dashboard_outlined, size: 18, color: Color(0xFF20B486)),
+                    Icon(
+                      Icons.dashboard_outlined,
+                      size: 18,
+                      color: Color(0xFF20B486),
+                    ),
                     SizedBox(width: 10),
                     Text(
                       'Dashboard',
-                      style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        fontFamily: 'Outfit',
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ),
@@ -742,11 +911,18 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                 value: 'profile',
                 child: Row(
                   children: const [
-                    Icon(Icons.person_outline, size: 18, color: Color(0xFF64748B)),
+                    Icon(
+                      Icons.person_outline,
+                      size: 18,
+                      color: Color(0xFF64748B),
+                    ),
                     SizedBox(width: 10),
                     Text(
                       'My Profile',
-                      style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        fontFamily: 'Outfit',
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ),
@@ -760,7 +936,11 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                     SizedBox(width: 10),
                     Text(
                       'Logout',
-                      style: TextStyle(fontFamily: 'Outfit', color: Colors.redAccent, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        fontFamily: 'Outfit',
+                        color: Colors.redAccent,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ),
@@ -822,6 +1002,39 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildUsageTypePill(String label, int? usageTypeValue) {
+    final isActive = _usageType == usageTypeValue;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _usageType = usageTypeValue;
+          _currentPage = 1;
+        });
+        _fetchQuestions();
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFFE6FFFA) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isActive ? const Color(0xFF20B486) : const Color(0xFFE2E8F0),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isActive ? const Color(0xFF20B486) : const Color(0xFF4B5563),
+            fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+            fontSize: 14,
+            fontFamily: 'Outfit',
+          ),
+        ),
       ),
     );
   }
