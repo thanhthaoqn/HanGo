@@ -118,7 +118,10 @@ public class ExamCourseRecommendationAIService {
                    - Nếu điểm `score_avg_hint` cao (>= 9) hoặc knowledge_gaps_json cho thấy ít lỗi, hãy nói rằng bạn đang làm rất tốt và chỉ gợi ý “review nhẹ” (không khẳng định yếu nhiều).
                    - Nếu điểm thấp hơn thì mô tả rõ điểm yếu dựa trên TOOL INPUT.
 
-                2) Đề xuất đúng 3 khóa học phù hợp nhất và kèm `reasonWhy` thân thiện, dễ hiểu (vì sao khóa này giúp bạn tiến bộ nhanh).
+                2) Đề xuất đúng 3 khóa học và BẮT BUỘC sắp xếp theo thứ tự ưu tiên:
+                   - Khóa học 1: Ưu tiên số 1 giải quyết trực tiếp kỹ năng yếu nhất (`explicit_weakest_skill`).
+                   - Khóa học 2 & 3: Lần lượt chọn các khóa học giải quyết các kỹ năng yếu tiếp theo trong danh sách `weak_skills` của `knowledge_gaps_json` (hoặc củng cố kiến thức nền tảng tương ứng).
+                   - Mỗi khóa học kèm `reasonWhy` thân thiện, dễ hiểu (vì sao khóa này giúp bạn tiến bộ nhanh).
 
                 Ràng buộc bắt buộc:
                 - Chỉ được chọn courseId tồn tại trong [AVAILABLE_COURSES]. Tuyệt đối không bịa courseId.
