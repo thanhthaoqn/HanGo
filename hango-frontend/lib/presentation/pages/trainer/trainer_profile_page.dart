@@ -30,10 +30,10 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
   bool _isSaving = false;
 
   String _maskAccountNumber(String acc) {
-    if (acc.isEmpty) return 'â€¢â€¢â€¢â€¢ â€¢â€¢â€¢â€¢ â€¢â€¢â€¢â€¢';
+    if (acc.isEmpty) return '**** **** ****';
     if (acc.length <= 4) return acc;
     final last4 = acc.substring(acc.length - 4);
-    return 'â€¢â€¢â€¢â€¢ â€¢â€¢â€¢â€¢ $last4';
+    return '**** **** $last4';
   }
 
   Map<String, dynamic> _profileData = {};
@@ -70,7 +70,6 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
   bool _bioError = false;
   bool _bankAccountError = false;
   bool _bankAccountNameError = false;
-  bool _citizenIdError = false;
 
   final List<String> _bankSuggestions = [
     'Vietcombank (VCB)',
@@ -249,7 +248,6 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
     final bio = _bioController.text.trim();
     final bankAccount = _bankAccountController.text.trim();
     final bankAccountName = _bankAccountNameController.text.trim();
-    final citizenId = _citizenIdController.text.trim();
 
     final numRegex = RegExp(r'^\d+$');
     final nameRegex = RegExp(r'^[A-Z ]+$');
@@ -265,15 +263,12 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
           bankAccount.isNotEmpty && !numRegex.hasMatch(bankAccount);
       _bankAccountNameError =
           bankAccountName.isNotEmpty && !nameRegex.hasMatch(bankAccountName);
-      _citizenIdError =
-          citizenId.isNotEmpty &&
-          (citizenId.length != 12 || !numRegex.hasMatch(citizenId));
     });
 
     if (_fullNameError) {
       ToastHelper.showError(
         context,
-        isVi ? 'Vui lÃ²ng nháº­p há» vÃ  tÃªn.' : 'Please enter full name.',
+        isVi ? 'Vui lÃ²ng nháº­p há»  vÃ  tÃªn.' : 'Please enter full name.',
       );
       return false;
     }
@@ -298,7 +293,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
     if (_gender == null) {
       ToastHelper.showError(
         context,
-        isVi ? 'Vui lÃ²ng chá»n giá»›i tÃ­nh.' : 'Please select gender.',
+        isVi ? 'Vui lÃ²ng chá» n giá»›i tÃ­nh.' : 'Please select gender.',
       );
       return false;
     }
@@ -320,16 +315,6 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
       );
       return false;
     }
-    if (_citizenIdError) {
-      ToastHelper.showError(
-        context,
-        isVi
-            ? 'Sá»‘ CCCD pháº£i gá»“m Ä‘Ãºng 12 chá»¯ sá»‘.'
-            : 'Citizen ID must be 12 digits.',
-      );
-      return false;
-    }
-
     final normalizedCertificates = normalizeTrainerDocuments(_certificates);
     final hasProof = normalizedCertificates.isNotEmpty;
 
@@ -537,31 +522,31 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
     final tabs = [
       {
         'index': 0,
-        'title': isVi ? 'ThÃ´ng tin cÃ¡ nhÃ¢n' : 'Personal Info',
-        'subtitle': isVi ? 'Há» tÃªn, email & bio' : 'Name, contact & bio',
+        'title': isVi ? 'Thông tin cá nhân' : 'Personal Info',
+        'subtitle': isVi ? 'Họ tên, email & bio' : 'Name, contact & bio',
         'icon': Icons.person_outline_rounded,
         'activeColor': const Color(0xFF28B79B),
       },
       {
         'index': 1,
-        'title': isVi ? 'CV & Báº±ng cáº¥p' : 'CV & Degrees',
+        'title': isVi ? 'CV & Bằng cấp' : 'CV & Degrees',
         'subtitle': isVi
-            ? 'Kinh nghiá»‡m & chá»©ng chá»‰'
-            : 'Experience & certificates',
+            ? 'Bằng cấp & chứng chỉ'
+            : 'Degrees & certificates',
         'icon': Icons.badge_outlined,
         'activeColor': const Color(0xFF0284C7),
       },
       {
         'index': 2,
-        'title': isVi ? 'TÃ i khoáº£n NgÃ¢n hÃ ng' : 'Bank Account',
-        'subtitle': isVi ? 'Nháº­n tiá»n doanh thu' : 'Payout & Tax ID',
+        'title': isVi ? 'Tài khoản Ngân hàng' : 'Bank Account',
+        'subtitle': isVi ? 'Thông tin tài khoản' : 'Bank details',
         'icon': Icons.account_balance_outlined,
         'activeColor': const Color(0xFF8B5CF6),
       },
       {
         'index': 3,
-        'title': isVi ? 'Äá»•i máº­t kháº©u' : 'Security',
-        'subtitle': isVi ? 'Máº­t kháº©u & báº£o máº­t' : 'Password & security',
+        'title': isVi ? 'Đổi mật khẩu' : 'Security',
+        'subtitle': isVi ? 'Mật khẩu & bảo mật' : 'Password & security',
         'icon': Icons.lock_reset_rounded,
         'activeColor': const Color(0xFFF59E0B),
       },
@@ -689,31 +674,31 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
     final tabs = [
       {
         'index': 0,
-        'title': isVi ? 'ThÃ´ng tin cÃ¡ nhÃ¢n' : 'Personal Info',
-        'subtitle': isVi ? 'Há» tÃªn, email & bio' : 'Name, contact & bio',
+        'title': isVi ? 'Thông tin cá nhân' : 'Personal Info',
+        'subtitle': isVi ? 'Họ tên, email & bio' : 'Name, contact & bio',
         'icon': Icons.person_outline_rounded,
         'activeColor': const Color(0xFF28B79B),
       },
       {
         'index': 1,
-        'title': isVi ? 'CV & Báº±ng cáº¥p' : 'CV & Degrees',
+        'title': isVi ? 'CV & Bằng cấp' : 'CV & Degrees',
         'subtitle': isVi
-            ? 'Kinh nghiá»‡m & chá»©ng chá»‰'
-            : 'Experience & certificates',
+            ? 'Bằng cấp & chứng chỉ'
+            : 'Degrees & certificates',
         'icon': Icons.badge_outlined,
         'activeColor': const Color(0xFF0284C7),
       },
       {
         'index': 2,
-        'title': isVi ? 'TÃ i khoáº£n NgÃ¢n hÃ ng' : 'Bank Account',
-        'subtitle': isVi ? 'Nháº­n tiá»n doanh thu' : 'Payout & Tax ID',
+        'title': isVi ? 'Tài khoản Ngân hàng' : 'Bank Account',
+        'subtitle': isVi ? 'Thông tin tài khoản' : 'Bank details',
         'icon': Icons.account_balance_outlined,
         'activeColor': const Color(0xFF8B5CF6),
       },
       {
         'index': 3,
-        'title': isVi ? 'Äá»•i máº­t kháº©u' : 'Security',
-        'subtitle': isVi ? 'Máº­t kháº©u & báº£o máº­t' : 'Password & security',
+        'title': isVi ? 'Đổi mật khẩu' : 'Security',
+        'subtitle': isVi ? 'Mật khẩu & bảo mật' : 'Password & security',
         'icon': Icons.lock_reset_rounded,
         'activeColor': const Color(0xFFF59E0B),
       },
@@ -1215,8 +1200,8 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
             const SizedBox(width: 12),
             Text(
               isVi
-                  ? '2. CV & Kinh nghiá»‡m giáº£ng dáº¡y'
-                  : '2. CV & Teaching Experience',
+                  ? '2. CV & Bằng cấp'
+                  : '2. CV & Degrees',
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -1229,15 +1214,8 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
         const SizedBox(height: 24),
         _buildInputField(
           isVi
-              ? 'NÆ¡i lÃ m viá»‡c / TrÆ°á»ng Ä‘Ã o táº¡o'
-              : 'Workplace / Organization',
-          _workplaceController,
-        ),
-        const SizedBox(height: 16),
-        _buildInputField(
-          isVi
-              ? 'Giá»›i thiá»‡u báº£n thÃ¢n & Kinh nghiá»‡m *'
-              : 'Bio & Experience *',
+              ? 'Giới thiệu bản thân *'
+              : 'Bio *',
           _bioController,
           maxLines: 5,
           errorText: _bioError
@@ -1295,8 +1273,8 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
             const SizedBox(width: 12),
             Text(
               isVi
-                  ? '3. Cáº¥u hÃ¬nh TÃ i khoáº£n thá»¥ hÆ°á»Ÿng'
-                  : '3. Bank Account & Payout',
+                  ? '3. Tài khoản ngân hàng'
+                  : '3. Bank Account',
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -1343,8 +1321,8 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                       const SizedBox(width: 6),
                       Text(
                         isVi
-                            ? 'TÃ€I KHOáº¢N THá»¤ HÆ¯á»žNG Báº¢O Máº¬T'
-                            : 'SECURED PAYOUT ACCOUNT',
+                            ? 'TÀI KHOẢN NGÂN HÀNG BẢO MẬT'
+                            : 'SECURED BANK ACCOUNT',
                         style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -1402,29 +1380,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                       ),
                     ],
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        isVi ? 'MÃƒ Sá» THUáº¾' : 'TAX ID',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: Color(0xFF94A3B8),
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _citizenIdController.text.isNotEmpty
-                            ? _citizenIdController.text
-                            : '---',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
+                  
                 ],
               ),
             ],
@@ -1495,7 +1451,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
               : 'Account Owner Name',
           _bankAccountNameController,
           errorText: _bankAccountNameError
-              ? (isVi ? 'Viáº¿t hoa khÃ´ng dáº¥u' : 'UPPERCASE only')
+              ? (isVi ? 'Viết hoa không dấu' : 'UPPERCASE only')
               : null,
           onChanged: (val) {
             _bankAccountNameController.value = _bankAccountNameController.value
@@ -1505,19 +1461,6 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                 );
             setState(() {});
           },
-        ),
-        const SizedBox(height: 16),
-        _buildInputField(
-          isVi
-              ? 'MÃ£ sá»‘ thuáº¿ (Tax ID)'
-              : 'Tax Identification Number (Tax ID)',
-          _citizenIdController,
-          keyboardType: TextInputType.number,
-          maxLength: 13,
-          errorText: _citizenIdError
-              ? (isVi ? 'MÃ£ sá»‘ thuáº¿ khÃ´ng há»£p lá»‡' : 'Invalid Tax ID')
-              : null,
-          onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 24),
         _buildSaveButtonRow(isVi),
