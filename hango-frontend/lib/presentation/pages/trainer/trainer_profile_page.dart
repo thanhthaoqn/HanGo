@@ -75,7 +75,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
   final List<String> _bankSuggestions = [
     'Vietcombank (VCB)',
     'Techcombank (TCB)',
-    'MB Bank (MB)',
+    'MBBank (MB)',
     'VietinBank (CTG)',
     'BIDV (BID)',
     'Agribank (VBA)',
@@ -146,7 +146,9 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
             ? p['gender']
             : null;
         _trainerType = p['trainerType'] ?? 'PROFESSIONAL';
-        _selectedBank = p['bankName'];
+        _selectedBank = (p['bankName'] != null && p['bankName'].toString().trim().isNotEmpty)
+            ? p['bankName'].toString().trim()
+            : null;
         _bankAccountController.text = p['bankAccount'] ?? '';
         _bankAccountNameController.text = p['bankAccountName'] ?? '';
         _citizenIdController.text = p['citizenId'] ?? '';
@@ -1431,7 +1433,7 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
         const SizedBox(height: 24),
 
         Text(
-          isVi ? 'NgÃ¢n hÃ ng thá»¥ hÆ°á»Ÿng' : 'Beneficiary Bank',
+          isVi ? 'Ngân hàng thụ hưởng' : 'Beneficiary Bank',
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 14,
@@ -1448,18 +1450,30 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
             border: Border.all(color: const Color(0xFFE2E8F0)),
           ),
           child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selectedBank,
-              dropdownColor: Colors.white,
-              isExpanded: true,
-              hint: Text(isVi ? 'Chá»n ngÃ¢n hÃ ng' : 'Select bank'),
-              items: _bankSuggestions.map((String b) {
-                return DropdownMenuItem<String>(value: b, child: Text(b));
-              }).toList(),
-              onChanged: (val) {
-                setState(() {
-                  _selectedBank = val;
-                });
+            child: Builder(
+              builder: (context) {
+                final currentBank = (_selectedBank != null && _selectedBank!.trim().isNotEmpty)
+                    ? _selectedBank!.trim()
+                    : null;
+                final bankOptions = <String>{
+                  if (currentBank != null) currentBank,
+                  ..._bankSuggestions,
+                }.toList();
+
+                return DropdownButton<String>(
+                  value: currentBank,
+                  dropdownColor: Colors.white,
+                  isExpanded: true,
+                  hint: Text(isVi ? 'Chọn ngân hàng' : 'Select bank'),
+                  items: bankOptions.map((String b) {
+                    return DropdownMenuItem<String>(value: b, child: Text(b));
+                  }).toList(),
+                  onChanged: (val) {
+                    setState(() {
+                      _selectedBank = val;
+                    });
+                  },
+                );
               },
             ),
           ),
