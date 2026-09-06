@@ -13,8 +13,10 @@ RUN flutter build web --release
 
 FROM nginx:alpine AS runtime
 
+COPY hango-frontend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /workspace/hango-frontend/build/web /usr/share/nginx/html
 
 EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]
+
