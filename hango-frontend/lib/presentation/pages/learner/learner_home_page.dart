@@ -546,10 +546,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
               ? 'Vui lòng đăng ký tài khoản giáo viên để bắt đầu'
               : 'Please register a trainer account to start',
         );
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const RegisterPage()),
-        );
+        context.go(AppRoutes.register);
       }
       return;
     }

@@ -848,7 +848,7 @@ class _LoginPageState extends State<LoginPage> {
                               cursor: SystemMouseCursors.click,
                               child: GestureDetector(
                                 onTap: () {
-                                  context.push(AppRoutes.forgotPassword);
+                                  context.go(AppRoutes.forgotPassword);
                                 },
                                 child: const Text(
                                   'Forgot password?',
@@ -949,7 +949,7 @@ class _LoginPageState extends State<LoginPage> {
                                     cursor: SystemMouseCursors.click,
                                     child: GestureDetector(
                                       onTap: () {
-                                        context.push(AppRoutes.register);
+                                        context.go(AppRoutes.register);
                                       },
                                       child: const Text(
                                         'Sign up',

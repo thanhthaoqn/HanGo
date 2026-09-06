@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../routes/app_routes.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/repositories/course_repository.dart';
 import '../../../data/repositories/cart_repository.dart';
@@ -223,10 +225,7 @@ class _CartPageState extends State<CartPage> {
     if (token == null || token.isEmpty) {
       if (mounted) {
         ToastHelper.show(context, 'Please log in to check out.');
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginPage()),
-        );
+        context.go(AppRoutes.login);
       }
       return;
     }

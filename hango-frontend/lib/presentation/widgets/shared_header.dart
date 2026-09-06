@@ -1389,7 +1389,7 @@ class _SharedHeaderState extends State<SharedHeader> {
               ],
               TextButton(
                 onPressed: () {
-                  context.push(AppRoutes.login);
+                  context.go(AppRoutes.login);
                 },
                 child: const Text(
                   'Login',
@@ -1416,7 +1416,7 @@ class _SharedHeaderState extends State<SharedHeader> {
                 ),
                 child: ElevatedButton(
                   onPressed: () {
-                    context.push(AppRoutes.register);
+                    context.go(AppRoutes.register);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,

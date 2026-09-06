@@ -860,7 +860,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                       cursor: SystemMouseCursors.click,
                                       child: GestureDetector(
                                         onTap: () {
-                                          _popCurrentRouteOnce();
+                                          context.go(AppRoutes.login);
                                         },
                                         child: const Text(
                                           'Sign In',
