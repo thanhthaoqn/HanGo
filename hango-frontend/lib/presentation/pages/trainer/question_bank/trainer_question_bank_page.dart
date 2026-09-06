@@ -860,7 +860,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
           const SizedBox(width: 16),
           // User profile widget with Popup Menu
           PopupMenuButton<String>(
-            onSelected: (val) {
+            onSelected: (val) async {
               if (val == 'dashboard') {
                 Navigator.pushReplacement(
                   context,
