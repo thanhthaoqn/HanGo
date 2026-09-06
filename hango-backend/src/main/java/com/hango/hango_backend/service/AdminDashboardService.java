@@ -61,7 +61,7 @@ public class AdminDashboardService {
         var totalPlatformFeeFuture = CompletableFuture.supplyAsync(() -> paymentRepository.sumTotalPlatformFee());
         var totalTrainerEarningsFuture = CompletableFuture.supplyAsync(() -> paymentRepository.sumTotalTrainerEarnings());
         var totalTxCountFuture = CompletableFuture.supplyAsync(() -> paymentRepository.countSuccessful());
-        var monthlyRevenueFuture = CompletableFuture.supplyAsync(() -> paymentRepository.getMonthlyRevenueBreakdown(12));
+        var monthlyRevenueFuture = CompletableFuture.supplyAsync(() -> paymentRepository.getMonthlyRevenueBreakdown());
 
         // --- CONTENT HEALTH ---
         var coursesByStatusFuture = CompletableFuture.supplyAsync(() -> courseRepository.countGroupedByStatus());
