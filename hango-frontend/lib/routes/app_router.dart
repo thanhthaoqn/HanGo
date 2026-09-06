@@ -54,6 +54,30 @@ class AppRouter {
             if (role == 'COURSE_MANAGER') return AppRoutes.courseManager;
             if (role == 'TRAINER') return AppRoutes.trainer;
           }
+
+          // Role guard: prevent wrong dashboard URLs
+          if (role == 'TRAINER') {
+            if (path.startsWith(AppRoutes.admin) ||
+                path.startsWith(AppRoutes.courseManager)) {
+              return AppRoutes.trainer;
+            }
+          } else if (role == 'COURSE_MANAGER') {
+            if (path.startsWith(AppRoutes.admin) ||
+                path.startsWith(AppRoutes.trainer)) {
+              return AppRoutes.courseManager;
+            }
+          } else if (role == 'ADMIN') {
+            if (path.startsWith(AppRoutes.trainer) ||
+                path.startsWith(AppRoutes.courseManager)) {
+              return AppRoutes.admin;
+            }
+          } else if (role == 'LEARNER') {
+            if (path.startsWith(AppRoutes.admin) ||
+                path.startsWith(AppRoutes.courseManager) ||
+                path.startsWith(AppRoutes.trainer)) {
+              return AppRoutes.home;
+            }
+          }
         } else {
           // Unauthenticated users trying to access role dashboards get redirected to login
           if (path.startsWith(AppRoutes.admin) ||

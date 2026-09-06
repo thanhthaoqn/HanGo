@@ -13,6 +13,7 @@ import '../../domain/model/auth_session.dart';
 class AuthService {
   // 🚀 DÒNG THÊM MỚI: Cổng phát tín hiệu (Callback static) để AppState đứng từ xa lắng nghe
   static Function(Map<String, dynamic>)? onLoginSuccess;
+  static VoidCallback? onLogout;
 
   // Use dynamic baseUrl configuration
   static String get baseUrl => EnvConfig.authBaseUrl;
@@ -318,6 +319,7 @@ class AuthService {
     cachedRoles = null;
     cachedIsLoggedIn = false;
     notifyUserChanged();
+    onLogout?.call();
 
     try {
       if (await googleSignIn.isSignedIn()) {

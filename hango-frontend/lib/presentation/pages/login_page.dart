@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:google_sign_in_web/web_only.dart' as web;
+import 'package:go_router/go_router.dart';
+import '../../routes/app_routes.dart';
 import '../../data/services/auth_service.dart';
 import '../../utils/toast_helper.dart';
 import 'register_page.dart';
@@ -79,9 +81,7 @@ class _LoginPageState extends State<LoginPage> {
     if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
     } else {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const LearnerShellPage()),
-      );
+      context.go(AppRoutes.home);
     }
   }
 
@@ -224,21 +224,11 @@ class _LoginPageState extends State<LoginPage> {
     if (redirectFlag) {
       await prefs.setBool('redirect_to_trainer_onboarding', false);
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const TrainerTypeSelectionPage(),
-          ),
-        );
+        context.go(AppRoutes.trainer);
       }
       return;
     }
 
-    // Frontend TU DOC danh sach roles backend tra ve (khong goi API rieng nao
-    // khac) de quyet dinh dieu huong sang dashboard tuong ung. Day CHI la dieu
-    // huong UI/UX; neu user co gang vao thang URL/man hinh khong thuoc quyen
-    // cua minh, cac API phia sau van bi chan boi @PreAuthorize o Backend.
-    // Determine role flags
     final isAdmin = roles.any((r) => r.toUpperCase().contains('ADMIN'));
     final isTrainerLead = roles.any(
       (r) => r.toUpperCase().contains('COURSE_MANAGER'),
@@ -253,28 +243,19 @@ class _LoginPageState extends State<LoginPage> {
 
     if (isAdmin) {
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const AdminDashboardPage()),
-        );
+        context.go(AppRoutes.admin);
       }
     } else if (isCourseManager || isTrainerLead) {
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const CourseManagerShellPage(),
-          ),
-        );
+        context.go(AppRoutes.courseManager);
       }
     } else if (isTrainer) {
-      _checkStatusAndRouteForLogin();
+      if (mounted) {
+        context.go(AppRoutes.trainer);
+      }
     } else {
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const LearnerShellPage()),
-        );
+        context.go(AppRoutes.home);
       }
     }
   }
@@ -867,13 +848,7 @@ class _LoginPageState extends State<LoginPage> {
                               cursor: SystemMouseCursors.click,
                               child: GestureDetector(
                                 onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const ForgotPasswordPage(),
-                                    ),
-                                  );
+                                  context.push(AppRoutes.forgotPassword);
                                 },
                                 child: const Text(
                                   'Forgot password?',
@@ -974,15 +949,7 @@ class _LoginPageState extends State<LoginPage> {
                                     cursor: SystemMouseCursors.click,
                                     child: GestureDetector(
                                       onTap: () {
-                                        // push (not pushReplacement) so Register's
-                                        // "Sign In" link can pop back here correctly.
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                const RegisterPage(),
-                                          ),
-                                        );
+                                        context.push(AppRoutes.register);
                                       },
                                       child: const Text(
                                         'Sign up',

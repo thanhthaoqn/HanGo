@@ -1,6 +1,8 @@
 // ignore_for_file: deprecated_member_use
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../routes/app_routes.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
@@ -1132,10 +1134,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   void _handleLogout() async {
     await _authService.logout();
     if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-      );
+      context.go(AppRoutes.login);
     }
   }
 
