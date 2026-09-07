@@ -7,10 +7,13 @@ class InteractiveNodeTree extends StatelessWidget {
   final Function(PathwayNode)? onStartLearningTap;
   final Function(PathwayNode)? onFastTrackTap;
   final Function(PathwayNode)? onMasteryTap; // B4 (spec 20): mo Mastery Quiz that
+  final Function(PathwayNode)? onSkipTap;
+  final VoidCallback? onRegenerateFreeTap;
   final PathwayNode? selectedNode;
   final bool isDarkMode;
   final EdgeInsetsGeometry? contentPadding;
   final Widget? header;
+  final List<String> suggestedActions;
 
   const InteractiveNodeTree({
     super.key,
@@ -19,10 +22,13 @@ class InteractiveNodeTree extends StatelessWidget {
     this.onStartLearningTap,
     this.onFastTrackTap,
     this.onMasteryTap,
+    this.onSkipTap,
+    this.onRegenerateFreeTap,
     this.selectedNode,
     this.isDarkMode = false,
     this.contentPadding,
     this.header,
+    this.suggestedActions = const [],
   });
 
   @override
@@ -58,6 +64,7 @@ class InteractiveNodeTree extends StatelessWidget {
           child: _NodeRow(
             node: node,
             isLast: isLast,
+            suggestedActions: suggestedActions,
             alignLeft: alignLeft,
             isSelected: selectedNode?.step == node.step,
             isDarkMode: isDarkMode,
@@ -65,6 +72,8 @@ class InteractiveNodeTree extends StatelessWidget {
             onStartLearningTap: onStartLearningTap != null ? () => onStartLearningTap!(node) : null,
             onFastTrackTap: onFastTrackTap != null ? () => onFastTrackTap!(node) : null,
             onMasteryTap: onMasteryTap != null ? () => onMasteryTap!(node) : null,
+            onSkipTap: onSkipTap != null ? () => onSkipTap!(node) : null,
+            onRegenerateFreeTap: onRegenerateFreeTap,
           ),
         );
       },
@@ -82,6 +91,9 @@ class _NodeRow extends StatelessWidget {
   final VoidCallback? onStartLearningTap;
   final VoidCallback? onFastTrackTap;
   final VoidCallback? onMasteryTap;
+  final VoidCallback? onSkipTap;
+  final VoidCallback? onRegenerateFreeTap;
+  final List<String> suggestedActions;
 
   const _NodeRow({
     required this.node,
@@ -93,6 +105,9 @@ class _NodeRow extends StatelessWidget {
     this.onStartLearningTap,
     this.onFastTrackTap,
     this.onMasteryTap,
+    this.onSkipTap,
+    this.onRegenerateFreeTap,
+    this.suggestedActions = const [],
   });
 
   @override
@@ -156,6 +171,9 @@ class _NodeRow extends StatelessWidget {
                         onStartLearningTap: onStartLearningTap,
                         onFastTrackTap: onFastTrackTap,
                         onMasteryTap: onMasteryTap,
+                        onSkipTap: onSkipTap,
+                        onRegenerateFreeTap: onRegenerateFreeTap,
+                        suggestedActions: suggestedActions,
                       ),
                     ),
                   ),
@@ -174,19 +192,25 @@ class _NodeCard extends StatelessWidget {
   final PathwayNode node;
   final bool isSelected;
   final bool isDarkMode;
-  final VoidCallback onTap;
-  final VoidCallback? onStartLearningTap;
+  final VoidCallback? onTap;
   final VoidCallback? onFastTrackTap;
   final VoidCallback? onMasteryTap;
+  final VoidCallback? onStartLearningTap;
+  final VoidCallback? onSkipTap;
+  final VoidCallback? onRegenerateFreeTap;
+  final List<String> suggestedActions;
 
   const _NodeCard({
     required this.node,
     required this.isSelected,
     required this.isDarkMode,
-    required this.onTap,
-    this.onStartLearningTap,
+    this.onTap,
     this.onFastTrackTap,
     this.onMasteryTap,
+    this.onStartLearningTap,
+    this.onSkipTap,
+    this.onRegenerateFreeTap,
+    this.suggestedActions = const [],
   });
 
   @override
@@ -363,7 +387,70 @@ class _NodeCard extends StatelessWidget {
           ],
           if (node.status != NodeStatus.locked && node.courseId > 0) ...[
             const SizedBox(height: 14),
-            SizedBox(
+            if (node.status == NodeStatus.inProgress && suggestedActions.contains('ENROLL_OR_REGENERATE')) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: isDarkMode ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: isDarkMode ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.lock_rounded, size: 16, color: isDarkMode ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Khóa học Premium (Bạn chưa mua)',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: isDarkMode ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: onRegenerateFreeTap,
+                        icon: const Icon(Icons.auto_awesome, size: 18),
+                        label: const Text('Nhờ AI tìm khóa Miễn phí'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF8B5CF6),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          elevation: 0,
+                          textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: onSkipTap,
+                        icon: const Icon(Icons.skip_next_rounded, size: 18),
+                        label: const Text('Bỏ qua & Học tiếp'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: isDarkMode ? Colors.white70 : Colors.black54,
+                          side: BorderSide(color: isDarkMode ? Colors.white24 : Colors.black12),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ] else ...[
+              SizedBox(
               width: double.infinity,
               child: Builder(builder: (context) {
                 final isMasteryAction = node.isReviewDue ||
@@ -404,8 +491,9 @@ class _NodeCard extends StatelessWidget {
                 );
               }),
             ),
+            ],
           ],
-          if (node.status == NodeStatus.inProgress && node.courseId > 0 && onFastTrackTap != null) ...[
+          if (node.status == NodeStatus.inProgress && node.courseId > 0 && onFastTrackTap != null && suggestedActions.contains('FAST_TRACK')) ...[
             const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,

@@ -1,6 +1,6 @@
 enum NodeStatus { locked, inProgress, completed }
 
-enum NodeType { normal, fastTrackSkipped, detourRemedial, merged }
+enum NodeType { normal, fastTrackSkipped, skipped, detourRemedial, merged }
 
 enum ScheduleStatus { onTrack, atRisk, behind, completed }
 
@@ -152,6 +152,8 @@ class PathwayNode {
       switch (raw.trim().toUpperCase()) {
         case 'FAST_TRACK_SKIPPED':
           return NodeType.fastTrackSkipped;
+        case 'SKIPPED':
+          return NodeType.skipped;
         case 'DETOUR_REMEDIAL':
           return NodeType.detourRemedial;
         case 'MERGED':
@@ -251,6 +253,8 @@ class PathwayNode {
       switch (type) {
         case NodeType.fastTrackSkipped:
           return 'FAST_TRACK_SKIPPED';
+        case NodeType.skipped:
+          return 'SKIPPED';
         case NodeType.detourRemedial:
           return 'DETOUR_REMEDIAL';
         case NodeType.merged:

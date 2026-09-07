@@ -133,6 +133,17 @@ public class LearningPathwayController {
         return ResponseEntity.ok(learningPathwayService.submitMasteryAnswers(id, nodeId, userDetails.getId(), requestDTO));
     }
 
+    // API to Skip a node (e.g. for premium courses)
+    @PostMapping("/{id}/nodes/{nodeId}/skip")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
+    public ResponseEntity<com.hango.hango_backend.dto.LearningPathwayResponseDTO> skipNode(
+            @PathVariable Long id,
+            @PathVariable Long nodeId,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+        
+        return ResponseEntity.ok(learningPathwayService.skipNode(id, nodeId, userDetails.getId()));
+    }
+
     /**
      * @deprecated Use schedule_status field from GET /pathways/{id} or GET /pathways/me instead.
      */

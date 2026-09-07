@@ -248,8 +248,53 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
     
     if (confirm != true) return;
     
-    // Redirect to Mastery Quiz instead of skipping via backend API
-    await _openMasteryQuiz(node);
+    _openMasteryQuiz(node);
+  }
+
+  Future<void> _handleSkipNode(PathwayNode node) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Bỏ qua khóa học?'),
+        content: const Text('Nếu bỏ qua, bạn sẽ không nhận được Mastery Score cho khóa này và hệ thống sẽ mở khóa bài học tiếp theo. Bạn có chắc chắn?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF64748B),
+            ),
+            child: const Text('Đồng ý bỏ qua'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirm != true || _pathway == null) return;
+    
+    try {
+      final updated = await _repository.skipPathwayNode(
+        pathwayId: _pathway!.pathwayId,
+        nodeId: node.id,
+      );
+      if (!mounted) return;
+      setState(() {
+        _pathway = _preparePathwayForDisplay(updated);
+        // chon luon node hien tai moi de UI update phan ben trai
+        _selectedNode = updated.nodes.firstWhere((n) => n.id == node.id, orElse: () => updated.nodes.first);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã bỏ qua khóa học.'), backgroundColor: Colors.green),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   Future<void> _showRegenerateFreeWarningDialog() async {
@@ -398,8 +443,11 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
                   onStartLearningTap: _openCourseAndRefresh,
                   onFastTrackTap: _handleFastTrack,
                   onMasteryTap: _openMasteryQuiz,
+                  onSkipTap: _handleSkipNode,
+                  onRegenerateFreeTap: _showRegenerateFreeWarningDialog,
                   selectedNode: _selectedNode,
                   isDarkMode: _isDarkMode,
+                  suggestedActions: _pathway!.suggestedActions,
                   contentPadding: const EdgeInsets.only(right: 480), // Padding to not hide nodes under mentor
                   header: DailyPlanCard(
                     pathway: _pathway!,
@@ -452,8 +500,11 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
             onStartLearningTap: _openCourseAndRefresh,
             onFastTrackTap: _handleFastTrack,
             onMasteryTap: _openMasteryQuiz,
+            onSkipTap: _handleSkipNode,
+            onRegenerateFreeTap: _showRegenerateFreeWarningDialog,
             selectedNode: _selectedNode,
             isDarkMode: _isDarkMode,
+            suggestedActions: _pathway!.suggestedActions,
             contentPadding: const EdgeInsets.only(bottom: 100),
             header: DailyPlanCard(
               pathway: _pathway!,

@@ -834,8 +834,12 @@ public class LearningPathwayService {
             resolvedStatus = "IN_PROGRESS";
         }
 
-        if (!"COMPLETED".equalsIgnoreCase(resolvedStatus)) {
-            throw new ApiException("Finish the course before taking its mastery quiz", HttpStatus.BAD_REQUEST);
+        boolean isFree = (course.getPrice() == null || course.getPrice().compareTo(java.math.BigDecimal.ZERO) == 0);
+        boolean isEnrolled = isFree || (courseId != null && (enrollmentRepository.existsByUserIdAndCourseId(studentId, courseId)
+                || (enrollmentRepository != null && !enrollmentRepository.findFamilyEnrollments(studentId, courseId).isEmpty())));
+
+        if (!isEnrolled) {
+            throw new ApiException("Bạn cần mua khóa học này để thi Fast-track", HttpStatus.FORBIDDEN);
         }
 
         List<Long> quizLessonIds = resolveQuizLessonIds(courseId);
@@ -896,6 +900,17 @@ public class LearningPathwayService {
         Course effectiveCourse = resolveEffectiveCourse(studentId, node.getCourse());
         Course course = effectiveCourse != null ? effectiveCourse : node.getCourse();
         Long courseId = course != null ? course.getId() : null;
+
+        if (course != null) {
+            boolean isFree = (course.getPrice() == null || course.getPrice().compareTo(java.math.BigDecimal.ZERO) == 0);
+            boolean isEnrolled = isFree || (courseId != null && (enrollmentRepository.existsByUserIdAndCourseId(studentId, courseId)
+                    || (enrollmentRepository != null && !enrollmentRepository.findFamilyEnrollments(studentId, courseId).isEmpty())));
+
+            if (!isEnrolled) {
+                throw new ApiException("Bạn cần mua khóa học này để thi Fast-track", HttpStatus.FORBIDDEN);
+            }
+        }
+
         List<Long> quizLessonIds = courseId != null ? resolveQuizLessonIds(courseId) : Collections.emptyList();
 
         // Cham tung cau: dung bang question_options de xac dinh dap an dung
@@ -977,7 +992,15 @@ public class LearningPathwayService {
                 passingScore = (int) Math.round(quizLesson.getExam().getPassingScore());
             }
         }
+        
         applyMasteryResult(node, score, passingScore);
+        
+        // Fast-track logic: if pass, mark as completed
+        if (score >= passingScore) {
+            node.setStatus("COMPLETED");
+            node.setNodeType("FAST_TRACKED"); // Bypass lesson progress checks in the future
+        }
+        
         learningPathwayRepository.save(pathway);
         return com.hango.hango_backend.dto.MasterySubmitResponseDTO.builder()
                 .pathway(toResponseDto(pathway, studentId))
@@ -1316,6 +1339,39 @@ public class LearningPathwayService {
             log.debug("Failed to extract latest weak categories from knowledge gaps json: {}", e.getMessage());
         }
         return Collections.emptyList();
+    }
+
+    @Transactional
+    public LearningPathwayResponseDTO skipNode(Long pathwayId, Long nodeId, Long studentId) {
+        LearningPathway pathway = learningPathwayRepository.findById(pathwayId)
+                .orElseThrow(() -> new ApiException("Pathway not found", HttpStatus.NOT_FOUND));
+
+        if (!pathway.getStudent().getId().equals(studentId)) {
+            throw new ApiException("Access denied", HttpStatus.FORBIDDEN);
+        }
+
+        PathwayNode nodeToSkip = pathway.getNodes().stream()
+                .filter(n -> n.getId().equals(nodeId))
+                .findFirst()
+                .orElseThrow(() -> new ApiException("Node not found", HttpStatus.NOT_FOUND));
+
+        nodeToSkip.setStatus("COMPLETED");
+        nodeToSkip.setNodeType("SKIPPED");
+        nodeToSkip.setSkippedAt(java.time.LocalDateTime.now());
+        
+        // Unlock next node
+        pathway.getNodes().stream()
+                .filter(n -> n.getStepOrder() == nodeToSkip.getStepOrder() + 1)
+                .findFirst()
+                .ifPresent(next -> {
+                    if ("LOCKED".equalsIgnoreCase(next.getStatus())) {
+                        next.setStatus("IN_PROGRESS");
+                    }
+                });
+        
+        learningPathwayRepository.save(pathway);
+        
+        return toResponseDto(pathway, studentId);
     }
 
     private Course resolveEffectiveCourse(Long studentId, Course course) {

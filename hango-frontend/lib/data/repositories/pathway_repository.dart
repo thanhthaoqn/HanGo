@@ -99,6 +99,10 @@ class PathwayRepository {
     return _putRequest('$baseUrl/pathways/$pathwayId/reroute');
   }
 
+  Future<LearningPathway> skipPathwayNode({required int pathwayId, required int nodeId}) async {
+    return _postRequestNoBody('$baseUrl/pathways/$pathwayId/nodes/$nodeId/skip');
+  }
+
   Future<LearningPathway> submitNodeMastery({
     required int pathwayId,
     required int nodeId,
