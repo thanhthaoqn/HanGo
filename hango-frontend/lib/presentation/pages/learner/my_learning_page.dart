@@ -11,7 +11,7 @@ import '../course/lesson_detail_page.dart';
 import '../course/course_completion_page.dart';
 import '../../../domain/model/course_detail.dart';
 import '../../../utils/language_manager.dart';
-import '../exam/exam_review_page.dart';
+import '../exam/exam_result_page.dart';
 import '../../../domain/entities/exam.dart';
 
 class MyLearningPage extends StatefulWidget {
@@ -1089,16 +1089,17 @@ class _MyLearningPageState extends State<MyLearningPage> {
                 ),
                 child: ListTile(
                   onTap: () {
-                    // Navigate directly to ExamReviewPage — it lazy-loads
-                    // questions itself. No blocking dialog, no pre-fetch.
+                    // Navigate to ExamResultPage — it lazy-loads questions
+                    // and shows AI recommendations, skill breakdown, etc.
                     final examId = attempt['examId']?.toString() ?? '1';
                     final qCount = attempt['questionCount'] ?? 50;
+                    final int questionCount = qCount is int ? qCount : int.tryParse(qCount.toString()) ?? 50;
 
                     final exam = Exam(
                       id: examId,
                       title: examTitle,
                       creatorName: 'System',
-                      questionCount: qCount is int ? qCount : int.tryParse(qCount.toString()) ?? 50,
+                      questionCount: questionCount,
                       durationMinutes: 60,
                       rating: 5.0,
                       learnerCountFormatted: '0',
@@ -1106,9 +1107,13 @@ class _MyLearningPageState extends State<MyLearningPage> {
 
                     Navigator.of(context, rootNavigator: true).push(
                       MaterialPageRoute(
-                        builder: (context) => ExamReviewPage(
+                        builder: (context) => ExamResultPage(
                           exam: exam,
+                          score: scoreVal,
+                          correctCount: (scoreVal * questionCount / 10).round(),
                           attempt: attempt,
+                          // examQuestions & userAnswers omitted — ExamResultPage
+                          // will lazy-load them from the API automatically.
                         ),
                       ),
                     );

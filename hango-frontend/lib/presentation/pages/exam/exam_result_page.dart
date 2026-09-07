@@ -20,8 +20,8 @@ class ExamResultPage extends StatefulWidget {
   final Exam exam;
   final double score;
   final int correctCount;
-  final Map<int, int> userAnswers;
-  final List<Map<String, dynamic>> examQuestions;
+  final Map<int, int>? userAnswers;
+  final List<Map<String, dynamic>>? examQuestions;
   final Map<String, dynamic> attempt;
 
   const ExamResultPage({
@@ -29,8 +29,8 @@ class ExamResultPage extends StatefulWidget {
     required this.exam,
     required this.score,
     required this.correctCount,
-    required this.userAnswers,
-    required this.examQuestions,
+    this.userAnswers,
+    this.examQuestions,
     required this.attempt,
   }) : super(key: key);
 
@@ -53,14 +53,69 @@ class _ExamResultPageState extends State<ExamResultPage> {
   bool _isLoadingAi = true;
   List<Map<String, dynamic>> _aiRecommendedCourses = [];
 
+  // Lazy-loaded data (when opened from My Learning without pre-fetched questions)
+  late Map<int, int> _resolvedUserAnswers;
+  late List<Map<String, dynamic>> _resolvedExamQuestions;
+  bool _isLoadingQuestions = false;
+
   @override
   void initState() {
     super.initState();
-    _analyzeSkills();
+
+    // If examQuestions were provided (fresh from TakeExamPage), use them directly
+    if (widget.examQuestions != null && widget.userAnswers != null) {
+      _resolvedExamQuestions = widget.examQuestions!;
+      _resolvedUserAnswers = widget.userAnswers!;
+      _analyzeSkills();
+    } else {
+      // Lazy-load: fetch questions from API & parse answers from attempt map
+      _resolvedExamQuestions = [];
+      _resolvedUserAnswers = _parseUserAnswersFromAttempt(widget.attempt);
+      _isLoadingQuestions = true;
+      _fetchQuestionsAndAnalyze();
+    }
+
     _loadRecommendations();
     _loadAttempts();
     _loadAiRecommendations();
   }
+
+  Map<int, int> _parseUserAnswersFromAttempt(Map<String, dynamic> attempt) {
+    final Map<int, int> parsed = {};
+    final rawAnswers = attempt['answers'];
+    if (rawAnswers is Map) {
+      rawAnswers.forEach((key, value) {
+        if (key != null && value != null) {
+          final k = int.tryParse(key.toString());
+          final v = int.tryParse(value.toString());
+          if (k != null && v != null) {
+            parsed[k - 1] = v; // Convert 1-based to 0-based
+          }
+        }
+      });
+    }
+    return parsed;
+  }
+
+  Future<void> _fetchQuestionsAndAnalyze() async {
+    try {
+      final repository = ExamRepository();
+      final questions = await repository.fetchExamQuestions(widget.exam.id);
+      if (!mounted) return;
+      setState(() {
+        _resolvedExamQuestions = questions;
+        _isLoadingQuestions = false;
+      });
+      _analyzeSkills();
+    } catch (e) {
+      debugPrint("Error fetching exam questions for result page: $e");
+      if (!mounted) return;
+      setState(() {
+        _isLoadingQuestions = false;
+      });
+    }
+  }
+
 
   Future<void> _loadAttempts() async {
     try {
@@ -88,8 +143,8 @@ class _ExamResultPageState extends State<ExamResultPage> {
 
     final correctnessMap = widget.attempt['correctness'] ?? {};
 
-    for (int i = 0; i < widget.examQuestions.length; i++) {
-      final q = widget.examQuestions[i];
+    for (int i = 0; i < _resolvedExamQuestions.length; i++) {
+      final q = _resolvedExamQuestions[i];
       final skill = q['skill'] ?? 'General';
       
       totalPerSkill[skill] = (totalPerSkill[skill] ?? 0) + 1;
@@ -368,7 +423,7 @@ class _ExamResultPageState extends State<ExamResultPage> {
               _buildStatBox(
                 Icons.quiz_outlined,
                 'Total',
-                '${widget.examQuestions.length}',
+                '${_resolvedExamQuestions.isNotEmpty ? _resolvedExamQuestions.length : widget.exam.questionCount}',
                 Colors.grey.shade700,
               ),
               _buildStatBox(
@@ -380,7 +435,7 @@ class _ExamResultPageState extends State<ExamResultPage> {
               _buildStatBox(
                 Icons.cancel_outlined,
                 'Incorrect',
-                '${widget.examQuestions.length - widget.correctCount}',
+                '${(_resolvedExamQuestions.isNotEmpty ? _resolvedExamQuestions.length : widget.exam.questionCount) - widget.correctCount}',
                 const Color(0xFFEF4444),
               ),
             ],
