@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../routes/app_routes.dart';
 import '../../../data/repositories/course_repository.dart';
 import '../../../domain/model/course_detail.dart';
 import '../../../domain/model/course.dart';
@@ -572,10 +574,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     final isLoggedIn = await authService.isLoggedIn();
     if (!isLoggedIn) {
       if (!mounted) return;
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-      );
+      context.go(AppRoutes.login);
       return;
     }
     _showEnrollConfirmDialog(course);
@@ -1878,12 +1877,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                           final isLoggedIn = await authService.isLoggedIn();
                           if (!isLoggedIn) {
                             if (!mounted) return;
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const LoginPage(),
-                              ),
-                            );
+                            context.go(AppRoutes.login);
                             return;
                           }
 

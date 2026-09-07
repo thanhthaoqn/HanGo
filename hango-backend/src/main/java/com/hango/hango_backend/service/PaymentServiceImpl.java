@@ -74,7 +74,8 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public PaymentResponseDTO createPayment(com.hango.hango_backend.dto.PaymentRequestDTO request, Long userId, String ipAddress, String origin) {
+    public PaymentResponseDTO createPayment(com.hango.hango_backend.dto.PaymentRequestDTO request, Long userId,
+            String ipAddress, String origin) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -93,7 +94,7 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         Course primaryCourse = courses.get(0);
-        
+
         // Check if user is already enrolled in all requested courses
         boolean allEnrolled = true;
         for (Course c : courses) {
@@ -140,9 +141,11 @@ public class PaymentServiceImpl implements PaymentService {
                     }
 
                     try {
-                        emailService.sendEnrollmentSuccessEmail(user.getEmail(), user.getFullName(), c.getTitle(), "Free", c.getThumbnailUrl());
+                        emailService.sendEnrollmentSuccessEmail(user.getEmail(), user.getFullName(), c.getTitle(),
+                                "Free", c.getThumbnailUrl());
                     } catch (Exception e) {
-                        log.warn("Failed to send free course enrollment email to {}: {}", user.getEmail(), e.getMessage());
+                        log.warn("Failed to send free course enrollment email to {}: {}", user.getEmail(),
+                                e.getMessage());
                     }
                 }
             }
@@ -160,7 +163,7 @@ public class PaymentServiceImpl implements PaymentService {
                     .build();
         }
 
-        // 1. Tạo payment PENDING để lấy ID làm orderCode duy nhất
+        // 1. Create PENDING payment to use ID as unique orderCode
         Payment payment = Payment.builder()
                 .user(user)
                 .course(primaryCourse)
@@ -177,21 +180,22 @@ public class PaymentServiceImpl implements PaymentService {
         payment.setTxnRef(txnRef);
         paymentRepository.save(payment);
 
-        // 2. Chuẩn bị request cho PayOS
+        // 2. Prepare request for PayOS
         String description = "Hango " + orderCode;
         String frontendBaseUrl = (origin != null && !origin.isEmpty()) ? origin : "https://hangog92.online";
         if (frontendBaseUrl.endsWith("/")) {
             frontendBaseUrl = frontendBaseUrl.substring(0, frontendBaseUrl.length() - 1);
         }
         boolean isCartPayment = targetCourseIds.size() > 1;
-        String cancelUrl = isCartPayment 
+        String cancelUrl = isCartPayment
                 ? frontendBaseUrl + "/?paymentStatus=failed&isCart=true"
                 : frontendBaseUrl + "/?paymentStatus=failed&courseId=" + primaryCourse.getId();
-        String returnUrl = isCartPayment 
+        String returnUrl = isCartPayment
                 ? frontendBaseUrl + "/?paymentStatus=success&isCart=true"
                 : frontendBaseUrl + "/?paymentStatus=success&courseId=" + primaryCourse.getId();
 
-        // Tạo chữ ký cho PayOS: amount, cancelUrl, description, orderCode, returnUrl sorted alphabetically
+        // Create signature for PayOS: amount, cancelUrl, description, orderCode,
+        // returnUrl sorted alphabetically
         String signatureData = "amount=" + totalAmount.longValue() +
                 "&cancelUrl=" + cancelUrl +
                 "&description=" + description +
@@ -234,7 +238,7 @@ public class PaymentServiceImpl implements PaymentService {
             requestBody.put("buyerPhone", user.getPhoneNumber().trim());
         }
 
-        // Gọi PayOS API tạo link thanh toán
+        // Call PayOS API to create payment link
         Map<String, String> payOSResponse = createPayOSPaymentLink(requestBody);
         String checkoutUrl = payOSResponse.get("checkoutUrl");
         String qrCode = payOSResponse.get("qrCode");
@@ -288,7 +292,7 @@ public class PaymentServiceImpl implements PaymentService {
     public void handlePayOSWebhook(Map<String, Object> payload) {
         log.info("PayOS Webhook received: {}", payload);
 
-        // 1. Kiểm tra chữ ký webhook
+        // 1. Validate webhook signature
         String signature = (String) payload.get("signature");
         Map<String, Object> data = (Map<String, Object>) payload.get("data");
 
@@ -297,7 +301,7 @@ public class PaymentServiceImpl implements PaymentService {
             return;
         }
 
-        // Sắp xếp các trường của data và build hash data
+        // Sort data fields and build hash data
         Map<String, Object> sortedData = new TreeMap<>(data);
         StringBuilder sb = new StringBuilder();
         for (Map.Entry<String, Object> entry : sortedData.entrySet()) {
@@ -313,10 +317,10 @@ public class PaymentServiceImpl implements PaymentService {
             throw new RuntimeException("Invalid webhook signature");
         }
 
-        // 2. Cập nhật trạng thái Payment và Enroll khóa học
+        // 2. Update payment status and enroll course
         String code = (String) payload.get("code");
 
-        // Bỏ qua nếu là request test/xác nhận từ PayOS
+        // Skip if test/confirm request from PayOS
         if ("confirm".equals(payload.get("desc")) || data.get("orderCode") == null) {
             log.info("PayOS webhook confirm / test request received. Signature validated successfully.");
             return;
@@ -327,7 +331,7 @@ public class PaymentServiceImpl implements PaymentService {
 
         // Pessimistic Locking to avoid race conditions during concurrent webhooks
         paymentRepository.findByTxnRefWithLock(txnRef).ifPresent(payment -> {
-            // Idempotency Check: Nếu đã SUCCESS rồi thì bỏ qua
+            // Idempotency Check: If status is SUCCESS, skip duplicate webhook processing.
             if ("SUCCESS".equalsIgnoreCase(payment.getStatus())) {
                 log.info("Payment txnRef={} is already SUCCESS. Skipping duplicate webhook processing.", txnRef);
                 return;
@@ -358,8 +362,7 @@ public class PaymentServiceImpl implements PaymentService {
                     url,
                     org.springframework.http.HttpMethod.GET,
                     entity,
-                    Map.class
-            );
+                    Map.class);
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 Map<String, Object> body = response.getBody();
@@ -409,7 +412,8 @@ public class PaymentServiceImpl implements PaymentService {
             for (String idStr : payment.getCourseIds().split(",")) {
                 try {
                     targetIds.add(Long.parseLong(idStr.trim()));
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
             }
         }
         if (targetIds.isEmpty() && payment.getCourse() != null) {
@@ -448,7 +452,8 @@ public class PaymentServiceImpl implements PaymentService {
                                 priceText,
                                 c.getThumbnailUrl());
                     } catch (Exception e) {
-                        log.warn("Failed to send enrollment email to {}: {}", payment.getUser().getEmail(), e.getMessage());
+                        log.warn("Failed to send enrollment email to {}: {}", payment.getUser().getEmail(),
+                                e.getMessage());
                     }
                 }
             }
@@ -506,7 +511,8 @@ public class PaymentServiceImpl implements PaymentService {
         if (status == null || status.trim().isEmpty() || "ALL".equalsIgnoreCase(status)) {
             paymentPage = paymentRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable);
         } else {
-            paymentPage = paymentRepository.findByUserIdAndStatusOrderByCreatedAtDesc(userId, status.toUpperCase(), pageable);
+            paymentPage = paymentRepository.findByUserIdAndStatusOrderByCreatedAtDesc(userId, status.toUpperCase(),
+                    pageable);
         }
         return paymentPage.map(this::mapPaymentToDTO);
     }
@@ -561,12 +567,15 @@ public class PaymentServiceImpl implements PaymentService {
             String status, String settlementStatus, String search, int page, int size) {
         syncAllPaymentSettlementStatuses();
 
-        String cleanStatus = (status == null || status.trim().isEmpty() || "ALL".equalsIgnoreCase(status.trim())) ? "" : status.trim();
-        String cleanSettlementStatus = (settlementStatus == null || settlementStatus.trim().isEmpty() || "ALL".equalsIgnoreCase(settlementStatus.trim())) ? "" : settlementStatus.trim();
+        String cleanStatus = (status == null || status.trim().isEmpty() || "ALL".equalsIgnoreCase(status.trim())) ? ""
+                : status.trim();
+        String cleanSettlementStatus = (settlementStatus == null || settlementStatus.trim().isEmpty()
+                || "ALL".equalsIgnoreCase(settlementStatus.trim())) ? "" : settlementStatus.trim();
         String cleanSearch = (search == null || search.trim().isEmpty()) ? "" : "%" + search.trim().toLowerCase() + "%";
 
         Pageable pageable = PageRequest.of(page, size);
-        Page<Payment> paymentPage = paymentRepository.findAllForManager(cleanStatus, cleanSettlementStatus, cleanSearch, pageable);
+        Page<Payment> paymentPage = paymentRepository.findAllForManager(cleanStatus, cleanSettlementStatus, cleanSearch,
+                pageable);
         return paymentPage.map(this::mapToManagerDTO);
     }
 
@@ -575,17 +584,20 @@ public class PaymentServiceImpl implements PaymentService {
     public byte[] exportPaymentsToExcel(String status, String settlementStatus, String search) {
         syncAllPaymentSettlementStatuses();
 
-        String cleanStatus = (status == null || status.trim().isEmpty() || "ALL".equalsIgnoreCase(status.trim())) ? "" : status.trim();
-        String cleanSettlementStatus = (settlementStatus == null || settlementStatus.trim().isEmpty() || "ALL".equalsIgnoreCase(settlementStatus.trim())) ? "" : settlementStatus.trim();
+        String cleanStatus = (status == null || status.trim().isEmpty() || "ALL".equalsIgnoreCase(status.trim())) ? ""
+                : status.trim();
+        String cleanSettlementStatus = (settlementStatus == null || settlementStatus.trim().isEmpty()
+                || "ALL".equalsIgnoreCase(settlementStatus.trim())) ? "" : settlementStatus.trim();
         String cleanSearch = (search == null || search.trim().isEmpty()) ? "" : "%" + search.trim().toLowerCase() + "%";
 
-        List<Payment> payments = paymentRepository.findAllForManagerList(cleanStatus, cleanSettlementStatus, cleanSearch);
+        List<Payment> payments = paymentRepository.findAllForManagerList(cleanStatus, cleanSettlementStatus,
+                cleanSearch);
         List<com.hango.hango_backend.dto.ManagerPaymentDTO> dtos = payments.stream()
                 .map(this::mapToManagerDTO)
                 .collect(Collectors.toList());
 
         try (org.apache.poi.ss.usermodel.Workbook workbook = new org.apache.poi.xssf.usermodel.XSSFWorkbook();
-             java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
+                java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
 
             org.apache.poi.ss.usermodel.Sheet sheet = workbook.createSheet("Payment Transactions");
 
@@ -623,7 +635,8 @@ public class PaymentServiceImpl implements PaymentService {
                 row.createCell(5).setCellValue(dto.getTrainerName() != null ? dto.getTrainerName() : "");
                 row.createCell(6).setCellValue(dto.getAmount() != null ? dto.getAmount().doubleValue() : 0);
                 row.createCell(7).setCellValue(dto.getPlatformFee() != null ? dto.getPlatformFee().doubleValue() : 0);
-                row.createCell(8).setCellValue(dto.getTrainerEarnings() != null ? dto.getTrainerEarnings().doubleValue() : 0);
+                row.createCell(8)
+                        .setCellValue(dto.getTrainerEarnings() != null ? dto.getTrainerEarnings().doubleValue() : 0);
                 row.createCell(9).setCellValue(dto.getStatus() != null ? dto.getStatus() : "");
                 row.createCell(10).setCellValue(dto.getSettlementStatus() != null ? dto.getSettlementStatus() : "");
                 row.createCell(11).setCellValue(dto.getStatementId() != null ? dto.getStatementId().toString() : "");
@@ -728,7 +741,6 @@ public class PaymentServiceImpl implements PaymentService {
                 .createdAt(p.getCreatedAt())
                 .build();
     }
-
 
     private String formatValue(Object value) {
         if (value == null) {

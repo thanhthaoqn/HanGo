@@ -95,7 +95,7 @@ jobs:
             cd /home/ubuntu/hango
             test -s .env
 
-            if docker inspect hango-nginx >/dev/null 2>&1; then
+            if [ "$(docker inspect -f '{{.State.Running}}' hango-nginx 2>/dev/null || true)" = "true" ]; then
               docker exec hango-nginx nginx -t
             fi
 
@@ -123,8 +123,10 @@ jobs:
               exit 1
             fi
 
-            docker exec hango-nginx nginx -t
-            docker exec hango-nginx nginx -s reload
+            if [ "$(docker inspect -f '{{.State.Running}}' hango-nginx 2>/dev/null || true)" = "true" ]; then
+              docker exec hango-nginx nginx -t
+              docker exec hango-nginx nginx -s reload
+            fi
             # Giữ lại image cũ tối đa 24h thay vì 168h (7 ngày)
             docker image prune -af --filter "until=24h"
             docker-compose ps

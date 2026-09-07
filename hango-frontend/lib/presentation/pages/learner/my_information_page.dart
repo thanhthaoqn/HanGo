@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../routes/app_routes.dart';
 import 'package:hango/presentation/widgets/image_cropper_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -610,13 +612,11 @@ class _MyInformationPageState extends State<MyInformationPage> {
             _showSuccessSnackBar('Password updated successfully!');
             // The prompt says "After the change, you will need to log back in on all devices."
             // We can prompt them or auto log out
-            Future.delayed(const Duration(seconds: 2), () {
-              _authService.logout();
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const LearnerShellPage()),
-                (route) => false,
-              );
+            Future.delayed(const Duration(seconds: 2), () async {
+              await _authService.logout();
+              if (mounted) {
+                context.go(AppRoutes.home);
+              }
             });
           } else {
             _showErrorSnackBar('Failed to update password: ${res['message']}');

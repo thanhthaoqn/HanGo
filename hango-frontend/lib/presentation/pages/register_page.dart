@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../routes/app_routes.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/services/auth_service.dart';
 import '../../utils/register_verification_guard.dart';
@@ -71,9 +73,7 @@ class _RegisterPageState extends State<RegisterPage> {
     } else {
       if (!_verificationGuard.tryClose()) return;
       _verificationTimer?.cancel();
-      navigator.pushReplacement(
-        MaterialPageRoute(builder: (context) => const LearnerShellPage()),
-      );
+      context.go(AppRoutes.home);
     }
   }
 
@@ -83,7 +83,11 @@ class _RegisterPageState extends State<RegisterPage> {
     _verificationTimer?.cancel();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      Navigator.of(context).maybePop();
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).maybePop();
+      } else {
+        context.go(AppRoutes.login);
+      }
     });
   }
 
@@ -856,7 +860,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                       cursor: SystemMouseCursors.click,
                                       child: GestureDetector(
                                         onTap: () {
-                                          _popCurrentRouteOnce();
+                                          context.go(AppRoutes.login);
                                         },
                                         child: const Text(
                                           'Sign In',
