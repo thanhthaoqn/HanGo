@@ -21,7 +21,7 @@ services:
     mem_reservation: 384m
     mem_limit: 600m
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/health | grep -q '\"status\":\"UP\"'"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api/health | grep -q '\"status\":\"UP\"'"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -42,7 +42,7 @@ services:
     expose:
       - "80"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost/ > /dev/null"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ > /dev/null || wget -qO- http://localhost/ > /dev/null"]
       interval: 10s
       timeout: 5s
       retries: 6
