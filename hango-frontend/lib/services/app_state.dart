@@ -25,6 +25,9 @@ class AppState extends ChangeNotifier {
     AuthService.onLoginSuccess = (result) {
       _handleExternalLoginSuccess(result);
     };
+    AuthService.onLogout = () {
+      logout();
+    };
 
     // Tự động nạp lại session cũ khi mở app
     restoreSession();

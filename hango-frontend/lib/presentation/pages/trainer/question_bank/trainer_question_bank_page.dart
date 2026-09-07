@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../routes/app_routes.dart';
 import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
@@ -858,7 +860,7 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
           const SizedBox(width: 16),
           // User profile widget with Popup Menu
           PopupMenuButton<String>(
-            onSelected: (val) {
+            onSelected: (val) async {
               if (val == 'dashboard') {
                 Navigator.pushReplacement(
                   context,
@@ -874,12 +876,10 @@ class _TrainerQuestionBankPageState extends State<TrainerQuestionBankPage> {
                   ),
                 );
               } else if (val == 'logout') {
-                _authService.logout();
-                Navigator.pushNamedAndRemoveUntil(
-                  context,
-                  '/login',
-                  (route) => false,
-                );
+                await _authService.logout();
+                if (mounted) {
+                  context.go(AppRoutes.login);
+                }
               }
             },
             offset: const Offset(0, 48),

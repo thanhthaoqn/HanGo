@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../routes/app_routes.dart';
 import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -211,11 +213,7 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
   void _handleLogout() async {
     await _authService.logout();
     if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-        (route) => false,
-      );
+      context.go(AppRoutes.login);
     }
   }
 

@@ -11,8 +11,9 @@ import '../../utils/web_session_helper.dart';
 import '../../domain/model/auth_session.dart';
 
 class AuthService {
-  // 🚀 DÒNG THÊM MỚI: Cổng phát tín hiệu (Callback static) để AppState đứng từ xa lắng nghe
+  // Static callback signals allowing external listeners like AppState to react to auth events
   static Function(Map<String, dynamic>)? onLoginSuccess;
+  static VoidCallback? onLogout;
 
   // Use dynamic baseUrl configuration
   static String get baseUrl => EnvConfig.authBaseUrl;
@@ -74,10 +75,10 @@ class AuthService {
     return text;
   }
 
-  // Goi API POST /api/auth/login. Day la diem bat dau flow dang nhap o Frontend:
-  // gui email+password (KHONG kem token, vi luc nay chua co token) -> nhan ve
-  // JSON { token, refreshToken, id, email, fullName, roles, avatarUrl } tu
-  // AuthController.authenticateUser (backend) neu thanh cong.
+  // Call API POST /api/auth/login. This is the entry point for the frontend login flow:
+  // sends email and password (without token) -> receives
+  // JSON { token, refreshToken, id, email, fullName, roles, avatarUrl } from
+  // AuthController.authenticateUser (backend) on success.
   Future<Map<String, dynamic>> login(
     String email,
     String password, {
@@ -93,10 +94,10 @@ class AuthService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setRememberMe(rememberMe);
-        // Luu token + thong tin user vao SharedPreferences (local storage cua thiet bi)
+        // Save token and user information to SharedPreferences (device local storage)
         await saveSession(data);
 
-        // 🔥 PHÁT TÍN HIỆU NGẦM: Báo cho AppState biết để cập nhật UI ngay lập tức
+        // Trigger callback to notify AppState to update UI immediately
         if (onLoginSuccess != null) {
           onLoginSuccess!(data);
         }
@@ -124,10 +125,10 @@ class AuthService {
     userChangeNotifier.value++;
   }
 
-  // Luu toan bo phien dang nhap vao SharedPreferences (key-value storage cua
-  // Flutter, tuong duong localStorage tren web). Tu day ve sau, MOI request
-  // toi API co bao ve deu doc token tu day (xem getToken()) va gan vao header
-  // "Authorization: Bearer <token>" - khong co store/context toan cuc rieng.
+  // Persist the entire session into SharedPreferences (Flutter key-value storage,
+  // equivalent to localStorage on web). Every subsequent protected API request
+  // retrieves the token from here (see getToken()) and attaches it to the
+  // "Authorization: Bearer <token>" header without needing a separate global store.
   Future<void> saveSession(Map<String, dynamic> data) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, data['token']);
@@ -295,7 +296,7 @@ class AuthService {
     setRememberMe(false);
     final prefs = await SharedPreferences.getInstance();
     
-    // Xoá cờ đã tắt popup Entry Exam của user này để lần đăng nhập sau nó hiện lại
+    // Reset the dismissed entry exam popup flag for this user so it appears on next login
     final currentUserId = prefs.getInt(_userIdKey) ?? 0;
     if (currentUserId != 0) {
       await prefs.remove('dismissed_entry_exam_$currentUserId');
@@ -318,6 +319,7 @@ class AuthService {
     cachedRoles = null;
     cachedIsLoggedIn = false;
     notifyUserChanged();
+    onLogout?.call();
 
     try {
       if (await googleSignIn.isSignedIn()) {
@@ -380,7 +382,7 @@ class AuthService {
         final data = jsonDecode(response.body);
         await saveSession(data);
 
-        // 🔥 PHÁT TÍN HIỆU NGẦM: Áp dụng tương tự cho đăng nhập Google
+        // Trigger callback to notify AppState upon Google login success
         if (onLoginSuccess != null) {
           onLoginSuccess!(data);
         }

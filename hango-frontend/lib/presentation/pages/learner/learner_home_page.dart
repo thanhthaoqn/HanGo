@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../routes/app_routes.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../utils/config.dart';
@@ -544,10 +546,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
               ? 'Vui lòng đăng ký tài khoản giáo viên để bắt đầu'
               : 'Please register a trainer account to start',
         );
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const RegisterPage()),
-        );
+        context.go(AppRoutes.register);
       }
       return;
     }
@@ -780,10 +779,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
   void _handleLogout() async {
     await _authService.logout();
     if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-      );
+      context.go(AppRoutes.login);
     }
   }
 

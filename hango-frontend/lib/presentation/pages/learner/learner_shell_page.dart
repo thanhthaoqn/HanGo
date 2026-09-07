@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../widgets/shared_header.dart';
 import 'learner_home_page.dart';
 import '../course/list_courses_page.dart';
@@ -16,11 +17,13 @@ import '../../../data/repositories/payment_repository.dart';
 class LearnerShellPage extends StatefulWidget {
   final int initialIndex;
   final int initialSubTab;
+  final StatefulNavigationShell? navigationShell;
 
   const LearnerShellPage({
     super.key,
     this.initialIndex = 0,
     this.initialSubTab = 0,
+    this.navigationShell,
   });
 
   static LearnerShellPageState? of(BuildContext context) {
@@ -134,17 +137,31 @@ class LearnerShellPageState extends State<LearnerShellPage> {
     });
   }
 
+  int get currentIndex => widget.navigationShell?.currentIndex ?? _currentIndex;
+
   void selectTab(int index, {int subTab = 0}) {
-    setState(() {
-      _currentIndex = index;
+    if (widget.navigationShell != null) {
+      widget.navigationShell!.goBranch(
+        index,
+        initialLocation: index == widget.navigationShell!.currentIndex,
+      );
       if (index == 5) {
-        _informationSubTab = subTab;
+        setState(() {
+          _informationSubTab = subTab;
+        });
       }
-    });
+    } else {
+      setState(() {
+        _currentIndex = index;
+        if (index == 5) {
+          _informationSubTab = subTab;
+        }
+      });
+    }
   }
 
   String _getActiveTabName() {
-    switch (_currentIndex) {
+    switch (currentIndex) {
       case 0:
         return '';
       case 1:
@@ -182,18 +199,19 @@ class LearnerShellPageState extends State<LearnerShellPage> {
         isDesktop: isDesktop,
         activeTab: _getActiveTabName(),
       ),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          const LearnerHomePage(isEmbedded: true),
-          const ListCoursesPage(isEmbedded: true),
-          const ListExamsPage(isEmbedded: true),
-          const LearningPathwayPage(isEmbedded: true),
-          const MyLearningPage(isEmbedded: true),
-          MyInformationPage(isEmbedded: true, initialTab: _informationSubTab),
-          const CartPage(isEmbedded: true),
-        ],
-      ),
+      body: widget.navigationShell ??
+          IndexedStack(
+            index: _currentIndex,
+            children: [
+              const LearnerHomePage(isEmbedded: true),
+              const ListCoursesPage(isEmbedded: true),
+              const ListExamsPage(isEmbedded: true),
+              const LearningPathwayPage(isEmbedded: true),
+              const MyLearningPage(isEmbedded: true),
+              MyInformationPage(isEmbedded: true, initialTab: _informationSubTab),
+              const CartPage(isEmbedded: true),
+            ],
+          ),
     );
   }
 }

@@ -132,7 +132,7 @@ class _TrainerTicketsPageState extends State<TrainerTicketsPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Support Tickets',
+                      'Tickets',
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
@@ -152,7 +152,7 @@ class _TrainerTicketsPageState extends State<TrainerTicketsPage> {
                     );
                   },
                   icon: const Icon(Icons.add_rounded, size: 18),
-                  label: const Text('New Support Request'),
+                  label: const Text('New Ticket Request'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF28B79B),
                     foregroundColor: Colors.white,
@@ -222,7 +222,7 @@ class _TrainerTicketsPageState extends State<TrainerTicketsPage> {
                       ),
                       SizedBox(height: 10),
                       Text(
-                        'No support requests found',
+                        'No Ticket requests found',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
@@ -854,20 +854,14 @@ class _TrainerTicketDetailDialogState
         OutlinedButton(
           onPressed: () => Navigator.pop(context),
           style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: 10,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
             ),
           ),
           child: const Text(
             'Close',
-            style: TextStyle(
-              color: Color(0xFF64748B),
-              fontFamily: 'Outfit',
-            ),
+            style: TextStyle(color: Color(0xFF64748B), fontFamily: 'Outfit'),
           ),
         ),
         if (_ticket != null &&
@@ -892,10 +886,7 @@ class _TrainerTicketDetailDialogState
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFF59E0B),
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 10,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -944,7 +935,7 @@ class _TrainerTicketDetailDialogState
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  'Support Request Details',
+                  'Ticket Request Details',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../routes/app_routes.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
 import '../pages/login_page.dart';
@@ -560,11 +562,7 @@ class _SharedHeaderState extends State<SharedHeader> {
   void _handleLogout() async {
     await _authService.logout();
     if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LearnerShellPage()),
-        (route) => false,
-      );
+      context.go(AppRoutes.home);
     }
   }
 
@@ -1058,26 +1056,11 @@ class _SharedHeaderState extends State<SharedHeader> {
                     final isTrainer = _userRoles.any((r) => r.toUpperCase().contains('TRAINER'));
                     final isAdmin = _userRoles.any((r) => r.toUpperCase().contains('ADMIN'));
                     if (isAdmin) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const AdminDashboardPage(),
-                        ),
-                      );
+                      context.go(AppRoutes.admin);
                     } else if (isTrainer) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const TrainerShellPage(),
-                        ),
-                      );
+                      context.go(AppRoutes.trainer);
                     } else {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const CourseManagerShellPage(),
-                        ),
-                      );
+                      context.go(AppRoutes.courseManager);
                     }
                   } else if (val == 'logout') {
                     _handleLogout();
@@ -1406,12 +1389,7 @@ class _SharedHeaderState extends State<SharedHeader> {
               ],
               TextButton(
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const LoginPage(),
-                    ),
-                  );
+                  context.go(AppRoutes.login);
                 },
                 child: const Text(
                   'Login',
@@ -1438,12 +1416,7 @@ class _SharedHeaderState extends State<SharedHeader> {
                 ),
                 child: ElevatedButton(
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const RegisterPage(),
-                      ),
-                    );
+                    context.go(AppRoutes.register);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
