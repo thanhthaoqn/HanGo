@@ -48,6 +48,25 @@ class _ExamResultPageState extends State<ExamResultPage> {
   List<Map<String, dynamic>> _attempts = [];
   bool _isLoadingAttempts = true;
 
+  // Pagination
+  int _historyCurrentPage = 1;
+  final int _historyPageSize = 5;
+
+  List<Map<String, dynamic>> get _paginatedAttempts {
+    if (_attempts.isEmpty) return [];
+    final startIndex = (_historyCurrentPage - 1) * _historyPageSize;
+    if (startIndex >= _attempts.length) {
+      return _attempts.take(_historyPageSize).toList();
+    }
+    return _attempts.skip(startIndex).take(_historyPageSize).toList();
+  }
+
+  int get _totalHistoryPages {
+    final total = _attempts.length;
+    if (total == 0) return 1;
+    return (total / _historyPageSize).ceil();
+  }
+
   // AI recommendation
   String _aiWeaknessSummary = "";
   bool _isLoadingAi = true;
@@ -1301,11 +1320,11 @@ class _ExamResultPageState extends State<ExamResultPage> {
               : ListView.separated(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _attempts.length,
+                  itemCount: _paginatedAttempts.length,
                   separatorBuilder: (context, index) =>
                       const Divider(height: 24),
                   itemBuilder: (context, index) {
-                    final attempt = _attempts[index];
+                    final attempt = _paginatedAttempts[index];
                     final attemptNum = attempt['attemptNumber'] ?? (index + 1);
                     final date = attempt['date'] ?? '';
                     final score = (attempt['score'] as num?)?.toDouble() ?? 0.0;
@@ -1407,8 +1426,52 @@ class _ExamResultPageState extends State<ExamResultPage> {
                     );
                   },
                 ),
+                  if (_totalHistoryPages > 1) ...[
+                    const SizedBox(height: 24),
+                    _buildHistoryPagination(),
+                  ],
         ],
       ),
+    );
+  }
+
+  Widget _buildHistoryPagination() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.chevron_left_rounded),
+          onPressed: _historyCurrentPage > 1
+              ? () {
+                  setState(() {
+                    _historyCurrentPage--;
+                  });
+                }
+              : null,
+          color: const Color(0xFF28B79B),
+        ),
+        const SizedBox(width: 16),
+        Text(
+          'Page $_historyCurrentPage of $_totalHistoryPages',
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1F2937),
+          ),
+        ),
+        const SizedBox(width: 16),
+        IconButton(
+          icon: const Icon(Icons.chevron_right_rounded),
+          onPressed: _historyCurrentPage < _totalHistoryPages
+              ? () {
+                  setState(() {
+                    _historyCurrentPage++;
+                  });
+                }
+              : null,
+          color: const Color(0xFF28B79B),
+        ),
+      ],
     );
   }
 }
