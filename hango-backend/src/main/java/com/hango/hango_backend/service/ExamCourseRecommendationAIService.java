@@ -91,21 +91,30 @@ public class ExamCourseRecommendationAIService {
                     .append("\n");
         }
 
-        double scoreAvg = 0.0;
-        if (analysis.getHints() != null && analysis.getHints().get("score_avg") != null) {
+        double examScore = 0.0;
+        if (attempt.getScore() != null) {
+            examScore = attempt.getScore().doubleValue();
+        } else if (analysis.getScore() != null) {
+            examScore = analysis.getScore();
+        } else if (analysis.getHints() != null && analysis.getHints().get("score") != null) {
             try {
-                scoreAvg = Double.parseDouble(analysis.getHints().get("score_avg").toString());
+                examScore = Double.parseDouble(analysis.getHints().get("score").toString());
+            } catch (NumberFormatException ignored) {
+            }
+        } else if (analysis.getHints() != null && analysis.getHints().get("score_avg") != null) {
+            try {
+                examScore = Double.parseDouble(analysis.getHints().get("score_avg").toString());
             } catch (NumberFormatException ignored) {
             }
         }
 
         String difficultyHint = "";
-        if (scoreAvg >= 8.0) {
-            difficultyHint = "\n                - [MANDATORY] Điểm học sinh >= 8.0 (Xuất sắc), bắt buộc ưu tiên chọn các khóa học có Difficulty là ADVANCED hoặc UPPER_INTERMEDIATE.";
-        } else if (scoreAvg >= 5.0) {
-            difficultyHint = "\n                - [MANDATORY] Điểm học sinh từ 5.0 đến dưới 8.0 (Khá/Trung bình), bắt buộc ưu tiên chọn các khóa học có Difficulty là INTERMEDIATE.";
+        if (examScore >= 8.0) {
+            difficultyHint = "\n                - [MANDATORY] Điểm bài thi này đạt " + String.format(java.util.Locale.US, "%.1f", examScore) + "/10.0 (Xuất sắc), bắt buộc ưu tiên chọn các khóa học có Difficulty là ADVANCED hoặc UPPER_INTERMEDIATE.";
+        } else if (examScore >= 5.0) {
+            difficultyHint = "\n                - [MANDATORY] Điểm bài thi này đạt " + String.format(java.util.Locale.US, "%.1f", examScore) + "/10.0 (Khá/Trung bình), bắt buộc ưu tiên chọn các khóa học có Difficulty là INTERMEDIATE.";
         } else {
-            difficultyHint = "\n                - [MANDATORY] Điểm học sinh < 5.0 (Căn bản/Mất gốc), bắt buộc CHỈ ĐƯỢC CHỌN các khóa học có Difficulty là BEGINNER hoặc BASIC để củng cố kiến thức nền tảng.";
+            difficultyHint = "\n                - [MANDATORY] Điểm bài thi này đạt " + String.format(java.util.Locale.US, "%.1f", examScore) + "/10.0 (Căn bản/Mất gốc), bắt buộc CHỈ ĐƯỢC CHỌN các khóa học có Difficulty là BEGINNER hoặc BASIC để củng cố kiến thức nền tảng.";
         }
 
         String systemPrompt = """
@@ -114,13 +123,14 @@ public class ExamCourseRecommendationAIService {
                 Hãy nói chuyện thân thiện, dễ gần, tích cực; không phán xét.
 
                 Nhiệm vụ của bạn:
-                1) Viết `weaknessSummary` ngắn gọn, ấm áp như nhắn với bạn học.
-                   - Nếu điểm `score_avg_hint` cao (>= 9) hoặc knowledge_gaps_json cho thấy ít lỗi, hãy nói rằng bạn đang làm rất tốt và chỉ gợi ý “review nhẹ” (không khẳng định yếu nhiều).
-                   - Nếu điểm thấp hơn thì mô tả rõ điểm yếu dựa trên TOOL INPUT.
+                1) Viết `weaknessSummary` ngắn gọn, ấm áp như nhắn với bạn học:
+                   - Nếu điểm bài thi này cao (>= 8.0) hoặc knowledge_gaps_json cho thấy rất ít lỗi, hãy chúc mừng nhiệt liệt vì học viên làm bài rất tốt (nếu 10.0 là hoàn hảo), khen ngợi sự vững vàng và chỉ gợi ý mở rộng thêm kiến thức nâng cao, TUYỆT ĐỐI KHÔNG coi học viên là người mới bắt đầu (beginner).
+                   - Nếu điểm bài thi từ 5.0 đến dưới 8.0, hãy động viên và chỉ ra kỹ năng cần cải thiện dựa trên TOOL INPUT.
+                   - Nếu điểm bài thi thấp (< 5.0), an ủi và khuyên củng cố kiến thức nền tảng.
 
                 2) Đề xuất đúng 3 khóa học và BẮT BUỘC sắp xếp theo thứ tự ưu tiên:
                    - Khóa học 1: Ưu tiên số 1 giải quyết trực tiếp kỹ năng yếu nhất (`explicit_weakest_skill`).
-                   - Khóa học 2 & 3: Lần lượt chọn các khóa học giải quyết các kỹ năng yếu tiếp theo trong danh sách `weak_skills` của `knowledge_gaps_json` (hoặc củng cố kiến thức nền tảng tương ứng).
+                   - Khóa học 2 & 3: Lần lượt chọn các khóa học giải quyết các kỹ năng yếu tiếp theo trong danh sách `weak_skills` của `knowledge_gaps_json` (hoặc củng cố kiến thức nền tảng/nâng cao tương ứng).
                    - Mỗi khóa học kèm `reasonWhy` thân thiện, dễ hiểu (vì sao khóa này giúp bạn tiến bộ nhanh).
 
                 Ràng buộc bắt buộc:
@@ -131,7 +141,7 @@ public class ExamCourseRecommendationAIService {
                 %s
 
                 TOOL INPUT (EXAM ANALYSIS):
-                - score_avg_hint: %s
+                - exam_score: %s / 10.0
                 - knowledge_gaps_json: %s
                 - explicit_weakest_skill: %s%s
 
@@ -148,9 +158,7 @@ public class ExamCourseRecommendationAIService {
                 .formatted(
                         difficultyHint,
                         courseList,
-                        analysis.getHints() != null && analysis.getHints().get("score_avg") != null
-                                ? analysis.getHints().get("score_avg").toString()
-                                : "0",
+                        String.format(java.util.Locale.US, "%.1f", examScore),
                         analysis.getKnowledgeGapsJson() == null ? "{}" : analysis.getKnowledgeGapsJson(),
                         weakestSkill != null ? weakestSkill : "N/A",
                         categoryHint);

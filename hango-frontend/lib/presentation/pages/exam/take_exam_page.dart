@@ -247,8 +247,7 @@ class _TakeExamPageState extends State<TakeExamPage>
 
     int correctCount = (score * _examQuestions.length / 10).round();
 
-    Navigator.pushReplacement(
-      context,
+    Navigator.of(context, rootNavigator: true).pushReplacement(
       MaterialPageRoute(
         builder: (context) => ExamResultPage(
           exam: widget.exam,
@@ -361,8 +360,7 @@ class _TakeExamPageState extends State<TakeExamPage>
                         int correctCount = (score * _examQuestions.length / 10)
                             .round();
 
-                        Navigator.pushReplacement(
-                          this.context,
+                        Navigator.of(this.context, rootNavigator: true).pushReplacement(
                           MaterialPageRoute(
                             builder: (context) => ExamResultPage(
                               exam: widget.exam,
