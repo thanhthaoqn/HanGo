@@ -939,4 +939,38 @@ class LearningPathwayServiceTest {
         assertEquals(false, node.getIsMastered());
         assertTrue(result.getMentorSummary().contains("50"));
     }
+
+    @Test
+    void toResponseDtoShouldResolveEffectiveCourseWhenUserEnrolledInNewerVersion() {
+        Long studentId = 186L;
+        User student = User.builder().id(studentId).build();
+        LearningPathway pathway = LearningPathway.builder().id(10L).student(student).build();
+
+        // Node points to older version ID 153 (6 lessons)
+        Course oldCourse = Course.builder().id(153L).code("THPT_ENG_VO").title("Vocab V1").status("PUBLISHED").build();
+        PathwayNode node = PathwayNode.builder().id(221L).stepOrder(1).course(oldCourse).status("IN_PROGRESS").build();
+        pathway.addNode(node);
+
+        // User is actually enrolled in newer version ID 158 (5 lessons, all completed)
+        Course newCourse = Course.builder().id(158L).code("THPT_ENG_VO-V2").title("Vocab V2").status("PUBLISHED").build();
+        com.hango.hango_backend.entity.Enrollment enrollment = com.hango.hango_backend.entity.Enrollment.builder()
+                .id(1L).user(student).course(newCourse).build();
+
+        when(learningPathwayRepository.findById(10L)).thenReturn(Optional.of(pathway));
+        when(enrollmentRepository.findFamilyEnrollments(studentId, 153L)).thenReturn(List.of(enrollment));
+        when(lessonRepository.countByCourseId(158L)).thenReturn(5L);
+        when(lessonProgressRepository.countCompletedLessonsByUserIdAndCourseId(studentId, 158L)).thenReturn(5L);
+
+        LearningPathwayResponseDTO dto = learningPathwayService.getPathwayById(10L, studentId);
+
+        assertNotNull(dto);
+        assertEquals(1, dto.getNodes().size());
+        PathwayNodeDTO nodeDto = dto.getNodes().get(0);
+        assertEquals(158L, nodeDto.getCourseId());
+        assertEquals("Vocab V2", nodeDto.getCourseTitle());
+        assertEquals(5, nodeDto.getTotalLessons());
+        assertEquals(5, nodeDto.getCompletedLessons());
+        assertEquals(100, nodeDto.getProgressPercent());
+        assertEquals("COMPLETED", nodeDto.getStatus());
+    }
 }

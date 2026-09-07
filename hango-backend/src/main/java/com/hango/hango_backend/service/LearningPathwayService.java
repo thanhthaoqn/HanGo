@@ -3,6 +3,7 @@ package com.hango.hango_backend.service;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
@@ -39,6 +40,7 @@ import com.hango.hango_backend.repository.LessonProgressRepository;
 import com.hango.hango_backend.repository.LessonRepository;
 import com.hango.hango_backend.repository.UserRepository;
 import com.hango.hango_backend.repository.EnrollmentRepository;
+import com.hango.hango_backend.entity.Enrollment;
 import com.hango.hango_backend.service.SkillCategoryMappingService;
 
 import lombok.RequiredArgsConstructor;
@@ -99,6 +101,7 @@ public class LearningPathwayService {
                 .toList();
         boolean usingExistingCoursesFallback = publishedCourses.isEmpty();
         List<Course> availableCourses = usingExistingCoursesFallback ? allCourses : publishedCourses;
+        availableCourses = deduplicateCourseVersions(studentId, availableCourses);
 
         if (Boolean.TRUE.equals(requestDTO.getOnlyFree())) {
             availableCourses = availableCourses.stream()
@@ -333,7 +336,9 @@ public class LearningPathwayService {
                 if (!firstNodeSeen && node.getStepOrder() != null && node.getStepOrder() == 1) {
                     node.setStatus("IN_PROGRESS");
                     // Reset progress only if less than current real progress
-                    int realProgress = calculateCourseProgressPercent(studentId, node.getCourse().getId());
+                    Course effectiveCourse = resolveEffectiveCourse(studentId, node.getCourse());
+                    Long courseId = effectiveCourse != null ? effectiveCourse.getId() : (node.getCourse() != null ? node.getCourse().getId() : null);
+                    int realProgress = courseId != null ? calculateCourseProgressPercent(studentId, courseId) : 0;
                     node.setProgressPercent(Math.max(node.getProgressPercent(), realProgress));
                     firstNodeSeen = true;
                 } else if (!"COMPLETED".equalsIgnoreCase(node.getStatus())) {
@@ -569,11 +574,13 @@ public class LearningPathwayService {
             if ("COMPLETED".equalsIgnoreCase(node.getStatus())) {
                 estimatedHoursPerNode.add(0); // Completed nodes consume no forward capacity
             } else {
-                Integer estDuration = node.getCourse().getEstimatedDuration();
+                Course effectiveCourse = resolveEffectiveCourse(pathway.getStudent() != null ? pathway.getStudent().getId() : null, node.getCourse());
+                Course course = effectiveCourse != null ? effectiveCourse : node.getCourse();
+                Integer estDuration = course != null ? course.getEstimatedDuration() : null;
                 if (estDuration != null && estDuration > 0) {
                     estimatedHoursPerNode.add(estDuration);
                 } else {
-                    long totalLessons = lessonRepository.countByCourseId(node.getCourse().getId());
+                    long totalLessons = course != null && course.getId() != null ? lessonRepository.countByCourseId(course.getId()) : 0;
                     estimatedHoursPerNode.add(totalLessons == 0 ? 3 : (int) (totalLessons * 2));
                 }
             }
@@ -631,12 +638,14 @@ public class LearningPathwayService {
         List<PathwayNodeDTO> nodeDTOs = pathway.getNodes().stream()
                 .sorted(java.util.Comparator.comparingInt(PathwayNode::getStepOrder))
                 .map(node -> {
-            int realProgress = calculateCourseProgressPercent(studentId, node.getCourse().getId());
-            long totalLessons = lessonRepository.countByCourseId(node.getCourse().getId());
-            long completedLessons = countCompletedLessons(studentId, node.getCourse().getId());
-            String skillType = node.getCourse().getCategory() != null
-                    ? node.getCourse().getCategory().getParamValue()
-                    : null;
+            Course effectiveCourse = resolveEffectiveCourse(studentId, node.getCourse());
+            Long effectiveCourseId = effectiveCourse != null ? effectiveCourse.getId() : (node.getCourse() != null ? node.getCourse().getId() : null);
+            int realProgress = effectiveCourseId != null ? calculateCourseProgressPercent(studentId, effectiveCourseId) : 0;
+            long totalLessons = effectiveCourseId != null ? lessonRepository.countByCourseId(effectiveCourseId) : 0;
+            long completedLessons = effectiveCourseId != null ? countCompletedLessons(studentId, effectiveCourseId) : 0;
+            String skillType = (effectiveCourse != null && effectiveCourse.getCategory() != null)
+                    ? effectiveCourse.getCategory().getParamValue()
+                    : (node.getCourse() != null && node.getCourse().getCategory() != null ? node.getCourse().getCategory().getParamValue() : null);
 
             // Auto-sync node status based on actual progress
             String resolvedStatus = node.getStatus();
@@ -651,24 +660,27 @@ public class LearningPathwayService {
                 resolvedStatus = "IN_PROGRESS";
             }
 
-                    return PathwayNodeDTO.builder()
-                            .id(node.getId())
-                            .step(node.getStepOrder())
-                            .courseId(node.getCourse().getId())
-                            .courseTitle(node.getCourse().getTitle())
-                            .difficulty(node.getCourse().getDifficulty() != null ? node.getCourse().getDifficulty().getParamValue() : "N/A")
-                            .status(resolvedStatus)
+            return PathwayNodeDTO.builder()
+                    .id(node.getId())
+                    .step(node.getStepOrder())
+                    .courseId(effectiveCourseId)
+                    .courseTitle(effectiveCourse != null ? effectiveCourse.getTitle() : (node.getCourse() != null ? node.getCourse().getTitle() : "Course Title"))
+                    .difficulty(effectiveCourse != null && effectiveCourse.getDifficulty() != null
+                            ? effectiveCourse.getDifficulty().getParamValue()
+                            : (node.getCourse() != null && node.getCourse().getDifficulty() != null ? node.getCourse().getDifficulty().getParamValue() : "N/A"))
+                    .status(resolvedStatus)
                     .reasonWhy(node.getReasonWhy())
                     .progressPercent(realProgress)
                     .skillType(skillType)
                     .totalLessons(Math.toIntExact(Math.min(totalLessons, Integer.MAX_VALUE)))
                     .completedLessons(Math.toIntExact(Math.min(completedLessons, Integer.MAX_VALUE)))
-                    .completedLessons(Math.toIntExact(Math.min(completedLessons, Integer.MAX_VALUE)))
                     .tags(node.getTags() != null && !node.getTags().isBlank()
                             ? Arrays.asList(node.getTags().split(","))
-                            : (node.getCourse().getCategory() != null
-                                    ? List.of("#" + node.getCourse().getCategory().getParamValue())
-                                    : Collections.emptyList()))
+                            : ((effectiveCourse != null && effectiveCourse.getCategory() != null)
+                                    ? List.of("#" + effectiveCourse.getCategory().getParamValue())
+                                    : (node.getCourse() != null && node.getCourse().getCategory() != null
+                                            ? List.of("#" + node.getCourse().getCategory().getParamValue())
+                                            : Collections.emptyList())))
                     .startDate(node.getStartDate() != null ? node.getStartDate().toString() : null)
                     .deadline(node.getDeadline() != null ? node.getDeadline().toString() : null)
                     .estimatedHours(node.getEstimatedHours())
@@ -715,9 +727,13 @@ public class LearningPathwayService {
         }
 
         if (currentNode != null) {
-            int progress = calculateCourseProgressPercent(studentId, currentNode.getCourse().getId());
-            boolean isFree = currentNode.getCourse().getPrice() == null || currentNode.getCourse().getPrice().compareTo(java.math.BigDecimal.ZERO) == 0;
-            boolean isEnrolled = isFree || enrollmentRepository.existsByUserIdAndCourseId(studentId, currentNode.getCourse().getId());
+            Course currentEffectiveCourse = resolveEffectiveCourse(studentId, currentNode.getCourse());
+            Long currentEffectiveCourseId = currentEffectiveCourse != null ? currentEffectiveCourse.getId() : (currentNode.getCourse() != null ? currentNode.getCourse().getId() : null);
+            int progress = currentEffectiveCourseId != null ? calculateCourseProgressPercent(studentId, currentEffectiveCourseId) : 0;
+            boolean isFree = (currentEffectiveCourse != null && currentEffectiveCourse.getPrice() != null && currentEffectiveCourse.getPrice().compareTo(java.math.BigDecimal.ZERO) == 0)
+                    || (currentNode.getCourse() != null && (currentNode.getCourse().getPrice() == null || currentNode.getCourse().getPrice().compareTo(java.math.BigDecimal.ZERO) == 0));
+            boolean isEnrolled = isFree || (currentEffectiveCourseId != null && (enrollmentRepository.existsByUserIdAndCourseId(studentId, currentEffectiveCourseId)
+                    || (enrollmentRepository != null && !enrollmentRepository.findFamilyEnrollments(studentId, currentEffectiveCourseId).isEmpty())));
 
             if (isEnrolled) {
                 suggestedActions.add("FAST_TRACK"); // Only allow fast-track if enrolled or free
@@ -798,8 +814,15 @@ public class LearningPathwayService {
                 .findFirst()
                 .orElseThrow(() -> new ApiException("Node not found in pathway", HttpStatus.NOT_FOUND));
 
-        int realProgress = calculateCourseProgressPercent(studentId, node.getCourse().getId());
-        long totalLessons = lessonRepository.countByCourseId(node.getCourse().getId());
+        Course effectiveCourse = resolveEffectiveCourse(studentId, node.getCourse());
+        Course course = effectiveCourse != null ? effectiveCourse : node.getCourse();
+        if (course == null) {
+            throw new ApiException("Node has no associated course", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        Long courseId = course.getId();
+
+        int realProgress = courseId != null ? calculateCourseProgressPercent(studentId, courseId) : 0;
+        long totalLessons = courseId != null ? lessonRepository.countByCourseId(courseId) : 0;
         String resolvedStatus = node.getStatus();
         boolean manuallyCompleted = node.getNodeType() != null && !node.getNodeType().isBlank();
         
@@ -815,13 +838,6 @@ public class LearningPathwayService {
             throw new ApiException("Finish the course before taking its mastery quiz", HttpStatus.BAD_REQUEST);
         }
 
-        // Defensive: course/category có thể null
-        Course course = node.getCourse();
-        if (course == null) {
-            throw new ApiException("Node has no associated course", HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-        Long courseId = course.getId();
-
         List<Long> quizLessonIds = resolveQuizLessonIds(courseId);
 
         if (!quizLessonIds.isEmpty()) {
@@ -834,8 +850,8 @@ public class LearningPathwayService {
 
         // Fallback: category có thể null
         String category = null;
-        if (node.getCourse() != null && node.getCourse().getCategory() != null) {
-            category = node.getCourse().getCategory().getParamValue();
+        if (course.getCategory() != null) {
+            category = course.getCategory().getParamValue();
         }
         return loadQuestionsFromBank(category, 10);
     }
@@ -877,8 +893,10 @@ public class LearningPathwayService {
             throw new ApiException("Answers are required", HttpStatus.BAD_REQUEST);
         }
 
-        Long courseId = node.getCourse().getId();
-        List<Long> quizLessonIds = resolveQuizLessonIds(courseId);
+        Course effectiveCourse = resolveEffectiveCourse(studentId, node.getCourse());
+        Course course = effectiveCourse != null ? effectiveCourse : node.getCourse();
+        Long courseId = course != null ? course.getId() : null;
+        List<Long> quizLessonIds = courseId != null ? resolveQuizLessonIds(courseId) : Collections.emptyList();
 
         // Cham tung cau: dung bang question_options de xac dinh dap an dung
         int correct = 0;
@@ -1113,8 +1131,11 @@ public class LearningPathwayService {
             throw new ApiException("Score must be between 0 and 100", HttpStatus.BAD_REQUEST);
         }
 
+        Course effectiveCourse = resolveEffectiveCourse(studentId, node.getCourse());
+        Course course = effectiveCourse != null ? effectiveCourse : node.getCourse();
+        Long courseId = course != null ? course.getId() : null;
         int passingScore = MASTERY_PASS_SCORE;
-        List<Long> quizLessonIds = resolveQuizLessonIds(node.getCourse().getId());
+        List<Long> quizLessonIds = courseId != null ? resolveQuizLessonIds(courseId) : Collections.emptyList();
         Long primaryLessonId = !quizLessonIds.isEmpty() ? quizLessonIds.get(0) : null;
         if (primaryLessonId != null) {
             Lesson quizLesson = lessonRepository.findById(primaryLessonId).orElse(null);
@@ -1295,6 +1316,89 @@ public class LearningPathwayService {
             log.debug("Failed to extract latest weak categories from knowledge gaps json: {}", e.getMessage());
         }
         return Collections.emptyList();
+    }
+
+    private Course resolveEffectiveCourse(Long studentId, Course course) {
+        if (course == null) return null;
+        if (studentId != null && enrollmentRepository != null) {
+            try {
+                List<Enrollment> familyE = enrollmentRepository.findFamilyEnrollments(studentId, course.getId());
+                if (familyE != null && !familyE.isEmpty()) {
+                    if (familyE.size() == 1 && familyE.get(0).getCourse() != null) {
+                        return familyE.get(0).getCourse();
+                    }
+                    // If multiple enrollments in family, pick the one with most completed lessons
+                    Enrollment best = null;
+                    long maxCompleted = -1;
+                    for (Enrollment e : familyE) {
+                        if (e.getCourse() == null) continue;
+                        long completed = countCompletedLessons(studentId, e.getCourse().getId());
+                        if (completed > maxCompleted) {
+                            maxCompleted = completed;
+                            best = e;
+                        }
+                    }
+                    if (best != null && best.getCourse() != null) {
+                        return best.getCourse();
+                    }
+                }
+            } catch (Exception e) {
+                log.debug("Could not resolve family enrollment for course {}: {}", course.getId(), e.getMessage());
+            }
+        }
+        if (course.getLatestVersionId() != null && !course.getLatestVersionId().equals(course.getId()) && courseRepository != null) {
+            try {
+                Optional<Course> latestOpt = courseRepository.findById(course.getLatestVersionId());
+                if (latestOpt != null && latestOpt.isPresent() && "PUBLISHED".equalsIgnoreCase(latestOpt.get().getStatus()) && latestOpt.get().getDeletedAt() == null) {
+                    return latestOpt.get();
+                }
+            } catch (Exception e) {
+                log.debug("Could not resolve latest version for course {}: {}", course.getId(), e.getMessage());
+            }
+        }
+        return course;
+    }
+
+    private List<Course> deduplicateCourseVersions(Long studentId, List<Course> courses) {
+        if (courses == null || courses.isEmpty()) return Collections.emptyList();
+        Map<String, List<Course>> byFamily = new LinkedHashMap<>();
+        for (Course c : courses) {
+            if (c == null) continue;
+            String key = (c.getCode() != null && !c.getCode().isBlank())
+                    ? toBaseCourseCode(c.getCode())
+                    : (c.getTitle() != null && !c.getTitle().isBlank() ? c.getTitle().trim().toLowerCase() : String.valueOf(c.getId()));
+            byFamily.computeIfAbsent(key, k -> new ArrayList<>()).add(c);
+        }
+        List<Course> deduplicated = new ArrayList<>();
+        for (List<Course> family : byFamily.values()) {
+            if (family.size() == 1) {
+                deduplicated.add(family.get(0));
+                continue;
+            }
+            Course selected = null;
+            if (studentId != null && enrollmentRepository != null) {
+                for (Course c : family) {
+                    try {
+                        if (c.getId() != null && enrollmentRepository.existsByUserIdAndCourseId(studentId, c.getId())) {
+                            selected = c;
+                            break;
+                        }
+                    } catch (Exception ignored) {}
+                }
+            }
+            if (selected == null) {
+                selected = family.stream()
+                        .max(Comparator.comparing(c -> c.getId() != null ? c.getId() : 0L))
+                        .orElse(family.get(0));
+            }
+            deduplicated.add(selected);
+        }
+        return deduplicated;
+    }
+
+    private static String toBaseCourseCode(String code) {
+        if (code == null || code.isBlank()) return "";
+        return code.replaceAll("(?i)-V\\d+.*$", "").toUpperCase();
     }
 }
 
