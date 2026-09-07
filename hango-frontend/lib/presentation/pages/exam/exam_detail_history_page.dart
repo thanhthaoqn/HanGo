@@ -380,8 +380,7 @@ class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
                     }
                   } else {
                     if (context.mounted) {
-                      Navigator.push(
-                        context,
+                      Navigator.of(context, rootNavigator: true).push(
                         MaterialPageRoute(
                           builder: (context) => TakeExamPage(exam: widget.exam),
                         ),

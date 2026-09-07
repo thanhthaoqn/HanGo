@@ -26,8 +26,7 @@ class _ExamCardState extends State<ExamCard> {
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: () {
-          Navigator.push(
-            context,
+          Navigator.of(context, rootNavigator: true).push(
             MaterialPageRoute(
               builder: (context) => ExamDetailHistoryPage(exam: widget.exam),
             ),

@@ -132,8 +132,7 @@ class EntryExamInstructionPage extends StatelessWidget {
               height: 56,
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.pushReplacement(
-                    context,
+                  Navigator.of(context, rootNavigator: true).pushReplacement(
                     MaterialPageRoute(
                       builder: (context) => TakeExamPage(exam: exam),
                     ),

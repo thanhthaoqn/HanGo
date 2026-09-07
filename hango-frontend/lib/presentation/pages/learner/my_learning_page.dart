@@ -1130,8 +1130,7 @@ class _MyLearningPageState extends State<MyLearningPage> {
                       if (!mounted) return;
                       Navigator.pop(context); // Close loading dialog
 
-                      Navigator.push(
-                        context,
+                      Navigator.of(context, rootNavigator: true).push(
                         MaterialPageRoute(
                           builder: (context) => ExamResultPage(
                             exam: dummyExam,
