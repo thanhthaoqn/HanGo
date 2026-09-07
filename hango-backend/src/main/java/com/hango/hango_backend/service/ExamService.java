@@ -159,23 +159,68 @@ public class ExamService {
     }
 
     private List<ExamAttemptResponseDTO> mapToAttemptDTOList(List<ExamAttempt> attempts) {
-        return attempts.stream().map(attempt -> {
-            int attemptNumber = 1;
+        if (attempts.isEmpty()) {
+            return new java.util.ArrayList<>();
+        }
+
+        // ── Step 1: Batch-load questions per examId (eliminates N+1) ──
+        java.util.Set<Long> examIds = new java.util.LinkedHashSet<>();
+        for (ExamAttempt a : attempts) {
             try {
-                if (attempt.getExam() != null && attempt.getStudent() != null) {
-                    if (attempt.getStartedAt() != null) {
-                        attemptNumber = examAttemptRepository.countByExamIdAndStudentIdAndStartedAtLessThanEqual(
-                                attempt.getExam().getId(), attempt.getStudent().getId(), attempt.getStartedAt());
-                    } else {
-                        // If startedAt is null, just use total count or default
-                        attemptNumber = examAttemptRepository.countByExamIdAndStudentId(
-                                attempt.getExam().getId(), attempt.getStudent().getId());
-                    }
+                if (a.getExam() != null) {
+                    examIds.add(a.getExam().getId());
                 }
-            } catch (Exception e) {
-                // fallback if count fails
+            } catch (jakarta.persistence.EntityNotFoundException | org.hibernate.LazyInitializationException e) {
+                // exam deleted — skip
             }
-            return mapToAttemptDTO(attempt, attemptNumber);
+        }
+        Map<Long, List<Question>> questionsByExamId = new java.util.HashMap<>();
+        for (Long eid : examIds) {
+            questionsByExamId.put(eid, questionRepository.findByExamIdOrderByQuestionOrder(eid));
+        }
+
+        // ── Step 2: Compute attemptNumber in-memory (eliminates N count queries) ──
+        // Group attempts by composite key (examId, studentId), sort each group by startedAt ASC, assign sequential numbers.
+        Map<String, java.util.List<ExamAttempt>> grouped = new java.util.LinkedHashMap<>();
+        for (ExamAttempt a : attempts) {
+            Long eid = null;
+            Long sid = null;
+            try {
+                if (a.getExam() != null) eid = a.getExam().getId();
+                if (a.getStudent() != null) sid = a.getStudent().getId();
+            } catch (jakarta.persistence.EntityNotFoundException | org.hibernate.LazyInitializationException e) {
+                // skip
+            }
+            String key = eid + "_" + sid;
+            grouped.computeIfAbsent(key, k -> new java.util.ArrayList<>()).add(a);
+        }
+        Map<Long, Integer> attemptNumberMap = new java.util.HashMap<>();
+        for (java.util.List<ExamAttempt> group : grouped.values()) {
+            // Sort ASC by startedAt to assign sequential attempt numbers
+            group.sort((a1, a2) -> {
+                java.time.LocalDateTime t1 = a1.getStartedAt();
+                java.time.LocalDateTime t2 = a2.getStartedAt();
+                if (t1 == null && t2 == null) return 0;
+                if (t1 == null) return -1;
+                if (t2 == null) return 1;
+                return t1.compareTo(t2);
+            });
+            for (int i = 0; i < group.size(); i++) {
+                attemptNumberMap.put(group.get(i).getId(), i + 1);
+            }
+        }
+
+        // ── Step 3: Map to DTOs using pre-loaded data ──
+        return attempts.stream().map(attempt -> {
+            int attemptNumber = attemptNumberMap.getOrDefault(attempt.getId(), 1);
+            Long eid = null;
+            try {
+                if (attempt.getExam() != null) eid = attempt.getExam().getId();
+            } catch (jakarta.persistence.EntityNotFoundException | org.hibernate.LazyInitializationException e) {
+                // skip
+            }
+            List<Question> cachedQuestions = eid != null ? questionsByExamId.getOrDefault(eid, List.of()) : List.of();
+            return mapToAttemptDTO(attempt, attemptNumber, cachedQuestions);
         }).collect(Collectors.toList());
     }
 
@@ -223,8 +268,9 @@ public class ExamService {
         attempt.setSubmittedAt(LocalDateTime.now());
 
         ExamAttempt saved = examAttemptRepository.save(attempt);
-        return mapToAttemptDTO(saved, nextAttemptNumber);
+        return mapToAttemptDTO(saved, nextAttemptNumber, examQuestions);
     }
+
 
     private List<Map<String, Object>> enrichAnswers(Map<String, Object> rawAnswers, List<Question> examQuestions) {
         return rawAnswers.entrySet().stream()
@@ -304,10 +350,11 @@ public class ExamService {
         return skill.isBlank() ? null : skill;
     }
 
-    private ExamAttemptResponseDTO mapToAttemptDTO(ExamAttempt attempt, int attemptNumber) {
+    private ExamAttemptResponseDTO mapToAttemptDTO(ExamAttempt attempt, int attemptNumber, List<Question> cachedQuestions) {
         Map<String, Integer> answers = new java.util.HashMap<>();
         Map<String, Boolean> correctness = new java.util.HashMap<>();
         Map<String, Integer> correctAnswers = new java.util.HashMap<>();
+        int questionCount = 0;
         try {
             if (attempt.getAnswersJson() != null && !attempt.getAnswersJson().equals("{}")) {
                 List<Map<String, Object>> enrichedList = objectMapper.readValue(attempt.getAnswersJson(), List.class);
@@ -330,11 +377,11 @@ public class ExamService {
                 }
             }
             
-            // Build correctAnswers map dynamically from DB so old attempts work too
-            if (attempt.getExam() != null) {
-                List<Question> questions = questionRepository.findByExamIdOrderByQuestionOrder(attempt.getExam().getId());
-                for (int i = 0; i < questions.size(); i++) {
-                    Question q = questions.get(i);
+            // Build correctAnswers map from pre-loaded questions (no DB query)
+            if (cachedQuestions != null && !cachedQuestions.isEmpty()) {
+                questionCount = cachedQuestions.size();
+                for (int i = 0; i < cachedQuestions.size(); i++) {
+                    Question q = cachedQuestions.get(i);
                     if (q != null && q.getOptions() != null) {
                         for (int j = 0; j < q.getOptions().size(); j++) {
                             if (Boolean.TRUE.equals(q.getOptions().get(j).getIsCorrect())) {
@@ -380,6 +427,7 @@ public class ExamService {
                 .answers(answers)
                 .correctness(correctness)
                 .correctAnswers(correctAnswers)
+                .questionCount(questionCount)
                 .build();
     }
     

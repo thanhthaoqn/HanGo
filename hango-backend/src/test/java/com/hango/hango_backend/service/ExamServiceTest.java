@@ -204,8 +204,6 @@ class ExamServiceTest {
         ExamAttempt second = examAttempt(102L, e, student, new BigDecimal("8.0"), null, t2, t2);
         when(examAttemptRepository.findByExamIdAndStudentIdOrderByStartedAtDesc(1L, 1L))
                 .thenReturn(List.of(first, second));
-        when(examAttemptRepository.countByExamIdAndStudentIdAndStartedAtLessThanEqual(1L, 1L, t1)).thenReturn(1);
-        when(examAttemptRepository.countByExamIdAndStudentIdAndStartedAtLessThanEqual(1L, 1L, t2)).thenReturn(2);
 
         List<ExamAttemptResponseDTO> result = examService.getExamAttempts(1L, 1L);
 
@@ -222,7 +220,6 @@ class ExamServiceTest {
         ExamAttempt attempt = examAttempt(101L, e, student, new BigDecimal("4.9"), null, t, t);
         when(examAttemptRepository.findByExamIdAndStudentIdOrderByStartedAtDesc(1L, 1L))
                 .thenReturn(List.of(attempt));
-        when(examAttemptRepository.countByExamIdAndStudentIdAndStartedAtLessThanEqual(1L, 1L, t)).thenReturn(1);
 
         List<ExamAttemptResponseDTO> result = examService.getExamAttempts(1L, 1L);
 
@@ -237,7 +234,6 @@ class ExamServiceTest {
         ExamAttempt attempt = examAttempt(101L, e, student, null, null, t, t);
         when(examAttemptRepository.findByExamIdAndStudentIdOrderByStartedAtDesc(1L, 1L))
                 .thenReturn(List.of(attempt));
-        when(examAttemptRepository.countByExamIdAndStudentIdAndStartedAtLessThanEqual(1L, 1L, t)).thenReturn(1);
 
         List<ExamAttemptResponseDTO> result = examService.getExamAttempts(1L, 1L);
 
@@ -252,7 +248,6 @@ class ExamServiceTest {
         ExamAttempt attempt = examAttempt(101L, e, student, new BigDecimal("6.0"), null, t, t);
         when(examAttemptRepository.findByExamIdAndStudentIdOrderByStartedAtDesc(1L, 1L))
                 .thenReturn(List.of(attempt));
-        when(examAttemptRepository.countByExamIdAndStudentIdAndStartedAtLessThanEqual(1L, 1L, t)).thenReturn(1);
 
         List<ExamAttemptResponseDTO> result = examService.getExamAttempts(1L, 1L);
 
@@ -268,7 +263,6 @@ class ExamServiceTest {
         ExamAttempt attempt = examAttempt(101L, e, student, new BigDecimal("6.0"), null, t, t);
         when(examAttemptRepository.findByExamIdAndStudentIdOrderByStartedAtDesc(1L, 1L))
                 .thenReturn(List.of(attempt));
-        when(examAttemptRepository.countByExamIdAndStudentIdAndStartedAtLessThanEqual(1L, 1L, t)).thenReturn(1);
         Question q0 = new Question();
         q0.setId(10L);
         q0.setOptions(List.of(questionOption(100L, false), questionOption(101L, true)));
@@ -287,7 +281,6 @@ class ExamServiceTest {
         ExamAttempt attempt = examAttempt(101L, e, student, new BigDecimal("6.0"), null, t, t);
         when(examAttemptRepository.findByExamIdAndStudentIdOrderByStartedAtDesc(1L, 1L))
                 .thenReturn(List.of(attempt));
-        when(examAttemptRepository.countByExamIdAndStudentIdAndStartedAtLessThanEqual(1L, 1L, t)).thenReturn(1);
 
         List<ExamAttemptResponseDTO> result = examService.getExamAttempts(1L, 1L);
 
@@ -309,12 +302,11 @@ class ExamServiceTest {
         ExamAttempt attemptOnB = examAttempt(202L, examB, student, new BigDecimal("6.0"), null, tB, tB);
         when(examAttemptRepository.findByStudentIdOrderByStartedAtDesc(1L))
                 .thenReturn(List.of(attemptOnB, attemptOnA));
-        when(examAttemptRepository.countByExamIdAndStudentIdAndStartedAtLessThanEqual(2L, 1L, tB)).thenReturn(3);
-        when(examAttemptRepository.countByExamIdAndStudentIdAndStartedAtLessThanEqual(1L, 1L, tA)).thenReturn(1);
 
         List<ExamAttemptResponseDTO> result = examService.getMyExamAttempts(1L);
 
-        assertEquals(3, result.get(0).getAttemptNumber());
+        // Each exam has only 1 attempt, so attemptNumber is 1 for both
+        assertEquals(1, result.get(0).getAttemptNumber());
         assertEquals(1, result.get(1).getAttemptNumber());
     }
 
