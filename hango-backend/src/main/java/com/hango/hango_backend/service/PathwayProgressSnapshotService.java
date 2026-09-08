@@ -80,6 +80,9 @@ public class PathwayProgressSnapshotService {
                         node.getCourse().getCategory().getParamValue().trim().toUpperCase());
             }
 
+            boolean alreadyDetoured = pathway.getNodes() != null && pathway.getNodes().stream()
+                    .anyMatch(n -> node.getId().equals(n.getParentNodeId()));
+
             nodeSnapshots.add(ProgressSnapshotDTO.NodeSnapshotDTO.builder()
                     .nodeId(node.getId())
                     .courseId(courseId)
@@ -89,6 +92,7 @@ public class PathwayProgressSnapshotService {
                     .failStreak(failStreak)
                     .latestScore(latestScore)
                     .hasWeakSkillOverlap(hasWeakSkillOverlap)
+                    .alreadyDetoured(alreadyDetoured)
                     .build());
         }
 

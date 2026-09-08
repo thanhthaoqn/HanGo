@@ -624,6 +624,13 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
                         pathwayId: widget.pathway.pathwayId,
                       );
                       widget.onPathwayUpdated?.call(updatedPathway);
+                      setState(() {
+                        _messages.add({
+                          'role': 'mentor',
+                          'content': 'Đã cập nhật lộ trình: chèn khóa học bổ trợ để bạn củng cố kiến thức.',
+                        });
+                      });
+                      _scrollToBottom();
                     } catch (e) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text('Failed to accept: $e')),

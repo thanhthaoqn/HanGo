@@ -222,10 +222,15 @@ class _NodeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = _NodePalette.forStatus(node.status, isDarkMode);
-    final effectiveProgress = node.status == NodeStatus.completed
-        ? 100
-        : node.progressPercent.clamp(0, 100);
+    final isSkipped = node.nodeType == NodeType.skipped;
+    final palette = isSkipped
+        ? _NodePalette.skipped(isDarkMode)
+        : _NodePalette.forStatus(node.status, isDarkMode);
+    final effectiveProgress = isSkipped
+        ? node.progressPercent.clamp(0, 100)
+        : (node.status == NodeStatus.completed
+            ? 100
+            : node.progressPercent.clamp(0, 100));
     final lessonText = node.totalLessons > 0
         ? '${node.completedLessons}/${node.totalLessons} lessons'
         : 'Course step';
@@ -258,7 +263,11 @@ class _NodeCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              _StatusPill(status: node.status, isDarkMode: isDarkMode),
+              _StatusPill(
+                status: node.status,
+                nodeType: node.nodeType,
+                isDarkMode: isDarkMode,
+              ),
               const Spacer(),
               Text(
                 'Step ${node.step}',
@@ -370,6 +379,7 @@ class _NodeCard extends StatelessWidget {
           _ProgressBar(
             percent: effectiveProgress,
             status: node.status,
+            isSkipped: isSkipped,
             isDarkMode: isDarkMode,
           ),
           if (node.isMastered) ...[
@@ -507,17 +517,19 @@ class _NodeCard extends StatelessWidget {
                 width: double.infinity,
                 child: Builder(
                   builder: (context) {
-                    final isMasteryAction =
+                    final isMasteryAction = !isSkipped && (
                         node.isReviewDue ||
                         (node.status == NodeStatus.completed &&
-                            !node.isMastered);
+                            !node.isMastered));
                     final handleTap = isMasteryAction && onMasteryTap != null
                         ? onMasteryTap
                         : (onStartLearningTap ?? onTap);
                     return ElevatedButton.icon(
                       onPressed: handleTap,
                       icon: Icon(
-                        node.isReviewDue
+                        isSkipped
+                            ? Icons.replay_rounded
+                            : node.isReviewDue
                             ? Icons.replay
                             : (node.status == NodeStatus.completed &&
                                   !node.isMastered)
@@ -529,7 +541,9 @@ class _NodeCard extends StatelessWidget {
                         size: 18,
                       ),
                       label: Text(
-                        node.isReviewDue
+                        isSkipped
+                            ? 'Review Course'
+                            : node.isReviewDue
                             ? 'Review Now'
                             : (node.status == NodeStatus.completed &&
                                   !node.isMastered)
@@ -540,7 +554,11 @@ class _NodeCard extends StatelessWidget {
                             : 'Start learning',
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: node.isReviewDue
+                        backgroundColor: isSkipped
+                            ? (isDarkMode
+                                  ? const Color(0xFF334155)
+                                  : const Color(0xFF64748B))
+                            : node.isReviewDue
                             ? const Color(0xFFF59E0B)
                             : (node.status == NodeStatus.completed &&
                                   !node.isMastered)
@@ -631,30 +649,36 @@ class _StepBadge extends StatelessWidget {
     switch (type) {
       case NodeType.fastTrackSkipped:
         return 'Fast-track';
+      case NodeType.skipped:
+        return 'Skipped';
       case NodeType.detourRemedial:
         return 'Detour';
       case NodeType.merged:
         return 'Merged';
       case NodeType.normal:
-      default:
         return '';
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isSkipped = node.nodeType == NodeType.skipped;
     final nodeTypeLabel = _nodeTypeLabel(node.nodeType);
-    final color = switch (node.status) {
-      NodeStatus.completed => const Color(0xFF10B981),
-      NodeStatus.inProgress => const Color(0xFF28B79B),
-      NodeStatus.locked =>
-        isDarkMode ? const Color(0xFF30363D) : const Color(0xFFCBD5E1),
-    };
-    final icon = switch (node.status) {
-      NodeStatus.completed => Icons.check_rounded,
-      NodeStatus.inProgress => Icons.play_arrow_rounded,
-      NodeStatus.locked => Icons.lock_rounded,
-    };
+    final color = isSkipped
+        ? (isDarkMode ? const Color(0xFF475569) : const Color(0xFF94A3B8))
+        : switch (node.status) {
+            NodeStatus.completed => const Color(0xFF10B981),
+            NodeStatus.inProgress => const Color(0xFF28B79B),
+            NodeStatus.locked =>
+              isDarkMode ? const Color(0xFF30363D) : const Color(0xFFCBD5E1),
+          };
+    final icon = isSkipped
+        ? Icons.skip_next_rounded
+        : switch (node.status) {
+            NodeStatus.completed => Icons.check_rounded,
+            NodeStatus.inProgress => Icons.play_arrow_rounded,
+            NodeStatus.locked => Icons.lock_rounded,
+          };
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -699,31 +723,42 @@ class _StepBadge extends StatelessWidget {
 
 class _StatusPill extends StatelessWidget {
   final NodeStatus status;
+  final NodeType nodeType;
   final bool isDarkMode;
 
-  const _StatusPill({required this.status, required this.isDarkMode});
+  const _StatusPill({
+    required this.status,
+    this.nodeType = NodeType.normal,
+    required this.isDarkMode,
+  });
 
   @override
   Widget build(BuildContext context) {
     late final String label;
     late final IconData icon;
     late final Color color;
-    switch (status) {
-      case NodeStatus.completed:
-        label = 'Completed';
-        icon = Icons.check_circle_rounded;
-        color = const Color(0xFF10B981);
-        break;
-      case NodeStatus.inProgress:
-        label = 'In Progress';
-        icon = Icons.play_circle_fill_rounded;
-        color = const Color(0xFF28B79B);
-        break;
-      case NodeStatus.locked:
-        label = 'Locked';
-        icon = Icons.lock_rounded;
-        color = const Color(0xFF94A3B8);
-        break;
+    if (nodeType == NodeType.skipped) {
+      label = 'Skipped';
+      icon = Icons.skip_next_rounded;
+      color = isDarkMode ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    } else {
+      switch (status) {
+        case NodeStatus.completed:
+          label = 'Completed';
+          icon = Icons.check_circle_rounded;
+          color = const Color(0xFF10B981);
+          break;
+        case NodeStatus.inProgress:
+          label = 'In Progress';
+          icon = Icons.play_circle_fill_rounded;
+          color = const Color(0xFF28B79B);
+          break;
+        case NodeStatus.locked:
+          label = 'Locked';
+          icon = Icons.lock_rounded;
+          color = const Color(0xFF94A3B8);
+          break;
+      }
     }
 
     return Container(
@@ -860,30 +895,32 @@ class _ScheduleChip extends StatelessWidget {
 class _ProgressBar extends StatelessWidget {
   final int percent;
   final NodeStatus status;
+  final bool isSkipped;
   final bool isDarkMode;
 
   const _ProgressBar({
     required this.percent,
     required this.status,
+    this.isSkipped = false,
     required this.isDarkMode,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = status == NodeStatus.completed
-        ? const Color(0xFF10B981)
-        : const Color(0xFF28B79B);
+    final color = isSkipped
+        ? (isDarkMode ? const Color(0xFF64748B) : const Color(0xFF94A3B8))
+        : status == NodeStatus.completed
+            ? const Color(0xFF10B981)
+            : const Color(0xFF28B79B);
     final track = isDarkMode
         ? const Color(0xFF30363D)
         : const Color(0xFFE2E8F0);
-
-    // Keep the progress height controlled via a parent SizedBox/ClipRRect instead.
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Text(
-          '$percent%',
+          isSkipped ? '$percent% (Skipped)' : '$percent%',
           style: TextStyle(
             color: color,
             fontSize: 12,
@@ -978,6 +1015,16 @@ class _NodePalette {
       text: dark ? const Color(0xFF8B949E) : const Color(0xFF64748B),
       muted: const Color(0xFF94A3B8),
       glow: dark ? Colors.black : const Color(0xFFCBD5E1),
+    );
+  }
+
+  static _NodePalette skipped(bool dark) {
+    return _NodePalette(
+      surface: dark ? const Color(0xFF161B22) : Colors.white,
+      border: dark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+      text: dark ? const Color(0xFFF0F6FC) : const Color(0xFF0F172A),
+      muted: dark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+      glow: dark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
     );
   }
 }
