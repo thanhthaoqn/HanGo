@@ -973,4 +973,36 @@ class LearningPathwayServiceTest {
         assertEquals(100, nodeDto.getProgressPercent());
         assertEquals("COMPLETED", nodeDto.getStatus());
     }
+
+    @Test
+    void toResponseDtoShouldPreserveNodeTypeAndMetadataForSkippedNode() {
+        Long studentId = 200L;
+        User student = User.builder().id(studentId).build();
+        LearningPathway pathway = LearningPathway.builder().id(11L).student(student).build();
+
+        Course course = Course.builder().id(101L).code("ENG_READING").title("Advanced Reading").status("PUBLISHED").build();
+        PathwayNode skippedNode = PathwayNode.builder()
+                .id(301L)
+                .stepOrder(1)
+                .course(course)
+                .status("COMPLETED")
+                .nodeType("SKIPPED")
+                .rerouteReason("Learner skipped this course")
+                .skippedAt(java.time.LocalDateTime.now())
+                .isOptional(false)
+                .build();
+        pathway.addNode(skippedNode);
+
+        when(learningPathwayRepository.findById(11L)).thenReturn(Optional.of(pathway));
+
+        LearningPathwayResponseDTO dto = learningPathwayService.getPathwayById(11L, studentId);
+
+        assertNotNull(dto);
+        assertEquals(1, dto.getNodes().size());
+        PathwayNodeDTO nodeDto = dto.getNodes().get(0);
+        assertEquals("SKIPPED", nodeDto.getNodeType());
+        assertEquals("COMPLETED", nodeDto.getStatus());
+        assertEquals("Learner skipped this course", nodeDto.getRerouteReason());
+        assertNotNull(nodeDto.getSkippedAt());
+    }
 }
