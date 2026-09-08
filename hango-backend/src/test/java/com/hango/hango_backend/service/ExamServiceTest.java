@@ -93,10 +93,11 @@ class ExamServiceTest {
 
     @Test
     void getAllExamsShouldQueryPublishedOnlyWhenStatusIsNull() {
-        when(examRepository.findByDeletedAtIsNullAndStatus("PUBLISHED"))
-                .thenReturn(List.of(exam(1L, "Exam A", "PUBLISHED", 50, user(1L, "trainer@example.com", "Trainer A"))));
+        when(examRepository.findByDeletedAtIsNullAndStatus(org.mockito.ArgumentMatchers.eq("PUBLISHED"), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(exam(1L, "Exam A", "PUBLISHED", 50, user(1L, "trainer@example.com", "Trainer A")))));
 
-        List<ExamResponseDTO> result = examService.getAllExams(null);
+        org.springframework.data.domain.Page<ExamResponseDTO> resultPage = examService.getAllExams(null, org.springframework.data.domain.Pageable.unpaged());
+        List<ExamResponseDTO> result = resultPage.getContent();
 
         assertEquals(1, result.size());
         assertEquals("Exam A", result.get(0).getTitle());
@@ -104,19 +105,20 @@ class ExamServiceTest {
 
     @Test
     void getAllExamsShouldQueryPublishedOnlyWhenStatusIsAllCaseInsensitive() {
-        when(examRepository.findByDeletedAtIsNullAndStatus("PUBLISHED")).thenReturn(List.of());
+        when(examRepository.findByDeletedAtIsNullAndStatus(org.mockito.ArgumentMatchers.eq("PUBLISHED"), any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
 
-        examService.getAllExams("all");
+        examService.getAllExams("all", org.springframework.data.domain.Pageable.unpaged());
 
-        org.mockito.Mockito.verify(examRepository).findByDeletedAtIsNullAndStatus("PUBLISHED");
+        org.mockito.Mockito.verify(examRepository).findByDeletedAtIsNullAndStatus(org.mockito.ArgumentMatchers.eq("PUBLISHED"), any());
     }
 
     @Test
     void getAllExamsShouldReturnExamsMatchingTheRequestedNonPublishedStatus() {
         Exam draftExam = exam(2L, "Draft Exam", "DRAFT", 40, null);
-        when(examRepository.findByDeletedAtIsNullAndStatus("DRAFT")).thenReturn(List.of(draftExam));
+        when(examRepository.findByDeletedAtIsNullAndStatus(org.mockito.ArgumentMatchers.eq("DRAFT"), any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(draftExam)));
 
-        List<ExamResponseDTO> result = examService.getAllExams("DRAFT");
+        org.springframework.data.domain.Page<ExamResponseDTO> resultPage = examService.getAllExams("DRAFT", org.springframework.data.domain.Pageable.unpaged());
+        List<ExamResponseDTO> result = resultPage.getContent();
 
         assertEquals(1, result.size());
         assertEquals("Draft Exam", result.get(0).getTitle());
@@ -124,10 +126,11 @@ class ExamServiceTest {
 
     @Test
     void getAllExamsShouldFallbackCreatorNameToUnknownWhenCreatedByNull() {
-        when(examRepository.findByDeletedAtIsNullAndStatus("PUBLISHED"))
-                .thenReturn(List.of(exam(3L, "Orphan Exam", "PUBLISHED", 30, null)));
+        when(examRepository.findByDeletedAtIsNullAndStatus(org.mockito.ArgumentMatchers.eq("PUBLISHED"), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(exam(3L, "Orphan Exam", "PUBLISHED", 30, null))));
 
-        List<ExamResponseDTO> result = examService.getAllExams(null);
+        org.springframework.data.domain.Page<ExamResponseDTO> resultPage = examService.getAllExams(null, org.springframework.data.domain.Pageable.unpaged());
+        List<ExamResponseDTO> result = resultPage.getContent();
 
         assertEquals("Unknown", result.get(0).getCreatorName());
     }
@@ -135,11 +138,12 @@ class ExamServiceTest {
     @Test
     void getAllExamsShouldReturnDistinctStudentCountAsLearnerCountFormatted() {
         Exam e = exam(4L, "Popular Exam", "PUBLISHED", 45, user(1L, "trainer@example.com", "Trainer A"));
-        when(examRepository.findByDeletedAtIsNullAndStatus("PUBLISHED")).thenReturn(List.of(e));
+        when(examRepository.findByDeletedAtIsNullAndStatus(org.mockito.ArgumentMatchers.eq("PUBLISHED"), any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(e)));
         when(examAttemptRepository.countDistinctStudentsByExamIds(List.of(4L)))
                 .thenReturn(java.util.Collections.singletonList(new Object[] { 4L, 1000L }));
 
-        List<ExamResponseDTO> result = examService.getAllExams(null);
+        org.springframework.data.domain.Page<ExamResponseDTO> resultPage = examService.getAllExams(null, org.springframework.data.domain.Pageable.unpaged());
+        List<ExamResponseDTO> result = resultPage.getContent();
 
         assertEquals("1000", result.get(0).getLearnerCountFormatted());
     }
@@ -147,11 +151,12 @@ class ExamServiceTest {
     @Test
     void getAllExamsShouldDefaultLearnerCountToZeroWhenCountIsZero() {
         Exam e = exam(5L, "New Exam", "PUBLISHED", 45, user(1L, "trainer@example.com", "Trainer A"));
-        when(examRepository.findByDeletedAtIsNullAndStatus("PUBLISHED")).thenReturn(List.of(e));
+        when(examRepository.findByDeletedAtIsNullAndStatus(org.mockito.ArgumentMatchers.eq("PUBLISHED"), any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(e)));
         when(examAttemptRepository.countDistinctStudentsByExamIds(List.of(5L)))
                 .thenReturn(java.util.Collections.singletonList(new Object[] { 5L, 0L }));
 
-        List<ExamResponseDTO> result = examService.getAllExams(null);
+        org.springframework.data.domain.Page<ExamResponseDTO> resultPage = examService.getAllExams(null, org.springframework.data.domain.Pageable.unpaged());
+        List<ExamResponseDTO> result = resultPage.getContent();
 
         assertEquals("0", result.get(0).getLearnerCountFormatted());
     }
@@ -159,10 +164,11 @@ class ExamServiceTest {
     @Test
     void getAllExamsShouldDefaultLearnerCountToZeroWhenNoAttemptRowReturned() {
         Exam e = exam(6L, "Fresh Exam", "PUBLISHED", 45, user(1L, "trainer@example.com", "Trainer A"));
-        when(examRepository.findByDeletedAtIsNullAndStatus("PUBLISHED")).thenReturn(List.of(e));
+        when(examRepository.findByDeletedAtIsNullAndStatus(org.mockito.ArgumentMatchers.eq("PUBLISHED"), any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(e)));
         when(examAttemptRepository.countDistinctStudentsByExamIds(List.of(6L))).thenReturn(List.of());
 
-        List<ExamResponseDTO> result = examService.getAllExams(null);
+        org.springframework.data.domain.Page<ExamResponseDTO> resultPage = examService.getAllExams(null, org.springframework.data.domain.Pageable.unpaged());
+        List<ExamResponseDTO> result = resultPage.getContent();
 
         assertEquals("0", result.get(0).getLearnerCountFormatted());
     }
@@ -170,11 +176,12 @@ class ExamServiceTest {
     @Test
     void getAllExamsShouldMapQuestionCountFromCountQuestionsByExamIds() {
         Exam e = exam(7L, "Exam With Questions", "PUBLISHED", 45, user(1L, "trainer@example.com", "Trainer A"));
-        when(examRepository.findByDeletedAtIsNullAndStatus("PUBLISHED")).thenReturn(List.of(e));
+        when(examRepository.findByDeletedAtIsNullAndStatus(org.mockito.ArgumentMatchers.eq("PUBLISHED"), any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(e)));
         when(examQuestionRepository.countQuestionsByExamIds(List.of(7L)))
                 .thenReturn(java.util.Collections.singletonList(new Object[] { 7L, 12 }));
 
-        List<ExamResponseDTO> result = examService.getAllExams(null);
+        org.springframework.data.domain.Page<ExamResponseDTO> resultPage = examService.getAllExams(null, org.springframework.data.domain.Pageable.unpaged());
+        List<ExamResponseDTO> result = resultPage.getContent();
 
         assertEquals(12, result.get(0).getQuestionCount());
     }
@@ -182,10 +189,11 @@ class ExamServiceTest {
     @Test
     void getAllExamsShouldDefaultQuestionCountToZeroWhenNoQuestionRowReturned() {
         Exam e = exam(8L, "Empty Exam", "PUBLISHED", 45, user(1L, "trainer@example.com", "Trainer A"));
-        when(examRepository.findByDeletedAtIsNullAndStatus("PUBLISHED")).thenReturn(List.of(e));
+        when(examRepository.findByDeletedAtIsNullAndStatus(org.mockito.ArgumentMatchers.eq("PUBLISHED"), any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(e)));
         when(examQuestionRepository.countQuestionsByExamIds(List.of(8L))).thenReturn(List.of());
 
-        List<ExamResponseDTO> result = examService.getAllExams(null);
+        org.springframework.data.domain.Page<ExamResponseDTO> resultPage = examService.getAllExams(null, org.springframework.data.domain.Pageable.unpaged());
+        List<ExamResponseDTO> result = resultPage.getContent();
 
         assertEquals(0, result.get(0).getQuestionCount());
     }
