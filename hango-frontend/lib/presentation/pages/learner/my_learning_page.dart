@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/shared_footer.dart';
@@ -486,23 +487,29 @@ class _MyLearningPageState extends State<MyLearningPage> {
                     ),
                   );
                 } else {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          CourseDetailPage(courseId: course.id),
-                    ),
-                  );
+                  try {
+                    context.push('/courses/${course.id}');
+                  } catch (_) {
+                    Navigator.of(context, rootNavigator: true).push(
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            CourseDetailPage(courseId: course.id),
+                      ),
+                    );
+                  }
                 }
               } catch (e) {
                 if (!mounted) return;
                 Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => CourseDetailPage(courseId: course.id),
-                  ),
-                );
+                try {
+                  context.push('/courses/${course.id}');
+                } catch (_) {
+                  Navigator.of(context, rootNavigator: true).push(
+                    MaterialPageRoute(
+                      builder: (context) => CourseDetailPage(courseId: course.id),
+                    ),
+                  );
+                }
               }
             },
             style: ElevatedButton.styleFrom(
@@ -629,12 +636,15 @@ class _MyLearningPageState extends State<MyLearningPage> {
                   ),
                 );
               } else {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => CourseDetailPage(courseId: course.id),
-                  ),
-                );
+                try {
+                  context.push('/courses/${course.id}');
+                } catch (_) {
+                  Navigator.of(context, rootNavigator: true).push(
+                    MaterialPageRoute(
+                      builder: (context) => CourseDetailPage(courseId: course.id),
+                    ),
+                  );
+                }
               }
             },
             borderRadius: BorderRadius.circular(12),

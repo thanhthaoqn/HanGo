@@ -9,8 +9,6 @@ import '../../../data/services/auth_service.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/shared_footer.dart';
 import '../learner/learner_shell_page.dart';
-import '../trainer/trainer_shell_page.dart';
-import '../course_manager/course_manager_shell_page.dart';
 import '../login_page.dart';
 import 'review_tab.dart';
 import 'lesson_detail_page.dart';
@@ -742,14 +740,17 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width > 900;
+    final isInShell = LearnerShellPage.of(context) != null;
 
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: SharedHeader(
-        isDesktop: isDesktop,
-        activeTab: 'Courses',
-        showBackButton: Navigator.canPop(context),
-      ),
+      appBar: isInShell
+          ? null
+          : SharedHeader(
+              isDesktop: isDesktop,
+              activeTab: 'Courses',
+              showBackButton: true,
+            ),
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(color: Color(0xFF28B79B)),
@@ -866,26 +867,18 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                         Navigator.pop(context);
                         return;
                       }
-                      // No history to pop to (e.g. a direct/deep link landed
-                      // straight on this page) -- send the user to their own
-                      // role's home instead of always assuming Learner, which
-                      // used to misroute Trainers/Course Managers.
                       final isTrainer = _userRoles.contains('ROLE_TRAINER') ||
                           _userRoles.contains('TRAINER');
                       final isCourseManager =
                           _userRoles.contains('ROLE_COURSE_MANAGER') ||
                           _userRoles.contains('COURSE_MANAGER');
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => isTrainer
-                              ? const TrainerShellPage()
-                              : isCourseManager
-                                  ? const CourseManagerShellPage()
-                                  : const LearnerShellPage(),
-                        ),
-                        (route) => false,
-                      );
+                      if (isTrainer) {
+                        context.go(AppRoutes.trainer);
+                      } else if (isCourseManager) {
+                        context.go(AppRoutes.courseManager);
+                      } else {
+                        context.go(AppRoutes.courses);
+                      }
                     },
                     hoverColor: Colors.transparent,
                     splashColor: Colors.transparent,

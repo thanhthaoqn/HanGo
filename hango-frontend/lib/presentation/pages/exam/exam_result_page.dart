@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../domain/entities/exam.dart';
 import '../../../data/repositories/course_repository.dart';
 import '../../../data/repositories/exam_repository.dart';
@@ -883,15 +884,18 @@ class _ExamResultPageState extends State<ExamResultPage> {
                                   ElevatedButton(
                                     onPressed: () {
                                       if (courseId > 0) {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                CourseDetailPage(
-                                                  courseId: courseId,
-                                                ),
-                                          ),
-                                        );
+                                        try {
+                                          context.push('/courses/$courseId');
+                                        } catch (_) {
+                                          Navigator.of(context, rootNavigator: true).push(
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  CourseDetailPage(
+                                                    courseId: courseId,
+                                                  ),
+                                            ),
+                                          );
+                                        }
                                       }
                                     },
                                     style: ElevatedButton.styleFrom(
@@ -1053,15 +1057,18 @@ class _ExamResultPageState extends State<ExamResultPage> {
                                 ElevatedButton(
                                   onPressed: () {
                                     if (courseId > 0) {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              CourseDetailPage(
-                                                courseId: courseId,
-                                              ),
-                                        ),
-                                      );
+                                      try {
+                                        context.push('/courses/$courseId');
+                                      } catch (_) {
+                                        Navigator.of(context, rootNavigator: true).push(
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                CourseDetailPage(
+                                                  courseId: courseId,
+                                                ),
+                                          ),
+                                        );
+                                      }
                                     }
                                   },
                                   style: ElevatedButton.styleFrom(
@@ -1207,14 +1214,17 @@ class _ExamResultPageState extends State<ExamResultPage> {
                                 const SizedBox(height: 12),
                                 ElevatedButton(
                                   onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => CourseDetailPage(
-                                          courseId: course.id,
+                                    try {
+                                      context.push('/courses/${course.id}');
+                                    } catch (_) {
+                                      Navigator.of(context, rootNavigator: true).push(
+                                        MaterialPageRoute(
+                                          builder: (context) => CourseDetailPage(
+                                            courseId: course.id,
+                                          ),
                                         ),
-                                      ),
-                                    );
+                                      );
+                                    }
                                   },
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFF28B79B),

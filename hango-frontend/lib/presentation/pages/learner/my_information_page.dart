@@ -1996,12 +1996,15 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                                             ElevatedButton.icon(
                                               onPressed: () {
                                                 Navigator.pop(context);
-                                                Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (context) => CourseDetailPage(courseId: courseId),
-                                                  ),
-                                                );
+                                                try {
+                                                  context.push('/courses/$courseId');
+                                                } catch (_) {
+                                                  Navigator.of(context, rootNavigator: true).push(
+                                                    MaterialPageRoute(
+                                                      builder: (context) => CourseDetailPage(courseId: courseId),
+                                                    ),
+                                                  );
+                                                }
                                               },
                                               icon: const Icon(Icons.play_circle_fill_rounded, size: 16, color: Colors.white),
                                               label: Text(

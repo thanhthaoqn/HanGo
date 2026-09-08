@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'package:video_player/video_player.dart';
@@ -1145,17 +1146,21 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                     InkWell(
                       onTap: () async {
                         _clearLastVisitedSession();
-                        if (widget.cameFromCourseDetail) {
+                        if (widget.cameFromCourseDetail && Navigator.canPop(context)) {
                           Navigator.pop(context);
                         } else {
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => CourseDetailPage(
-                                courseId: widget.courseId,
+                          try {
+                            context.push('/courses/${widget.courseId}');
+                          } catch (_) {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => CourseDetailPage(
+                                  courseId: widget.courseId,
+                                ),
                               ),
-                            ),
-                          );
+                            );
+                          }
                         }
                       },
                       borderRadius: BorderRadius.circular(20),

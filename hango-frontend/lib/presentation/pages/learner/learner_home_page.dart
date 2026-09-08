@@ -2111,12 +2111,15 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => CourseDetailPage(courseId: course.id),
-            ),
-          );
+          try {
+            context.push('/courses/${course.id}');
+          } catch (_) {
+            Navigator.of(context, rootNavigator: true).push(
+              MaterialPageRoute(
+                builder: (context) => CourseDetailPage(courseId: course.id),
+              ),
+            );
+          }
         },
         child: HoverableCard(
           child: Column(

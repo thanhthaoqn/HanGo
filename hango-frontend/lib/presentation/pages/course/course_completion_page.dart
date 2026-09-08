@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/repositories/course_repository.dart';
@@ -238,12 +239,16 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
             cursor: SystemMouseCursors.click,
             child: TextButton.icon(
               onPressed: () {
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        CourseDetailPage(courseId: widget.courseId),
-                  ),
-                );
+                try {
+                  context.push('/courses/${widget.courseId}');
+                } catch (_) {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          CourseDetailPage(courseId: widget.courseId),
+                    ),
+                  );
+                }
               },
               icon: const Icon(
                 Icons.menu_book_rounded,

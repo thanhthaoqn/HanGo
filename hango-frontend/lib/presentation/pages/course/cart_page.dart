@@ -195,12 +195,15 @@ class _CartPageState extends State<CartPage> {
 
       if (mounted) {
         ToastHelper.showSuccess(context, 'Enrolled successfully!');
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => CourseDetailPage(courseId: course.id),
-          ),
-        );
+        try {
+          context.push('/courses/${course.id}');
+        } catch (_) {
+          Navigator.of(context, rootNavigator: true).push(
+            MaterialPageRoute(
+              builder: (context) => CourseDetailPage(courseId: course.id),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {

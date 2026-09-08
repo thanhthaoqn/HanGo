@@ -122,12 +122,15 @@ class LearnerShellPageState extends State<LearnerShellPage> {
       }
 
       if (courseId != null && mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => CourseDetailPage(courseId: courseId!),
-          ),
-        );
+        try {
+          context.push('/courses/$courseId');
+        } catch (_) {
+          Navigator.of(context, rootNavigator: true).push(
+            MaterialPageRoute(
+              builder: (context) => CourseDetailPage(courseId: courseId!),
+            ),
+          );
+        }
       } else if (mounted) {
         setState(() {
           _currentIndex = 6; // Return directly to Shopping Cart tab

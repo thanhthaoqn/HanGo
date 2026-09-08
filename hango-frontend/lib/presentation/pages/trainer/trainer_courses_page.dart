@@ -1644,13 +1644,16 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
               icon: Icons.visibility_outlined,
               label: 'View',
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        CourseDetailPage(courseId: extractId(course)),
-                  ),
-                );
+                try {
+                  context.push('/courses/${extractId(course)}');
+                } catch (_) {
+                  Navigator.of(context, rootNavigator: true).push(
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          CourseDetailPage(courseId: extractId(course)),
+                    ),
+                  );
+                }
               },
             ),
             if (_canManageCourses) ...[
@@ -2057,13 +2060,16 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                             OutlinedButton(
                               onPressed: () {
                                 Navigator.pop(context);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        CourseDetailPage(courseId: courseId),
-                                  ),
-                                );
+                                try {
+                                  context.push('/courses/$courseId');
+                                } catch (_) {
+                                  Navigator.of(context, rootNavigator: true).push(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          CourseDetailPage(courseId: courseId),
+                                    ),
+                                  );
+                                }
                               },
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: const Color(0xFF475569),

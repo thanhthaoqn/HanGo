@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/learning_pathway/interactive_node_tree.dart';
 import '../../widgets/learning_pathway/ai_mentor_side_panel.dart';
@@ -190,12 +191,15 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
 
   /// E1 (spec 20): mo khoa hoc va refresh pathway khi quay ve de tien do/status khong bi stale.
   Future<void> _openCourseAndRefresh(PathwayNode node) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => CourseDetailPage(courseId: node.courseId),
-      ),
-    );
+    try {
+      await context.push('/courses/${node.courseId}');
+    } catch (_) {
+      await Navigator.of(context, rootNavigator: true).push(
+        MaterialPageRoute(
+          builder: (_) => CourseDetailPage(courseId: node.courseId),
+        ),
+      );
+    }
     if (mounted) _loadPathway();
   }
 

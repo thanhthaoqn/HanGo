@@ -450,10 +450,13 @@ class _SharedHeaderState extends State<SharedHeader> {
     return InkWell(
       onTap: () {
         _hideCartOverlay();
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => CourseDetailPage(courseId: course.id)),
-        );
+        try {
+          context.push('/courses/${course.id}');
+        } catch (_) {
+          Navigator.of(context, rootNavigator: true).push(
+            MaterialPageRoute(builder: (context) => CourseDetailPage(courseId: course.id)),
+          );
+        }
       },
       child: Row(
         children: [
@@ -803,6 +806,8 @@ class _SharedHeaderState extends State<SharedHeader> {
               onPressed: () {
                 if (Navigator.canPop(context)) {
                   Navigator.pop(context);
+                } else {
+                  context.go(AppRoutes.courses);
                 }
               },
             ),

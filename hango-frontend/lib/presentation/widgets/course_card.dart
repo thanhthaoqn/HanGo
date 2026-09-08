@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../domain/model/course.dart';
 import '../../../data/repositories/course_repository.dart';
@@ -285,12 +286,15 @@ class _CourseCardState extends State<CourseCard> {
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => CourseDetailPage(courseId: widget.course.id),
-            ),
-          );
+          try {
+            context.push('/courses/${widget.course.id}');
+          } catch (_) {
+            Navigator.of(context, rootNavigator: true).push(
+              MaterialPageRoute(
+                builder: (context) => CourseDetailPage(courseId: widget.course.id),
+              ),
+            );
+          }
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
