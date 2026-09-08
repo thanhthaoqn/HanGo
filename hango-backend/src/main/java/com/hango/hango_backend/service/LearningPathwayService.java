@@ -712,6 +712,7 @@ public class LearningPathwayService {
         List<ExamAttempt> recentAttempts = examAttemptRepository.findTop10ByStudent_IdOrderBySubmittedAtDesc(studentId);
         ExamResultAnalysisDTO analysisDTO = examResultAnalyzerService.analyzeLearnerAttempts(studentId, recentAttempts);
         List<String> weakSkills = Collections.emptyList();
+        List<String> latestWeakSkills = Collections.emptyList();
         if (analysisDTO != null && analysisDTO.getKnowledgeGapsJson() != null) {
             try {
                 @SuppressWarnings("unchecked")
@@ -720,6 +721,10 @@ public class LearningPathwayService {
                 Object ws = gaps.get("weak_skills");
                 if (ws instanceof List<?> wsList) {
                     weakSkills = wsList.stream().map(Object::toString).toList();
+                }
+                Object lws = gaps.get("latest_weak_skills");
+                if (lws instanceof List<?> lwsList) {
+                    latestWeakSkills = lwsList.stream().map(Object::toString).toList();
                 }
             } catch (Exception e) {
                 log.debug("Failed to parse weak_skills from knowledge gap: {}", e.getMessage());
@@ -811,6 +816,7 @@ public class LearningPathwayService {
                 .totalSteps(totalSteps)
                 .completedSteps(completedSteps)
                 .weakSkills(weakSkills)
+                .latestWeakSkills(latestWeakSkills)
                 .analyzedAttempts(recentAttempts.size())
                 .goalName(pathway.getGoalName())
                 .targetDate(pathway.getTargetDate() != null ? pathway.getTargetDate().toString() : null)
