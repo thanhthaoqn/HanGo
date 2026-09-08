@@ -259,19 +259,21 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Bỏ qua khóa học?'),
-        content: const Text('Nếu bỏ qua, bạn sẽ không nhận được Mastery Score cho khóa này và hệ thống sẽ mở khóa bài học tiếp theo. Bạn có chắc chắn?'),
+        title: const Text('Skip Course?'),
+        content: const Text(
+          'If you skip this course, you will not receive a Mastery Score for it, and the next course will be unlocked. Are you sure you want to proceed?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Hủy'),
+            child: const Text('Cancel'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFF64748B),
             ),
-            child: const Text('Đồng ý bỏ qua'),
+            child: const Text('Skip Course'),
           ),
         ],
       ),
@@ -291,12 +293,12 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
         _selectedNode = updated.nodes.firstWhere((n) => n.id == node.id, orElse: () => updated.nodes.first);
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã bỏ qua khóa học.'), backgroundColor: Colors.green),
+        const SnackBar(content: Text('Course skipped successfully.'), backgroundColor: Colors.green),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
     }
   }
