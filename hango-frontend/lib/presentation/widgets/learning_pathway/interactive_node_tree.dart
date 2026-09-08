@@ -518,6 +518,22 @@ class _NodeCard extends StatelessWidget {
               ),
             ),
           ],
+          if (node.status == NodeStatus.inProgress && node.courseId > 0 && onSkipTap != null && !suggestedActions.contains('ENROLL_OR_REGENERATE')) ...[
+            const SizedBox(height: 6),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton.icon(
+                onPressed: onSkipTap,
+                icon: const Icon(Icons.skip_next_rounded, size: 16),
+                label: const Text('Bỏ qua khóa học này (Skip)'),
+                style: TextButton.styleFrom(
+                  foregroundColor: isDarkMode ? Colors.white60 : Colors.black45,
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

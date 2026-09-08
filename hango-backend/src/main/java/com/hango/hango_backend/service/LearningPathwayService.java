@@ -635,9 +635,13 @@ public class LearningPathwayService {
     }
 
     private LearningPathwayResponseDTO toResponseDto(LearningPathway pathway, Long studentId) {
-        List<PathwayNodeDTO> nodeDTOs = pathway.getNodes().stream()
-                .sorted(java.util.Comparator.comparingInt(PathwayNode::getStepOrder))
-                .map(node -> {
+        List<PathwayNode> sortedNodes = pathway.getNodes() != null
+                ? pathway.getNodes().stream().sorted(java.util.Comparator.comparingInt(PathwayNode::getStepOrder)).toList()
+                : Collections.emptyList();
+
+        List<PathwayNodeDTO> nodeDTOs = new ArrayList<>();
+        boolean allPreviousCompleted = true;
+        for (PathwayNode node : sortedNodes) {
             Course effectiveCourse = resolveEffectiveCourse(studentId, node.getCourse());
             Long effectiveCourseId = effectiveCourse != null ? effectiveCourse.getId() : (node.getCourse() != null ? node.getCourse().getId() : null);
             int realProgress = effectiveCourseId != null ? calculateCourseProgressPercent(studentId, effectiveCourseId) : 0;
@@ -656,11 +660,13 @@ public class LearningPathwayService {
             } else if ("COMPLETED".equalsIgnoreCase(resolvedStatus) && realProgress < 100 && !manuallyCompleted) {
                 // E5: AI co the tra COMPLETED ao - ha ve IN_PROGRESS neu tien do that < 100%
                 resolvedStatus = "IN_PROGRESS";
-            } else if (realProgress > 0 && "LOCKED".equalsIgnoreCase(node.getStatus())) {
+            } else if ((realProgress > 0 || allPreviousCompleted) && "LOCKED".equalsIgnoreCase(node.getStatus())) {
                 resolvedStatus = "IN_PROGRESS";
             }
 
-            return PathwayNodeDTO.builder()
+            allPreviousCompleted = allPreviousCompleted && "COMPLETED".equalsIgnoreCase(resolvedStatus);
+
+            nodeDTOs.add(PathwayNodeDTO.builder()
                     .id(node.getId())
                     .step(node.getStepOrder())
                     .courseId(effectiveCourseId)
@@ -689,8 +695,8 @@ public class LearningPathwayService {
                     .isMastered(node.getIsMastered())
                     .nextReviewDate(node.getNextReviewDate() != null ? node.getNextReviewDate().toString() : null)
                     .reviewIntervalDays(node.getReviewIntervalDays())
-                    .build();
-        }).toList();
+                    .build());
+        }
 
         int totalSteps = nodeDTOs.size();
         int completedSteps = (int) nodeDTOs.stream()
@@ -721,9 +727,18 @@ public class LearningPathwayService {
         PathwayNode currentNode = null;
         if (pathway.getNodes() != null) {
             currentNode = pathway.getNodes().stream()
+                    .sorted(Comparator.comparingInt(PathwayNode::getStepOrder))
                     .filter(n -> "IN_PROGRESS".equalsIgnoreCase(n.getStatus()))
                     .findFirst()
                     .orElse(null);
+
+            if (currentNode == null) {
+                currentNode = pathway.getNodes().stream()
+                        .sorted(Comparator.comparingInt(PathwayNode::getStepOrder))
+                        .filter(n -> !"COMPLETED".equalsIgnoreCase(n.getStatus()))
+                        .findFirst()
+                        .orElse(null);
+            }
         }
 
         if (currentNode != null) {
@@ -999,6 +1014,16 @@ public class LearningPathwayService {
         if (score >= passingScore) {
             node.setStatus("COMPLETED");
             node.setNodeType("FAST_TRACKED"); // Bypass lesson progress checks in the future
+
+            // Unlock next node
+            pathway.getNodes().stream()
+                    .filter(n -> n.getStepOrder() == node.getStepOrder() + 1)
+                    .findFirst()
+                    .ifPresent(next -> {
+                        if ("LOCKED".equalsIgnoreCase(next.getStatus())) {
+                            next.setStatus("IN_PROGRESS");
+                        }
+                    });
         }
         
         learningPathwayRepository.save(pathway);
