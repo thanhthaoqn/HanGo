@@ -10,6 +10,8 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Repository
 public interface CourseRepository extends JpaRepository<Course, Long> {
@@ -33,10 +35,11 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
                         +
                         "AND ((c.latestVersionId = c.id OR c.latestVersionId IS NULL) " +
                         "     OR (:enrolledUserId IS NOT NULL AND EXISTS (SELECT 1 FROM Enrollment e3 WHERE e3.course.id = c.id AND e3.user.id = :enrolledUserId)))")
-        List<CourseSummaryDTO> findCoursesWithFilters(@Param("search") String search,
+        Page<CourseSummaryDTO> findCoursesWithFilters(@Param("search") String search,
                         @Param("difficulty") String difficulty,
                         @Param("enrolledUserId") Long enrolledUserId,
-                        @Param("enrollmentStatus") String enrollmentStatus);
+                        @Param("enrollmentStatus") String enrollmentStatus,
+                        Pageable pageable);
 
         @Query("SELECT c.id, cat.paramValue FROM Course c JOIN c.categories cat WHERE c.id IN :courseIds")
         List<Object[]> findCategoriesByCourseIds(@Param("courseIds") List<Long> courseIds);

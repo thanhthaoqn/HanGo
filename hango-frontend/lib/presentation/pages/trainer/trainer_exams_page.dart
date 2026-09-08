@@ -120,7 +120,9 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
               final s = _statusOf(e);
               return s == 'PUBLISHED' || s == 'APPROVED' || s == 'PUBLIC';
             }).length;
-            _hiddenCount = allData.where((e) => _statusOf(e) == 'HIDDEN').length;
+            _hiddenCount = allData
+                .where((e) => _statusOf(e) == 'HIDDEN')
+                .length;
             _pendingCount = allData
                 .where((e) => _statusOf(e) == 'SUBMITTED')
                 .length;
@@ -345,7 +347,7 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
 
   Future<void> _loadTrainerInfo() async {
     final prefs = await SharedPreferences.getInstance();
-    final fullName = prefs.getString('user_fullname') ?? 'Thảo';
+    final fullName = prefs.getString('user_fullname') ?? 'A';
     final avatarUrl = prefs.getString('user_avatar_url') ?? '';
 
     final roles = prefs.getStringList('user_roles') ?? [];
@@ -459,15 +461,17 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                               _editingExamData!['expectedQuestionCount']
                                   as int? ??
                               10,
-                          isReadOnly: !['DRAFT', 'REJECTED', 'PUBLISHED'].contains(
-                            _editingExamData!['status']
-                                ?.toString()
-                                .toUpperCase(),
-                          ),
+                          isReadOnly: !['DRAFT', 'REJECTED', 'PUBLISHED']
+                              .contains(
+                                _editingExamData!['status']
+                                    ?.toString()
+                                    .toUpperCase(),
+                              ),
                           isCourseManager: false,
                           isEmbedded: true,
-                          initialAiData: _editingExamData!['aiData']
-                              as TrainerAiExamGenerateResponse?,
+                          initialAiData:
+                              _editingExamData!['aiData']
+                                  as TrainerAiExamGenerateResponse?,
                           onBack: () {
                             setState(() {
                               _editingExamData = null;
@@ -821,7 +825,11 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
             ),
             child: const Column(
               children: [
-                Icon(Icons.assignment_outlined, size: 48, color: Color(0xFF94A3B8)),
+                Icon(
+                  Icons.assignment_outlined,
+                  size: 48,
+                  color: Color(0xFF94A3B8),
+                ),
                 SizedBox(height: 16),
                 Text(
                   'No exams found matching this criteria',
@@ -874,7 +882,9 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isHovered ? const Color(0xFF38C9A6).withAlpha(102) : borderColor,
+          color: isHovered
+              ? const Color(0xFF38C9A6).withAlpha(102)
+              : borderColor,
           width: 1.5,
         ),
         boxShadow: [
@@ -946,15 +956,24 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                       spacing: 16,
                       runSpacing: 6,
                       children: [
-                        _statChip(Icons.help_outline, '$questionCount questions'),
-                        _statChip(Icons.timer_outlined, '$durationMinutes mins'),
+                        _statChip(
+                          Icons.help_outline,
+                          '$questionCount questions',
+                        ),
+                        _statChip(
+                          Icons.timer_outlined,
+                          '$durationMinutes mins',
+                        ),
                         _statChip(Icons.calendar_today_outlined, dateStr),
                       ],
                     ),
                     if (status == 'REJECTED' && rejectionReason.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFFEF2F2),
                           borderRadius: BorderRadius.circular(6),
@@ -963,7 +982,11 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.info_outline, color: Color(0xFFDC2626), size: 16),
+                            const Icon(
+                              Icons.info_outline,
+                              color: Color(0xFFDC2626),
+                              size: 16,
+                            ),
                             const SizedBox(width: 6),
                             Expanded(
                               child: Column(
@@ -1065,7 +1088,8 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                 builder: (ctx) => ExamReviewDashboardDialog(
                   examId: exam['id'] as int,
                   examTitle: exam['title'] ?? 'Untitled Exam',
-                  examExpectedCount: exam['expectedQuestionCount'] as int? ?? 10,
+                  examExpectedCount:
+                      exam['expectedQuestionCount'] as int? ?? 10,
                   examQuestionCount: exam['questionCount'] as int? ?? 0,
                   examDurationMinutes: exam['durationMinutes'] as int? ?? 0,
                   examCreatedAt: _formatDate(exam['createdAt']),
@@ -1080,7 +1104,8 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                   onActionSuccess: () {
                     _fetchExamsData();
                   },
-                  onEditExam: isOwnExam && ['REJECTED', 'PUBLISHED'].contains(status)
+                  onEditExam:
+                      isOwnExam && ['REJECTED', 'PUBLISHED'].contains(status)
                       ? () {
                           setState(() => _editingExamData = exam);
                         }
@@ -1320,7 +1345,9 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
             child: Icon(
               Icons.chevron_left,
               size: 16,
-              color: _currentPage > 1 ? const Color(0xFF475569) : const Color(0xFF94A3B8),
+              color: _currentPage > 1
+                  ? const Color(0xFF475569)
+                  : const Color(0xFF94A3B8),
             ),
           ),
         ),
@@ -1346,14 +1373,18 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
           child: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: _currentPage < totalPages ? Colors.white : const Color(0xFFF1F5F9),
+              color: _currentPage < totalPages
+                  ? Colors.white
+                  : const Color(0xFFF1F5F9),
               border: Border.all(color: const Color(0xFFE2E8F0)),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
               Icons.chevron_right,
               size: 16,
-              color: _currentPage < totalPages ? const Color(0xFF475569) : const Color(0xFF94A3B8),
+              color: _currentPage < totalPages
+                  ? const Color(0xFF475569)
+                  : const Color(0xFF94A3B8),
             ),
           ),
         ),

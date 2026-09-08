@@ -20,6 +20,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -40,17 +42,19 @@ public class ExamService {
     private final QuestionRepository questionRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public List<ExamResponseDTO> getAllExams(String status) {
-        List<Exam> exams;
+    public Page<ExamResponseDTO> getAllExams(String status, Pageable pageable) {
+        Page<Exam> examPage;
         if (status != null && !status.isEmpty() && !status.equalsIgnoreCase("All")) {
-            exams = examRepository.findByDeletedAtIsNullAndStatus(status);
+            examPage = examRepository.findByDeletedAtIsNullAndStatus(status, pageable);
         } else {
-            exams = examRepository.findByDeletedAtIsNullAndStatus("PUBLISHED");
+            examPage = examRepository.findByDeletedAtIsNullAndStatus("PUBLISHED", pageable);
         }
 
-        if (exams.isEmpty()) {
-            return new java.util.ArrayList<>();
+        if (examPage.isEmpty()) {
+            return Page.empty(pageable);
         }
+
+        List<Exam> exams = examPage.getContent();
 
         List<Long> examIds = exams.stream().map(Exam::getId).collect(Collectors.toList());
 
@@ -70,11 +74,11 @@ public class ExamService {
             }
         }
 
-        return exams.stream().map(exam -> {
+        return examPage.map(exam -> {
             int qCount = questionCounts.getOrDefault(exam.getId(), 0);
             Long sCount = studentCounts.getOrDefault(exam.getId(), 0L);
             return mapToDTO(exam, qCount, sCount);
-        }).collect(Collectors.toList());
+        });
     }
 
     /**

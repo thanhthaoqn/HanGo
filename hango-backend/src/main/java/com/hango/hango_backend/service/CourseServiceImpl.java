@@ -21,6 +21,8 @@ import com.hango.hango_backend.repository.UserRepository;
 import com.hango.hango_backend.repository.TrainerProfileRepository;
 import com.hango.hango_backend.entity.PathwayNode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
@@ -52,7 +54,7 @@ public class CourseServiceImpl implements CourseService {
     private final PathwayNodeRepository pathwayNodeRepository;
 
     @Override
-    public List<CourseSummaryDTO> getCourses(String search, String filterType, String difficulty) {
+    public Page<CourseSummaryDTO> getCourses(String search, String filterType, String difficulty, Pageable pageable) {
         Long enrolledUserId = null;
         String enrollmentStatus = null;
 
@@ -80,12 +82,14 @@ public class CourseServiceImpl implements CourseService {
             diffFilter = difficulty.toUpperCase();
         }
 
-        List<CourseSummaryDTO> dtos = courseRepository.findCoursesWithFilters(search, diffFilter, enrolledUserId,
-                enrollmentStatus);
+        Page<CourseSummaryDTO> page = courseRepository.findCoursesWithFilters(search, diffFilter, enrolledUserId,
+                enrollmentStatus, pageable);
 
-        if (dtos.isEmpty()) {
-            return dtos;
+        if (page.isEmpty()) {
+            return page;
         }
+
+        List<CourseSummaryDTO> dtos = page.getContent();
 
         List<Long> courseIds = dtos.stream().map(CourseSummaryDTO::getId).collect(Collectors.toList());
         List<Object[]> courseCategories = courseRepository.findCategoriesByCourseIds(courseIds);
@@ -162,7 +166,7 @@ public class CourseServiceImpl implements CourseService {
             }
         }
 
-        return dtos;
+        return page;
     }
 
     @Override

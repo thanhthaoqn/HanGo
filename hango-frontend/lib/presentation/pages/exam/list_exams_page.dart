@@ -23,7 +23,13 @@ class ListExamsPage extends StatefulWidget {
 
 class _ListExamsPageState extends State<ListExamsPage> {
   final ExamRepository _repository = ExamRepository();
-  late Future<List<dynamic>> _dataFuture;
+  final ScrollController _scrollController = ScrollController();
+  
+  List<Exam> _allExams = [];
+  List<Map<String, dynamic>> _examAttempts = [];
+  bool _isLoading = true;
+  int _currentPage = 0;
+  int _totalPages = 0;
 
   bool _isLoggedIn = false;
   bool _canAttemptExam = true;
@@ -58,7 +64,7 @@ class _ListExamsPageState extends State<ListExamsPage> {
   void initState() {
     super.initState();
     _loadPermissions();
-    _loadData();
+    _fetchPage(0);
     _fetchPublicStats();
   }
 
@@ -77,23 +83,47 @@ class _ListExamsPageState extends State<ListExamsPage> {
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  void _loadData() {
-    _dataFuture = _fetchData();
-  }
-
-  Future<List<dynamic>> _fetchData() async {
+  Future<void> _fetchPage(int page) async {
+    setState(() {
+      _isLoading = true;
+      _currentPage = page;
+      _allExams = [];
+      _examAttempts = [];
+    });
+    
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
-    
-    final examsFuture = _repository.fetchExams(status: 'All');
-    final attemptsFuture = token != null
-        ? _repository.fetchMyExamAttempts()
-        : Future.value(<Map<String, dynamic>>[]);
-        
-    return Future.wait([examsFuture, attemptsFuture]);
+
+    try {
+      final examsResponse = await _repository.fetchExamsPaginated(
+        status: 'All',
+        page: _currentPage,
+        size: 8,
+      );
+
+      final attemptsList = token != null
+        ? await _repository.fetchMyExamAttempts()
+        : <Map<String, dynamic>>[];
+
+      if (mounted) {
+        setState(() {
+          _allExams = examsResponse.content;
+          _totalPages = examsResponse.totalPages;
+          _examAttempts = attemptsList;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -131,6 +161,7 @@ class _ListExamsPageState extends State<ListExamsPage> {
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: widget.isEmbedded ? null : SharedHeader(isDesktop: isDesktop, activeTab: 'Exams'),
       body: SingleChildScrollView(
+        controller: _scrollController,
         physics: const BouncingScrollPhysics(),
         child: Column(
           children: [
@@ -413,7 +444,7 @@ class _ListExamsPageState extends State<ListExamsPage> {
                     onSubmitted: (value) {
                       setState(() {
                         _searchQuery = value;
-                        _loadData();
+                        _fetchPage(0);
                       });
                     },
                     style: const TextStyle(fontFamily: 'Outfit', fontSize: 14, fontWeight: FontWeight.w500),
@@ -435,7 +466,7 @@ class _ListExamsPageState extends State<ListExamsPage> {
                       setState(() {
                         _searchController.clear();
                         _searchQuery = '';
-                        _loadData();
+                        _fetchPage(0);
                       });
                     },
                   ),
@@ -449,7 +480,7 @@ class _ListExamsPageState extends State<ListExamsPage> {
                   ),
                   onPressed: () {
                     setState(() {
-                      _loadData();
+                      _fetchPage(0);
                     });
                   },
                   child: Text(
@@ -569,28 +600,23 @@ class _ListExamsPageState extends State<ListExamsPage> {
 
   Widget _buildGrid(bool isVi) {
     final isDesktop = MediaQuery.of(context).size.width > 900;
-    return FutureBuilder<List<dynamic>>(
-      future: _dataFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 60.0),
-            child: Center(child: CircularProgressIndicator(color: Color(0xFF28B79B))),
-          );
-        } else if (snapshot.hasError) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 40.0),
-            child: Center(child: Text(isVi ? 'Lỗi tải danh sách: ${snapshot.error}' : 'Error: ${snapshot.error}', style: const TextStyle(fontFamily: 'Outfit', color: Colors.red))),
-          );
-        } else if (!snapshot.hasData) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 60.0),
-            child: Center(child: Text(isVi ? 'Không tìm thấy đề thi nào.' : 'No exams found.', style: const TextStyle(fontFamily: 'Outfit', fontSize: 16, color: Color(0xFF64748B)))),
-          );
-        }
+    
+    if (_isLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 60.0),
+        child: Center(child: CircularProgressIndicator(color: Color(0xFF28B79B))),
+      );
+    }
+    
+    if (_allExams.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 60.0),
+        child: Center(child: Text(isVi ? 'Không tìm thấy đề thi nào.' : 'No exams found.', style: const TextStyle(fontFamily: 'Outfit', fontSize: 16, color: Color(0xFF64748B)))),
+      );
+    }
 
-        final List<Exam> allExams = snapshot.data![0] as List<Exam>;
-        final List<Map<String, dynamic>> attempts = (snapshot.data![1] as List<dynamic>).map((e) => Map<String, dynamic>.from(e)).toList();
+    final List<Exam> allExams = _allExams;
+    final List<Map<String, dynamic>> attempts = _examAttempts;
 
         // 1. Search Query filter (local)
         List<Exam> filteredExams = allExams;
@@ -637,10 +663,12 @@ class _ListExamsPageState extends State<ListExamsPage> {
 
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 24.0),
-          child: GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: filteredExams.length,
+          child: Column(
+            children: [
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: filteredExams.length,
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: isDesktop ? 4 : 2,
               childAspectRatio: isDesktop ? 1.25 : 0.85,
@@ -665,8 +693,49 @@ class _ListExamsPageState extends State<ListExamsPage> {
               );
             },
           ),
-        );
-      },
+          if (_totalPages > 1)
+            Padding(
+              padding: const EdgeInsets.only(top: 40.0, bottom: 20.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(_totalPages, (index) {
+                  final isSelected = _currentPage == index;
+                  return InkWell(
+                    onTap: () {
+                      if (!isSelected) {
+                        _fetchPage(index);
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: isSelected ? const Color(0xFF20B486) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isSelected ? const Color(0xFF20B486) : Colors.grey.shade300,
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '${index + 1}',
+                        style: TextStyle(
+                          fontFamily: 'Outfit',
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                          color: isSelected ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

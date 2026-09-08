@@ -14,6 +14,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
 import java.util.Map;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 @RestController
 @RequestMapping("/api/v1/exams")
@@ -38,9 +42,12 @@ public class ExamController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ExamResponseDTO>> getAllExams(
-            @RequestParam(required = false, defaultValue = "All") String status) {
-        List<ExamResponseDTO> exams = examService.getAllExams(status);
+    public ResponseEntity<Page<ExamResponseDTO>> getAllExams(
+            @RequestParam(required = false, defaultValue = "All") String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "8") int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<ExamResponseDTO> exams = examService.getAllExams(status, pageable);
         return ResponseEntity.ok(exams);
     }
     

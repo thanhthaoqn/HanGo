@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/entities/exam.dart';
+import '../../domain/model/paginated_response.dart';
 import '../../utils/config.dart';
 
 class ExamRepository {
@@ -15,7 +16,8 @@ class ExamRepository {
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(utf8.decode(response.bodyBytes));
+        final Map<String, dynamic> responseData = json.decode(utf8.decode(response.bodyBytes));
+        final List<dynamic> data = responseData['content'] ?? [];
         return data
             .map(
               (json) => Exam(
@@ -37,6 +39,35 @@ class ExamRepository {
       }
     } catch (e) {
       throw Exception('Error fetching exams: $e');
+    }
+  }
+
+  Future<PaginatedResponse<Exam>> fetchExamsPaginated({
+    String status = 'All',
+    int page = 0,
+    int size = 8,
+  }) async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/exams?status=$status&page=$page&size=$size'));
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData = json.decode(utf8.decode(response.bodyBytes));
+        return PaginatedResponse<Exam>.fromJson(responseData, (json) => Exam(
+          id: json['id'].toString(),
+          title: json['title'] ?? '',
+          description: json['description'] ?? '',
+          status: json['status'] ?? '',
+          creatorName: json['creatorName'] ?? 'Unknown',
+          questionCount: json['questionCount'] ?? 0,
+          durationMinutes: json['durationMinutes'] ?? 0,
+          rating: (json['rating'] ?? 0.0).toDouble(),
+          learnerCountFormatted: json['learnerCountFormatted'] ?? '0 Learner',
+        ));
+      } else {
+        throw Exception('Failed to load paginated exams: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching paginated exams: $e');
     }
   }
 
@@ -161,7 +192,7 @@ class ExamRepository {
   /// which one gets served is randomized and can change as Course Managers
   /// (un)flag exams over time). Also reports whether one is configured at all.
   Future<Map<String, dynamic>> fetchEntryExamStatus() async {
-    final uri = Uri.parse('$baseUrl/exams/entr/statusy/status');
+    final uri = Uri.parse('$baseUrl/exams/entry/status');
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
 

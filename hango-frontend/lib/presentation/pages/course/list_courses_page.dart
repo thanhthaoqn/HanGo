@@ -22,7 +22,12 @@ class ListCoursesPage extends StatefulWidget {
 
 class _ListCoursesPageState extends State<ListCoursesPage> {
   final CourseRepository _repository = CourseRepository();
-  late Future<List<Course>> _coursesFuture;
+  final ScrollController _scrollController = ScrollController();
+  
+  List<Course> _allCourses = [];
+  bool _isLoading = true;
+  int _currentPage = 0;
+  int _totalPages = 0;
 
   String _searchQuery = '';
   String _filterType = 'All'; // All, Free, Paid
@@ -52,13 +57,14 @@ class _ListCoursesPageState extends State<ListCoursesPage> {
   @override
   void initState() {
     super.initState();
-    _fetchCourses();
+    _fetchPage(0);
     _fetchPublicStats();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -66,7 +72,13 @@ class _ListCoursesPageState extends State<ListCoursesPage> {
     return course.price;
   }
 
-  void _fetchCourses() {
+  Future<void> _fetchPage(int page) async {
+    setState(() {
+      _isLoading = true;
+      _currentPage = page;
+      _allCourses = [];
+    });
+
     String backendDifficulty = 'ALL';
     if (_difficulty == 'Basic') backendDifficulty = 'BASIC';
     if (_difficulty == 'Intermediate') backendDifficulty = 'INTERMEDIATE';
@@ -76,13 +88,33 @@ class _ListCoursesPageState extends State<ListCoursesPage> {
     if (_filterType == 'Free') backendFilterType = 'FREE';
     if (_filterType == 'Paid') backendFilterType = 'PAID';
 
-    setState(() {
-      _coursesFuture = _repository.fetchCourses(
+    try {
+      final response = await _repository.fetchCoursesPaginated(
         search: _searchQuery,
         filterType: backendFilterType,
         difficulty: backendDifficulty,
+        page: _currentPage,
+        size: 8,
       );
-    });
+      
+      if (mounted) {
+        setState(() {
+          _allCourses = response.content;
+          _totalPages = response.totalPages;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _fetchCourses() {
+    _fetchPage(0);
   }
 
   @override
@@ -94,6 +126,7 @@ class _ListCoursesPageState extends State<ListCoursesPage> {
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: widget.isEmbedded ? null : SharedHeader(isDesktop: isDesktop, activeTab: 'Courses'),
       body: SingleChildScrollView(
+        controller: _scrollController,
         physics: const BouncingScrollPhysics(),
         child: Column(
           children: [
@@ -579,38 +612,28 @@ class _ListCoursesPageState extends State<ListCoursesPage> {
 
   Widget _buildGrid(bool isVi) {
     final isDesktop = MediaQuery.of(context).size.width > 900;
-    return FutureBuilder<List<Course>>(
-      future: _coursesFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 60.0),
-            child: Center(child: CircularProgressIndicator(color: Color(0xFF28B79B))),
-          );
-        } else if (snapshot.hasError) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 40.0),
-            child: Center(
-              child: Text(
-                isVi ? 'Lỗi tải danh sách: ${snapshot.error}' : 'Error: ${snapshot.error}',
-                style: const TextStyle(fontFamily: 'Outfit', color: Colors.red),
-              ),
-            ),
-          );
-        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 60.0),
-            child: Center(
-              child: Text(
-                isVi ? 'Không tìm thấy khóa học nào.' : 'No courses found.',
-                style: const TextStyle(fontFamily: 'Outfit', fontSize: 16, color: Color(0xFF64748B)),
-              ),
-            ),
-          );
-        }
+    
+    if (_isLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 60.0),
+        child: Center(child: CircularProgressIndicator(color: Color(0xFF28B79B))),
+      );
+    }
+    
+    if (_allCourses.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 60.0),
+        child: Center(
+          child: Text(
+            isVi ? 'Không tìm thấy khóa học nào.' : 'No courses found.',
+            style: const TextStyle(fontFamily: 'Outfit', fontSize: 16, color: Color(0xFF64748B)),
+          ),
+        ),
+      );
+    }
 
-        final courses = snapshot.data!;
-        List<Course> filteredCourses = List.from(courses);
+    final courses = _allCourses;
+    List<Course> filteredCourses = List.from(courses);
 
         // 1. Filter by Fee Type
         if (_filterType == 'Free') {
@@ -649,9 +672,11 @@ class _ListCoursesPageState extends State<ListCoursesPage> {
 
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 24.0),
-          child: GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
             itemCount: filteredCourses.length,
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: isDesktop ? 4 : 2,
@@ -682,8 +707,49 @@ class _ListCoursesPageState extends State<ListCoursesPage> {
               );
             },
           ),
-        );
-      },
+          if (_totalPages > 1)
+            Padding(
+              padding: const EdgeInsets.only(top: 40.0, bottom: 20.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(_totalPages, (index) {
+                  final isSelected = _currentPage == index;
+                  return InkWell(
+                    onTap: () {
+                      if (!isSelected) {
+                        _fetchPage(index);
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: isSelected ? const Color(0xFF20B486) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isSelected ? const Color(0xFF20B486) : Colors.grey.shade300,
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '${index + 1}',
+                        style: TextStyle(
+                          fontFamily: 'Outfit',
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                          color: isSelected ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
