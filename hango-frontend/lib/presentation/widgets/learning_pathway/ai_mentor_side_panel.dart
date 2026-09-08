@@ -10,6 +10,7 @@ class AIMentorSidePanel extends StatefulWidget {
   final PathwayNode? selectedNode;
   final ValueChanged<LearningPathway>? onPathwayUpdated;
   final VoidCallback? onRegenerateFree;
+  final ValueChanged<PathwayNode>? onOpenCourse;
   final bool isDarkMode;
 
   const AIMentorSidePanel({
@@ -18,6 +19,7 @@ class AIMentorSidePanel extends StatefulWidget {
     this.selectedNode,
     this.onPathwayUpdated,
     this.onRegenerateFree,
+    this.onOpenCourse,
     this.isDarkMode = false,
   });
 
@@ -203,7 +205,11 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
   }
 
   void _syncCourseUnlockMessage() {
+    final isVi = LanguageManager.isVi;
     final nodes = widget.pathway.nodes;
+    final isPathwayRequiresPayment =
+        widget.pathway.suggestedActions.contains('ENROLL_OR_REGENERATE');
+
     for (var i = 0; i < nodes.length - 1; i++) {
       final completedNode = nodes[i];
       final nextNode = nodes[i + 1];
@@ -217,10 +223,20 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
       if (_unlockAnnouncements.contains(key)) continue;
       _unlockAnnouncements.add(key);
 
+      final String messageContent;
+      if (isPathwayRequiresPayment) {
+        messageContent = isVi
+            ? 'Bạn đã hoàn thành **${completedNode.courseTitle}**! 🎉\n\nBước tiếp theo là **${nextNode.courseTitle}** (khóa học Premium). Bạn có thể mua khóa học để tiếp tục, hoặc chọn bỏ qua (skip), hay để tôi tìm lộ trình thay thế miễn phí cho bạn nhé!'
+            : 'You completed **${completedNode.courseTitle}**! 🎉\n\nThe next step is **${nextNode.courseTitle}** (Premium course). You can purchase the course, skip it, or let me find a free alternative route for you.';
+      } else {
+        messageContent = isVi
+            ? 'Bạn đã hoàn thành **${completedNode.courseTitle}**! 🎉 Tôi đã mở khóa **${nextNode.courseTitle}** để bạn tiếp tục duy trì đà học tập.'
+            : '**${completedNode.courseTitle}** is completed! 🎉 I have unlocked **${nextNode.courseTitle}** so you can keep the momentum going.';
+      }
+
       _messages.add({
         'role': 'mentor',
-        'content':
-            '**${completedNode.courseTitle}** is completed. I have unlocked **${nextNode.courseTitle}** so you can keep the momentum going.',
+        'content': messageContent,
       });
       _scrollToBottom();
     }
@@ -739,6 +755,12 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
 
     if (widget.pathway.suggestedActions.contains('ENROLL_OR_REGENERATE')) {
       final isVi = LanguageManager.isVi;
+      final targetNode = widget.selectedNode ??
+          widget.pathway.nodes.firstWhere(
+            (n) => n.status == NodeStatus.inProgress,
+            orElse: () => widget.pathway.nodes.first,
+          );
+
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
         child: Column(
@@ -746,11 +768,18 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
           children: [
             ElevatedButton.icon(
               onPressed: () {
-                if (widget.selectedNode != null) {
-                  // Navigate to Course Details to buy
-                  // For now, we can just print or call a callback, but actually CourseDetailPreviewPage is the standard.
-                  // We'll leave it simple.
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Opening Course Details...')));
+                if (widget.onOpenCourse != null) {
+                  widget.onOpenCourse!(targetNode);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        isVi
+                            ? 'Đang mở chi tiết khóa học ${targetNode.courseTitle}...'
+                            : 'Opening details for ${targetNode.courseTitle}...',
+                      ),
+                    ),
+                  );
                 }
               },
               icon: const Icon(Icons.shopping_cart_rounded),
@@ -776,7 +805,7 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
               },
               icon: const Icon(Icons.autorenew_rounded),
               label: Text(
-                isVi ? 'Tìm Đường Vòng Miễn Phí' : 'Find Free Alternative',
+                isVi ? 'Tìm Khóa Học Miễn Phí' : 'Find Free Alternative',
               ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: dark ? const Color(0xFFF0F6FC) : const Color(0xFF334155),

@@ -752,6 +752,11 @@ public class LearningPathwayService {
         }
 
         String effectiveMentorSummary = pathway.getMentorSummary();
+        if (effectiveMentorSummary == null || effectiveMentorSummary.isBlank()
+                || effectiveMentorSummary.contains("Đường dẫn này yêu cầu một khóa học Premium")
+                || effectiveMentorSummary.startsWith("⚠️ **Lưu ý:** Lộ trình này yêu cầu một khóa học Premium")) {
+            effectiveMentorSummary = "Chào bạn! Tôi là AI Mentor đồng hành cùng bạn. Dựa trên kết quả bài kiểm tra của bạn, tôi đã xây dựng lộ trình học tập này để giúp bạn củng cố các kỹ năng còn yếu và đạt được mục tiêu điểm số.";
+        }
 
         if (currentNode != null) {
             Course currentEffectiveCourse = resolveEffectiveCourse(studentId, currentNode.getCourse());
@@ -770,10 +775,8 @@ public class LearningPathwayService {
                 }
             } else {
                 suggestedActions.add("ENROLL_OR_REGENERATE");
-                String premiumNotice = "⚠️ **Lưu ý:** Lộ trình này yêu cầu một khóa học Premium. Bạn có thể mua khóa học để tiếp tục, hoặc tôi có thể thiết kế lại một lộ trình thay thế hoàn toàn miễn phí cho bạn.";
-                if (effectiveMentorSummary == null || effectiveMentorSummary.isBlank()) {
-                    effectiveMentorSummary = premiumNotice;
-                } else if (!effectiveMentorSummary.contains("Premium")) {
+                String premiumNotice = "⚠️ **Lưu ý:** Khóa học tiếp theo là khóa học Premium. Bạn có thể mua khóa học để tiếp tục, hoặc tôi có thể thiết kế lại một lộ trình thay thế hoàn toàn miễn phí cho bạn.";
+                if (!effectiveMentorSummary.contains("Premium")) {
                     effectiveMentorSummary = effectiveMentorSummary + "\n\n" + premiumNotice;
                 }
             }

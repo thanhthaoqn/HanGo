@@ -474,17 +474,38 @@ class _NodeCard extends StatelessWidget {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: onRegenerateFreeTap,
-                        icon: const Icon(Icons.auto_awesome, size: 18),
-                        label: const Text('Ask AI to find free courses'),
+                        onPressed: onStartLearningTap ?? onTap,
+                        icon: const Icon(Icons.shopping_cart_rounded, size: 18),
+                        label: const Text('Buy Course / View Details'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF8B5CF6),
+                          backgroundColor: const Color(0xFFF59E0B),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
                           elevation: 0,
+                          textStyle: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: onRegenerateFreeTap,
+                        icon: const Icon(Icons.auto_awesome, size: 18),
+                        label: const Text('Ask AI to find free courses'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF8B5CF6),
+                          side: const BorderSide(color: Color(0xFF8B5CF6)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                           textStyle: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
