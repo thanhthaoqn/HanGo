@@ -746,6 +746,8 @@ public class LearningPathwayService {
             }
         }
 
+        String effectiveMentorSummary = pathway.getMentorSummary();
+
         if (currentNode != null) {
             Course currentEffectiveCourse = resolveEffectiveCourse(studentId, currentNode.getCourse());
             Long currentEffectiveCourseId = currentEffectiveCourse != null ? currentEffectiveCourse.getId() : (currentNode.getCourse() != null ? currentNode.getCourse().getId() : null);
@@ -763,13 +765,18 @@ public class LearningPathwayService {
                 }
             } else {
                 suggestedActions.add("ENROLL_OR_REGENERATE");
-                pathway.setMentorSummary("Đường dẫn này yêu cầu một khóa học Premium. Bạn có thể mua khóa học để tiếp tục, hoặc tôi có thể thiết kế lại một lộ trình thay thế hoàn toàn miễn phí cho bạn.");
+                String premiumNotice = "⚠️ **Lưu ý:** Lộ trình này yêu cầu một khóa học Premium. Bạn có thể mua khóa học để tiếp tục, hoặc tôi có thể thiết kế lại một lộ trình thay thế hoàn toàn miễn phí cho bạn.";
+                if (effectiveMentorSummary == null || effectiveMentorSummary.isBlank()) {
+                    effectiveMentorSummary = premiumNotice;
+                } else if (!effectiveMentorSummary.contains("Premium")) {
+                    effectiveMentorSummary = effectiveMentorSummary + "\n\n" + premiumNotice;
+                }
             }
         } else if (completedSteps > 0 && completedSteps == totalSteps) {
             // Pathway is fully completed
             suggestedActions.add("TAKE_NEW_EXAM");
-            pathway.setMentorSummary(
-                    "🎉 Chúc mừng bạn đã hoàn thành xuất sắc toàn bộ lộ trình hiện tại! Để tiếp tục nâng cao trình độ, hãy làm một bài kiểm tra đánh giá năng lực mới để tôi có thể thiết kế cho bạn một lộ trình nâng cấp hơn nhé!");
+            effectiveMentorSummary =
+                    "🎉 Chúc mừng bạn đã hoàn thành xuất sắc toàn bộ lộ trình hiện tại! Để tiếp tục nâng cao trình độ, hãy làm một bài kiểm tra đánh giá năng lực mới để tôi có thể thiết kế cho bạn một lộ trình nâng cấp hơn nhé!";
         }
 
         if ("BEHIND".equalsIgnoreCase(pathway.getScheduleStatus())
@@ -799,7 +806,7 @@ public class LearningPathwayService {
                 .pathwayId(pathway.getId())
                 .roadmapId("RM_USER_" + studentId + "_" + pathway.getId())
                 .examAttemptId(pathway.getExamAttempt() != null ? pathway.getExamAttempt().getId() : null)
-                .mentorSummary(pathway.getMentorSummary())
+                .mentorSummary(effectiveMentorSummary)
                 .nodes(nodeDTOs)
                 .totalSteps(totalSteps)
                 .completedSteps(completedSteps)

@@ -1005,4 +1005,44 @@ class LearningPathwayServiceTest {
         assertEquals("Learner skipped this course", nodeDto.getRerouteReason());
         assertNotNull(nodeDto.getSkippedAt());
     }
+
+    @Test
+    void toResponseDtoShouldPreserveInitialMentorSummaryWhenCourseIsPremium() {
+        Long studentId = 1L;
+        User student = User.builder().id(studentId).build();
+        LearningPathway pathway = LearningPathway.builder()
+                .id(12L)
+                .student(student)
+                .mentorSummary("Dựa trên kết quả thi gần nhất, bạn cần củng cố ngữ pháp.")
+                .build();
+
+        Course paidCourse = Course.builder()
+                .id(201L)
+                .code("ENG_PREMIUM")
+                .title("Grammar Mastery")
+                .price(java.math.BigDecimal.valueOf(199000))
+                .status("PUBLISHED")
+                .build();
+
+        PathwayNode node = PathwayNode.builder()
+                .id(401L)
+                .stepOrder(1)
+                .course(paidCourse)
+                .status("IN_PROGRESS")
+                .nodeType("NORMAL")
+                .build();
+        pathway.addNode(node);
+
+        when(learningPathwayRepository.findById(12L)).thenReturn(Optional.of(pathway));
+        when(enrollmentRepository.existsByUserIdAndCourseId(studentId, 201L)).thenReturn(false);
+
+        LearningPathwayResponseDTO dto = learningPathwayService.getPathwayById(12L, studentId);
+
+        assertNotNull(dto);
+        assertTrue(dto.getSuggestedActions().contains("ENROLL_OR_REGENERATE"));
+        // Phải giữ được lời chào mở đầu ban đầu
+        assertTrue(dto.getMentorSummary().contains("Dựa trên kết quả thi gần nhất, bạn cần củng cố ngữ pháp."));
+        // Phải có thông báo Premium nối tiếp
+        assertTrue(dto.getMentorSummary().contains("Premium"));
+    }
 }
