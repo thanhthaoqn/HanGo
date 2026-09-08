@@ -6,7 +6,8 @@ class InteractiveNodeTree extends StatelessWidget {
   final Function(PathwayNode) onNodeTap;
   final Function(PathwayNode)? onStartLearningTap;
   final Function(PathwayNode)? onFastTrackTap;
-  final Function(PathwayNode)? onMasteryTap; // B4 (spec 20): mo Mastery Quiz that
+  final Function(PathwayNode)?
+  onMasteryTap; // B4 (spec 20): mo Mastery Quiz that
   final Function(PathwayNode)? onSkipTap;
   final VoidCallback? onRegenerateFreeTap;
   final PathwayNode? selectedNode;
@@ -34,7 +35,7 @@ class InteractiveNodeTree extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final itemCount = nodes.length + (header != null ? 1 : 0);
-    
+
     return ListView.builder(
       padding: contentPadding ?? const EdgeInsets.fromLTRB(22, 18, 22, 28),
       itemCount: itemCount,
@@ -42,7 +43,7 @@ class InteractiveNodeTree extends StatelessWidget {
         if (header != null && index == 0) {
           return header!;
         }
-        
+
         final nodeIndex = header != null ? index - 1 : index;
         final node = nodes[nodeIndex];
         final isLast = nodeIndex == nodes.length - 1;
@@ -69,9 +70,15 @@ class InteractiveNodeTree extends StatelessWidget {
             isSelected: selectedNode?.step == node.step,
             isDarkMode: isDarkMode,
             onTap: () => onNodeTap(node),
-            onStartLearningTap: onStartLearningTap != null ? () => onStartLearningTap!(node) : null,
-            onFastTrackTap: onFastTrackTap != null ? () => onFastTrackTap!(node) : null,
-            onMasteryTap: onMasteryTap != null ? () => onMasteryTap!(node) : null,
+            onStartLearningTap: onStartLearningTap != null
+                ? () => onStartLearningTap!(node)
+                : null,
+            onFastTrackTap: onFastTrackTap != null
+                ? () => onFastTrackTap!(node)
+                : null,
+            onMasteryTap: onMasteryTap != null
+                ? () => onMasteryTap!(node)
+                : null,
             onSkipTap: onSkipTap != null ? () => onSkipTap!(node) : null,
             onRegenerateFreeTap: onRegenerateFreeTap,
           ),
@@ -304,7 +311,9 @@ class _NodeCard extends StatelessWidget {
                   status: node.status,
                   isDarkMode: isDarkMode,
                 ),
-              if (node.difficulty != null && node.difficulty != 'N/A' && node.difficulty!.isNotEmpty)
+              if (node.difficulty != null &&
+                  node.difficulty != 'N/A' &&
+                  node.difficulty!.isNotEmpty)
                 _SkillTag(
                   label: '#${node.difficulty}',
                   status: node.status,
@@ -317,13 +326,13 @@ class _NodeCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: isDarkMode 
-                    ? const Color(0xFF1F2937).withOpacity(0.5) 
+                color: isDarkMode
+                    ? const Color(0xFF1F2937).withOpacity(0.5)
                     : const Color(0xFF8B5CF6).withOpacity(0.06),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isDarkMode 
-                      ? const Color(0xFF374151) 
+                  color: isDarkMode
+                      ? const Color(0xFF374151)
                       : const Color(0xFF8B5CF6).withOpacity(0.15),
                 ),
               ),
@@ -333,7 +342,9 @@ class _NodeCard extends StatelessWidget {
                   Icon(
                     Icons.psychology_rounded,
                     size: 20,
-                    color: isDarkMode ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED),
+                    color: isDarkMode
+                        ? const Color(0xFFA78BFA)
+                        : const Color(0xFF7C3AED),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -342,7 +353,9 @@ class _NodeCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 13,
                         height: 1.5,
-                        color: isDarkMode ? const Color(0xFFD1D5DB) : const Color(0xFF4B5563),
+                        color: isDarkMode
+                            ? const Color(0xFFD1D5DB)
+                            : const Color(0xFF4B5563),
                         fontStyle: FontStyle.italic,
                       ),
                     ),
@@ -366,15 +379,23 @@ class _NodeCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: const Color(0xFFEC4899).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFEC4899).withOpacity(0.2)),
+                border: Border.all(
+                  color: const Color(0xFFEC4899).withOpacity(0.2),
+                ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.workspace_premium, color: Color(0xFFEC4899), size: 16),
+                  const Icon(
+                    Icons.workspace_premium,
+                    color: Color(0xFFEC4899),
+                    size: 16,
+                  ),
                   const SizedBox(width: 6),
                   Text(
-                    node.masteryScore != null ? 'Mastery: ${node.masteryScore}%' : 'Mastered',
+                    node.masteryScore != null
+                        ? 'Mastery: ${node.masteryScore}%'
+                        : 'Mastered',
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -387,28 +408,46 @@ class _NodeCard extends StatelessWidget {
           ],
           if (node.status != NodeStatus.locked && node.courseId > 0) ...[
             const SizedBox(height: 14),
-            if (node.status == NodeStatus.inProgress && suggestedActions.contains('ENROLL_OR_REGENERATE')) ...[
+            if (node.status == NodeStatus.inProgress &&
+                suggestedActions.contains('ENROLL_OR_REGENERATE')) ...[
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 16,
+                ),
                 decoration: BoxDecoration(
-                  color: isDarkMode ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                  color: isDarkMode
+                      ? const Color(0xFF1E293B)
+                      : const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: isDarkMode ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                  border: Border.all(
+                    color: isDarkMode
+                        ? const Color(0xFF334155)
+                        : const Color(0xFFE2E8F0),
+                  ),
                 ),
                 child: Column(
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.lock_rounded, size: 16, color: isDarkMode ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                        Icon(
+                          Icons.lock_rounded,
+                          size: 16,
+                          color: isDarkMode
+                              ? const Color(0xFF94A3B8)
+                              : const Color(0xFF64748B),
+                        ),
                         const SizedBox(width: 6),
                         Text(
-                          'Khóa học Premium (Bạn chưa mua)',
+                          'Premium Course (not paid yet)',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: isDarkMode ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                            color: isDarkMode
+                                ? const Color(0xFF94A3B8)
+                                : const Color(0xFF64748B),
                           ),
                         ),
                       ],
@@ -419,14 +458,19 @@ class _NodeCard extends StatelessWidget {
                       child: ElevatedButton.icon(
                         onPressed: onRegenerateFreeTap,
                         icon: const Icon(Icons.auto_awesome, size: 18),
-                        label: const Text('Nhờ AI tìm khóa Miễn phí'),
+                        label: const Text('Ask AI to find free courses'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF8B5CF6),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 10),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                           elevation: 0,
-                          textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          textStyle: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                     ),
@@ -436,13 +480,22 @@ class _NodeCard extends StatelessWidget {
                       child: OutlinedButton.icon(
                         onPressed: onSkipTap,
                         icon: const Icon(Icons.skip_next_rounded, size: 18),
-                        label: const Text('Bỏ qua & Học tiếp'),
+                        label: const Text('Skip this course'),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: isDarkMode ? Colors.white70 : Colors.black54,
-                          side: BorderSide(color: isDarkMode ? Colors.white24 : Colors.black12),
+                          foregroundColor: isDarkMode
+                              ? Colors.white70
+                              : Colors.black54,
+                          side: BorderSide(
+                            color: isDarkMode ? Colors.white24 : Colors.black12,
+                          ),
                           padding: const EdgeInsets.symmetric(vertical: 10),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          textStyle: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                     ),
@@ -451,56 +504,78 @@ class _NodeCard extends StatelessWidget {
               ),
             ] else ...[
               SizedBox(
-              width: double.infinity,
-              child: Builder(builder: (context) {
-                final isMasteryAction = node.isReviewDue ||
-                    (node.status == NodeStatus.completed && !node.isMastered);
-                final handleTap = isMasteryAction && onMasteryTap != null
-                    ? onMasteryTap
-                    : (onStartLearningTap ?? onTap);
-                return ElevatedButton.icon(
-                  onPressed: handleTap,
-                  icon: Icon(
-                    node.isReviewDue ? Icons.replay : 
-                    (node.status == NodeStatus.completed && !node.isMastered) ? Icons.workspace_premium : 
-                    (node.status == NodeStatus.completed && node.isMastered) ? Icons.done_all_rounded :
-                    Icons.play_arrow_rounded, 
-                    size: 18
-                  ),
-                  label: Text(
-                    node.isReviewDue ? 'Review Now' :
-                    (node.status == NodeStatus.completed && !node.isMastered) ? 'Take Mastery Quiz' :
-                    (node.status == NodeStatus.completed && node.isMastered) ? 'Review Course' :
-                    'Start learning'
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: node.isReviewDue ? const Color(0xFFF59E0B) :
-                                    (node.status == NodeStatus.completed && !node.isMastered) ? const Color(0xFFEC4899) :
-                                    (isDarkMode ? const Color(0xFF6366F1) : const Color(0xFF4F46E5)),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    elevation: 0,
-                    textStyle: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
-                );
-              }),
-            ),
+                width: double.infinity,
+                child: Builder(
+                  builder: (context) {
+                    final isMasteryAction =
+                        node.isReviewDue ||
+                        (node.status == NodeStatus.completed &&
+                            !node.isMastered);
+                    final handleTap = isMasteryAction && onMasteryTap != null
+                        ? onMasteryTap
+                        : (onStartLearningTap ?? onTap);
+                    return ElevatedButton.icon(
+                      onPressed: handleTap,
+                      icon: Icon(
+                        node.isReviewDue
+                            ? Icons.replay
+                            : (node.status == NodeStatus.completed &&
+                                  !node.isMastered)
+                            ? Icons.workspace_premium
+                            : (node.status == NodeStatus.completed &&
+                                  node.isMastered)
+                            ? Icons.done_all_rounded
+                            : Icons.play_arrow_rounded,
+                        size: 18,
+                      ),
+                      label: Text(
+                        node.isReviewDue
+                            ? 'Review Now'
+                            : (node.status == NodeStatus.completed &&
+                                  !node.isMastered)
+                            ? 'Take Mastery Quiz'
+                            : (node.status == NodeStatus.completed &&
+                                  node.isMastered)
+                            ? 'Review Course'
+                            : 'Start learning',
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: node.isReviewDue
+                            ? const Color(0xFFF59E0B)
+                            : (node.status == NodeStatus.completed &&
+                                  !node.isMastered)
+                            ? const Color(0xFFEC4899)
+                            : (isDarkMode
+                                  ? const Color(0xFF6366F1)
+                                  : const Color(0xFF4F46E5)),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 0,
+                        textStyle: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
             ],
           ],
-          if (node.status == NodeStatus.inProgress && node.courseId > 0 && onFastTrackTap != null && suggestedActions.contains('FAST_TRACK')) ...[
+          if (node.status == NodeStatus.inProgress &&
+              node.courseId > 0 &&
+              onFastTrackTap != null &&
+              suggestedActions.contains('FAST_TRACK')) ...[
             const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: onFastTrackTap,
                 icon: const Icon(Icons.fast_forward_rounded, size: 18),
-                label: const Text('Fast-track (Skip)'),
+                label: const Text('Fast-track (Take final exam)'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: isDarkMode ? Colors.white70 : Colors.black54,
                   side: BorderSide(
@@ -518,18 +593,24 @@ class _NodeCard extends StatelessWidget {
               ),
             ),
           ],
-          if (node.status == NodeStatus.inProgress && node.courseId > 0 && onSkipTap != null && !suggestedActions.contains('ENROLL_OR_REGENERATE')) ...[
+          if (node.status == NodeStatus.inProgress &&
+              node.courseId > 0 &&
+              onSkipTap != null &&
+              !suggestedActions.contains('ENROLL_OR_REGENERATE')) ...[
             const SizedBox(height: 6),
             SizedBox(
               width: double.infinity,
               child: TextButton.icon(
                 onPressed: onSkipTap,
                 icon: const Icon(Icons.skip_next_rounded, size: 16),
-                label: const Text('Bỏ qua khóa học này (Skip)'),
+                label: const Text('Skip this course'),
                 style: TextButton.styleFrom(
                   foregroundColor: isDarkMode ? Colors.white60 : Colors.black45,
                   padding: const EdgeInsets.symmetric(vertical: 6),
-                  textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                  textStyle: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ),
@@ -684,18 +765,24 @@ class _SkillTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final locked = status == NodeStatus.locked;
-    
+
     // Default color
     Color color = locked ? const Color(0xFF94A3B8) : const Color(0xFF6366F1);
     Color bgColor = color.withOpacity(isDarkMode ? 0.16 : 0.10);
     Color borderColor = color.withOpacity(0.22);
-    
+
     // Premium styling for special tags
-    if (label == "#FocusNow" || label == "#LỗiMới" || label == "#Mới Phát Hiện" || label == "#New Vulnerability") {
+    if (label == "#FocusNow" ||
+        label == "#LỗiMới" ||
+        label == "#Mới Phát Hiện" ||
+        label == "#New Vulnerability") {
       color = const Color(0xFFEF4444); // Red/Orange for urgency
       bgColor = color.withOpacity(isDarkMode ? 0.2 : 0.12);
       borderColor = color.withOpacity(0.4);
-    } else if (label == "#LongTerm" || label == "#KinhNiên" || label == "#Kinh Niên" || label == "#Chronic Weakness") {
+    } else if (label == "#LongTerm" ||
+        label == "#KinhNiên" ||
+        label == "#Kinh Niên" ||
+        label == "#Chronic Weakness") {
       color = const Color(0xFF8B5CF6); // Purple for long-term mastery
       bgColor = color.withOpacity(isDarkMode ? 0.2 : 0.12);
       borderColor = color.withOpacity(0.4);
@@ -846,18 +933,26 @@ class _NodePalette {
     if (status == NodeStatus.completed) {
       return _NodePalette(
         surface: dark ? const Color(0xFF161B22) : Colors.white,
-        border: dark ? const Color(0xFF10B981).withOpacity(0.6) : const Color(0xFF10B981).withOpacity(0.5),
+        border: dark
+            ? const Color(0xFF10B981).withOpacity(0.6)
+            : const Color(0xFF10B981).withOpacity(0.5),
         text: dark ? const Color(0xFFF0F6FC) : const Color(0xFF0F172A),
         muted: dark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
         glow: const Color(0xFF10B981).withOpacity(0.3),
         gradient: dark
             ? LinearGradient(
-                colors: [const Color(0xFF10B981).withOpacity(0.05), const Color(0xFF161B22)],
+                colors: [
+                  const Color(0xFF10B981).withOpacity(0.05),
+                  const Color(0xFF161B22),
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               )
             : LinearGradient(
-                colors: [const Color(0xFF10B981).withOpacity(0.05), Colors.white],
+                colors: [
+                  const Color(0xFF10B981).withOpacity(0.05),
+                  Colors.white,
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
