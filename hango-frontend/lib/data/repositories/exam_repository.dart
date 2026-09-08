@@ -161,7 +161,7 @@ class ExamRepository {
   /// which one gets served is randomized and can change as Course Managers
   /// (un)flag exams over time). Also reports whether one is configured at all.
   Future<Map<String, dynamic>> fetchEntryExamStatus() async {
-    final uri = Uri.parse('$baseUrl/exams/entr/statusy/status');
+    final uri = Uri.parse('$baseUrl/exams/entry/status');
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
 
