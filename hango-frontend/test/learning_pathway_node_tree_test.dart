@@ -122,12 +122,48 @@ void main() {
 
     expect(find.text('⏳ Estimated: 6h'), findsOneWidget);
   });
+
+  testWidgets(
+    'InteractiveNodeTree shows both Take Mastery Quiz and Review Course Content for completed unmastered node',
+    (tester) async {
+      PathwayNode? openedCourse;
+      PathwayNode? openedQuiz;
+
+      final completedNode = node(
+        step: 2,
+        courseId: 25,
+        title: 'Cloze Test Strategies',
+        status: NodeStatus.completed,
+        progress: 100,
+      );
+
+      await tester.pumpWidget(
+        treeHarness(
+          nodes: [completedNode],
+          onNodeTap: (_) {},
+          onStartLearningTap: (n) => openedCourse = n,
+          onMasteryTap: (n) => openedQuiz = n,
+        ),
+      );
+
+      expect(find.text('Take Mastery Quiz'), findsOneWidget);
+      expect(find.text('Review Course Content'), findsOneWidget);
+
+      await tester.tap(find.text('Review Course Content'));
+      expect(openedCourse?.courseId, 25);
+
+      await tester.tap(find.text('Take Mastery Quiz'));
+      expect(openedQuiz?.courseId, 25);
+    },
+  );
 }
 
 Widget treeHarness({
   required List<PathwayNode> nodes,
   required ValueChanged<PathwayNode> onNodeTap,
   PathwayNode? selectedNode,
+  ValueChanged<PathwayNode>? onStartLearningTap,
+  ValueChanged<PathwayNode>? onMasteryTap,
 }) {
   return MaterialApp(
     home: Scaffold(
@@ -138,6 +174,8 @@ Widget treeHarness({
           nodes: nodes,
           selectedNode: selectedNode,
           onNodeTap: onNodeTap,
+          onStartLearningTap: onStartLearningTap,
+          onMasteryTap: onMasteryTap,
         ),
       ),
     ),

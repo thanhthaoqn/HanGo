@@ -280,15 +280,23 @@ class _NodeCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          Text(
-            node.courseTitle,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              height: 1.35,
-              color: palette.text,
+          InkWell(
+            onTap: (node.courseId > 0 &&
+                    node.status != NodeStatus.locked &&
+                    onStartLearningTap != null)
+                ? onStartLearningTap
+                : null,
+            borderRadius: BorderRadius.circular(6),
+            child: Text(
+              node.courseTitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                height: 1.35,
+                color: palette.text,
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -583,6 +591,35 @@ class _NodeCard extends StatelessWidget {
               ),
             ],
           ],
+          if (!isSkipped &&
+              (node.isReviewDue ||
+                  (node.status == NodeStatus.completed && !node.isMastered)) &&
+              node.courseId > 0 &&
+              onStartLearningTap != null) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onStartLearningTap,
+                icon: const Icon(Icons.menu_book_rounded, size: 18),
+                label: const Text('Review Course Content'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: isDarkMode ? Colors.white70 : Colors.black87,
+                  side: BorderSide(
+                    color: isDarkMode ? Colors.white24 : Colors.black12,
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  textStyle: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+          ],
           if (node.status == NodeStatus.inProgress &&
               node.courseId > 0 &&
               onFastTrackTap != null &&
@@ -851,12 +888,6 @@ class _ScheduleChip extends StatelessWidget {
   final bool isDarkMode;
 
   const _ScheduleChip({required this.node, required this.isDarkMode});
-
-  String _formatDate(DateTime d) {
-    final day = d.day.toString().padLeft(2, '0');
-    final month = d.month.toString().padLeft(2, '0');
-    return '$day/$month';
-  }
 
   @override
   Widget build(BuildContext context) {
