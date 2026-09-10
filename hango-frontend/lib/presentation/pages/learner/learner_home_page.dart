@@ -592,12 +592,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
 
         if (status == 'VERIFIED') {
           if (mounted) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const TrainerDashboardPage(),
-              ),
-            );
+            context.go(AppRoutes.trainer);
           }
         } else {
           if (mounted) {
@@ -885,12 +880,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
               title: const Text('Exams'),
               onTap: () {
                 Navigator.pop(context); // close drawer
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ListExamsPage(),
-                  ),
-                );
+                context.go(AppRoutes.exams);
               },
             ),
           ListTile(
@@ -898,12 +888,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
             title: const Text('Courses'),
             onTap: () {
               Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ListCoursesPage(),
-                ),
-              );
+              context.go(AppRoutes.courses);
             },
           ),
           ListTile(
@@ -911,12 +896,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
             title: const Text('Learning Pathway'),
             onTap: () {
               Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const LearningPathwayPage(),
-                ),
-              );
+              context.go(AppRoutes.pathway);
             },
           ),
           ListTile(
@@ -924,12 +904,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
             title: const Text('Purchase History'),
             onTap: () {
               Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const MyInformationPage(initialTab: 2),
-                ),
-              );
+              context.go('${AppRoutes.profile}?tab=2');
             },
           ),
           const Divider(),
@@ -1190,12 +1165,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                       // Orange filled button
                       ElevatedButton(
                         onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ListCoursesPage(),
-                            ),
-                          );
+                          context.go(AppRoutes.courses);
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFF05A22),
@@ -1231,12 +1201,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                       if (_canAttemptExam)
                         OutlinedButton(
                           onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const ListExamsPage(),
-                              ),
-                            );
+                            context.go(AppRoutes.exams);
                           },
                           style: OutlinedButton.styleFrom(
                             foregroundColor: Colors.white,
@@ -1787,12 +1752,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
             if (isDesktop)
               OutlinedButton.icon(
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ListCoursesPage(),
-                    ),
-                  );
+                  context.go(AppRoutes.courses);
                 },
                 icon: const Icon(
                   Icons.grid_view_rounded,
@@ -1905,12 +1865,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
               const SizedBox(width: 12),
               GestureDetector(
                 onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ListCoursesPage(),
-                    ),
-                  );
+                  context.go(AppRoutes.courses);
                 },
                 child: Row(
                   children: [
@@ -2420,12 +2375,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
               if (isDesktop)
                 OutlinedButton.icon(
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ListExamsPage(),
-                      ),
-                    );
+                    context.go(AppRoutes.exams);
                   },
                   icon: const Icon(
                     Icons.assignment_outlined,
@@ -2525,12 +2475,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                     const SizedBox(width: 12),
                     GestureDetector(
                       onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const ListExamsPage(),
-                          ),
-                        );
+                        context.go(AppRoutes.exams);
                       },
                       child: Row(
                         children: [
@@ -3158,10 +3103,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
     final isVi = LanguageManager.isVi;
     return ElevatedButton(
       onPressed: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const ListCoursesPage()),
-        );
+        context.go(AppRoutes.courses);
       },
       style: ElevatedButton.styleFrom(
         backgroundColor: const Color(0xFFF05A22),

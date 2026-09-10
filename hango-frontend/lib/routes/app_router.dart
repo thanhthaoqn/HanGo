@@ -145,8 +145,11 @@ class AppRouter {
               routes: [
                 GoRoute(
                   path: AppRoutes.profile,
-                  builder: (context, state) =>
-                      const MyInformationPage(isEmbedded: true),
+                  builder: (context, state) {
+                    final tabStr = state.uri.queryParameters['tab'];
+                    final tab = int.tryParse(tabStr ?? '') ?? 0;
+                    return MyInformationPage(isEmbedded: true, initialTab: tab);
+                  },
                 ),
               ],
             ),

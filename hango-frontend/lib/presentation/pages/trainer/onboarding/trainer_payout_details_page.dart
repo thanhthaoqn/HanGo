@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../routes/app_routes.dart';
 import 'package:flutter/services.dart';
 import '../../../../data/services/trainer_onboarding_service.dart';
 import '../../../../utils/toast_helper.dart';
@@ -125,11 +127,7 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
             : 'Payout details saved successfully! Welcome to your Trainer Dashboard.',
       );
 
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const TrainerShellPage()),
-        (route) => false,
-      );
+      context.go(AppRoutes.trainer);
     } else {
       ToastHelper.showError(
         context,

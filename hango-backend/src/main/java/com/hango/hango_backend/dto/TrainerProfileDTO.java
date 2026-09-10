@@ -35,8 +35,6 @@ public class TrainerProfileDTO {
     private String bankName;
     private String bankAccount;
     private String bankAccountName;
-    private String taxCode;
-    private String citizenId;
 
     // status & agreement
     private Boolean agreementSigned;

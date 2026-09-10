@@ -45,10 +45,8 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
   final _addressController = TextEditingController();
   final _phoneNumberController = TextEditingController();
   final _bioController = TextEditingController();
-  final _workplaceController = TextEditingController();
   final _bankAccountController = TextEditingController();
   final _bankAccountNameController = TextEditingController();
-  final _citizenIdController = TextEditingController();
 
   String _userEmail = '';
   String? _gender;
@@ -97,10 +95,8 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
     _addressController.dispose();
     _phoneNumberController.dispose();
     _bioController.dispose();
-    _workplaceController.dispose();
     _bankAccountController.dispose();
     _bankAccountNameController.dispose();
-    _citizenIdController.dispose();
     super.dispose();
   }
 
@@ -139,7 +135,6 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
         _userEmail = p['email'] ?? '';
         _phoneNumberController.text = p['phoneNumber'] ?? '';
         _bioController.text = p['bio'] ?? '';
-        _workplaceController.text = p['workplace'] ?? '';
         _avatarUrl = p['avatarUrl'] ?? avatarUrl;
         _gender = (p['gender'] == 'MALE' || p['gender'] == 'FEMALE')
             ? p['gender']
@@ -150,7 +145,6 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
             : null;
         _bankAccountController.text = p['bankAccount'] ?? '';
         _bankAccountNameController.text = p['bankAccountName'] ?? '';
-        _citizenIdController.text = p['citizenId'] ?? '';
 
         _certificates = decodeTrainerDocuments(
           certificates: p['certificates'],
@@ -355,7 +349,6 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
     payload['fullName'] = _fullNameController.text.trim();
     payload['phoneNumber'] = _phoneNumberController.text.trim();
     payload['bio'] = _bioController.text.trim();
-    payload['workplace'] = _workplaceController.text.trim();
     payload['gender'] = _gender;
     payload['avatarUrl'] = _avatarUrl ?? '';
     payload['username'] = _usernameController.text.trim();
@@ -372,7 +365,6 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
         .trim()
         .toUpperCase();
     payload.addAll(buildTrainerDocumentPayload(_certificates));
-    payload['citizenId'] = _citizenIdController.text.trim();
 
     debugPrint('[TrainerProfile] Saving draft payload: $payload');
     final result = await _onboardingService.saveProfileDraft(payload);

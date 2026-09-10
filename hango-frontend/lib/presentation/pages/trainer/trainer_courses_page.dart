@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
 import '../login_page.dart';
 import 'trainer_dashboard_page.dart';
+import 'trainer_shell_page.dart';
 
 import 'edit_course_page.dart';
 import '../course/course_detail_page.dart';
@@ -809,19 +810,29 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
           PopupMenuButton<String>(
             onSelected: (val) {
               if (val == 'dashboard') {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const TrainerDashboardPage(),
-                  ),
-                );
+                final shell = TrainerShellPage.of(context);
+                if (shell != null) {
+                  shell.selectTab(0);
+                } else {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const TrainerDashboardPage(),
+                    ),
+                  );
+                }
               } else if (val == 'profile') {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const TrainerProfilePage(),
-                  ),
-                );
+                final shell = TrainerShellPage.of(context);
+                if (shell != null) {
+                  shell.selectTab(5);
+                } else {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const TrainerProfilePage(),
+                    ),
+                  );
+                }
               } else if (val == 'logout') {
                 _handleLogout();
               }

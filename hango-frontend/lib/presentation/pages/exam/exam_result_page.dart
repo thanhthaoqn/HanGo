@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../routes/app_routes.dart';
 import '../../../domain/entities/exam.dart';
 import '../../../data/repositories/course_repository.dart';
 import '../../../data/repositories/exam_repository.dart';
@@ -592,12 +593,7 @@ class _ExamResultPageState extends State<ExamResultPage> {
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ListExamsPage(),
-                      ),
-                    );
+                    context.go(AppRoutes.exams);
                   },
                   icon: const Icon(Icons.arrow_back, size: 18),
                   label: const Text('Back to Exams List'),

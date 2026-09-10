@@ -830,8 +830,6 @@ class TrainerOnboardingServiceTest {
         p.setBankName("Example Bank");
         p.setBankAccount("1023928129");
         p.setBankAccountName("NGUYEN VAN A");
-        p.setTaxCode("1234567890");
-        p.setCitizenId("001234567890");
         when(trainerProfileRepository.findAllWithUser()).thenReturn(List.of(p));
 
         TrainerProfileDTO result = service.getTrainerProfilesForAdmin(null, "ALL").get(0);
@@ -839,8 +837,6 @@ class TrainerOnboardingServiceTest {
         assertNull(result.getBankName());
         assertNull(result.getBankAccount());
         assertNull(result.getBankAccountName());
-        assertNull(result.getTaxCode());
-        assertNull(result.getCitizenId());
     }
 
     @Test

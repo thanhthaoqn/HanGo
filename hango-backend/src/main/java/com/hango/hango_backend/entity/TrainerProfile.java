@@ -51,12 +51,6 @@ public class TrainerProfile {
     @Column(name = "bank_account_name", length = 100)
     private String bankAccountName;
 
-    @Column(name = "tax_code", length = 50)
-    private String taxCode;
-
-    @Column(name = "citizen_id", length = 50)
-    private String citizenId;
-
     @Column(name = "agreement_signed")
     @Builder.Default
     private Boolean agreementSigned = false;

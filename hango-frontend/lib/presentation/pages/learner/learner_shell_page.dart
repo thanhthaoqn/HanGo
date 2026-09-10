@@ -121,21 +121,28 @@ class LearnerShellPageState extends State<LearnerShellPage> {
         );
       }
 
-      if (courseId != null && mounted) {
-        try {
-          context.push('/courses/$courseId');
-        } catch (_) {
-          Navigator.of(context, rootNavigator: true).push(
-            MaterialPageRoute(
-              builder: (context) => CourseDetailPage(courseId: courseId!),
-            ),
-          );
-        }
-      } else if (mounted) {
+      if (mounted) {
         setState(() {
-          _currentIndex = 6; // Return directly to Shopping Cart tab
           _isRedirecting = false;
         });
+      }
+
+      if (courseId != null && mounted) {
+        try {
+          context.go('/courses/$courseId');
+        } catch (_) {
+          try {
+            context.push('/courses/$courseId');
+          } catch (_) {
+            Navigator.of(context, rootNavigator: true).push(
+              MaterialPageRoute(
+                builder: (context) => CourseDetailPage(courseId: courseId!),
+              ),
+            );
+          }
+        }
+      } else if (mounted) {
+        selectTab(6); // Return directly to Shopping Cart tab
       }
     });
   }

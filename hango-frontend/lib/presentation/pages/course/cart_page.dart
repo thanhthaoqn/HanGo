@@ -445,12 +445,7 @@ class _CartPageState extends State<CartPage> {
                 ),
               ),
               onPressed: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ListCoursesPage(),
-                  ),
-                );
+                context.go(AppRoutes.courses);
               },
               child: Text(
                 isVi ? 'Khám phá khóa học ngay' : 'Explore Courses Now',

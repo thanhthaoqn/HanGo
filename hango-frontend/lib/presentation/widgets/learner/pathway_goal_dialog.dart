@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../routes/app_routes.dart';
 
 import '../../../data/repositories/exam_repository.dart';
 import '../../../data/repositories/pathway_repository.dart';
-import '../../pages/learner/learning_pathway_page.dart';
 
 class PathwayGoalDialog extends StatefulWidget {
   final String weakestSkill;
@@ -277,10 +278,7 @@ class _PathwayGoalDialogState extends State<PathwayGoalDialog> {
       if (!mounted) return;
       Navigator.pop(context);
       // Chuyen thang sang man hinh pathway vua duoc tao
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LearningPathwayPage()),
-      );
+      context.go(AppRoutes.pathway);
     } catch (e) {
       if (!mounted) return;
       setState(() {

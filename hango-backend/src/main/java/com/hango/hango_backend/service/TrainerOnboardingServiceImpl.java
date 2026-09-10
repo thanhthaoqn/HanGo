@@ -211,8 +211,6 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
         if (dto.getBankName() != null) profile.setBankName(dto.getBankName().trim());
         if (dto.getBankAccount() != null) profile.setBankAccount(dto.getBankAccount().trim());
         if (dto.getBankAccountName() != null) profile.setBankAccountName(dto.getBankAccountName().trim().toUpperCase(Locale.ROOT));
-        if (dto.getTaxCode() != null) profile.setTaxCode(dto.getTaxCode().trim());
-        if (dto.getCitizenId() != null) profile.setCitizenId(dto.getCitizenId().trim());
         User u = profile.getUser() != null ? profile.getUser() : user;
         if (u != null) {
             if (dto.getPhoneNumber() != null) u.setPhoneNumber(dto.getPhoneNumber().trim());
@@ -524,8 +522,6 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
                 .bankName(p.getBankName())
                 .bankAccount(p.getBankAccount())
                 .bankAccountName(p.getBankAccountName())
-                .taxCode(p.getTaxCode())
-                .citizenId(p.getCitizenId())
                 .agreementSigned(p.getAgreementSigned())
                 .agreementVersion(p.getAgreementVersion())
                 .agreementAcceptedAt(p.getAgreementAcceptedAt())
@@ -551,8 +547,6 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
         dto.setBankName(null);
         dto.setBankAccount(null);
         dto.setBankAccountName(null);
-        dto.setTaxCode(null);
-        dto.setCitizenId(null);
         return dto;
     }
 
@@ -818,8 +812,6 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
         requireMaxLength(dto.getBankName(), 100, "Bank name");
         requireMaxLength(dto.getBankAccount(), 50, "Bank account");
         requireMaxLength(dto.getBankAccountName(), 100, "Bank account owner name");
-        requireMaxLength(dto.getTaxCode(), 50, "Tax code");
-        requireMaxLength(dto.getCitizenId(), 50, "Citizen ID");
         requireMaxLength(dto.getUsername(), 100, "Username");
         requireMaxLength(dto.getAddress(), 500, "Address");
         requireMaxLength(dto.getAvatarUrl(), 2048, "Avatar URL");
@@ -842,16 +834,6 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
         if (accountName != null && !accountName.toUpperCase(Locale.ROOT).matches("[A-Z ]{2,100}")) {
             throw new ApiException("Bank account owner name must contain uppercase unaccented letters only.",
                     HttpStatus.BAD_REQUEST);
-        }
-        String taxCode = trimToNull(dto.getTaxCode());
-        if (taxCode != null
-                && (!taxCode.matches("\\d{10}(\\d{3})?") || isDummyFinancialNumber(taxCode))) {
-            throw new ApiException("Tax code must contain 10 or 13 digits.", HttpStatus.BAD_REQUEST);
-        }
-        String citizenId = trimToNull(dto.getCitizenId());
-        if (citizenId != null
-                && (!citizenId.matches("\\d{12}") || isDummyFinancialNumber(citizenId))) {
-            throw new ApiException("Citizen ID must contain exactly 12 digits.", HttpStatus.BAD_REQUEST);
         }
         if (dto.getCertificates() != null && dto.getCertificates().size() > MAX_DOCUMENTS) {
             throw new ApiException("A trainer profile can contain at most 10 credential documents.",

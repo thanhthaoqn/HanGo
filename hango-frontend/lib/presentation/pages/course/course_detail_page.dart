@@ -9,11 +9,9 @@ import '../../../data/services/auth_service.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/shared_footer.dart';
 import '../learner/learner_shell_page.dart';
-import '../login_page.dart';
 import 'review_tab.dart';
 import 'lesson_detail_page.dart';
 import 'course_completion_page.dart';
-import 'cart_page.dart';
 import '../../../utils/cart_manager.dart';
 import '../../../utils/language_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -1947,12 +1945,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                 child: OutlinedButton(
                   onPressed: _isInCart
                       ? () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const CartPage(),
-                            ),
-                          );
+                          context.go(AppRoutes.cart);
                         }
                       : _addToCart,
                   style: OutlinedButton.styleFrom(

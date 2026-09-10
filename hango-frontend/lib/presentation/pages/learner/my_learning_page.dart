@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../routes/app_routes.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/shared_footer.dart';
 import '../../../data/repositories/course_repository.dart';
 import '../../../data/repositories/exam_repository.dart';
 import '../../../domain/model/course.dart';
-import 'learning_pathway_page.dart';
 import '../course/course_detail_page.dart';
 import '../course/lesson_detail_page.dart';
 import '../course/course_completion_page.dart';
@@ -1344,12 +1344,7 @@ class _MyLearningPageState extends State<MyLearningPage> {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const LearningPathwayPage(),
-                  ),
-                );
+                context.go(AppRoutes.pathway);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF28B79B),

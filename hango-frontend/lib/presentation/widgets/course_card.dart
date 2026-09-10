@@ -7,7 +7,6 @@ import '../../../utils/language_manager.dart';
 import '../../../utils/toast_helper.dart';
 import '../../../utils/cart_manager.dart';
 import '../../../utils/permission_utils.dart';
-import '../../../utils/wishlist_manager.dart';
 import '../pages/course/course_detail_page.dart';
 
 class CourseCard extends StatefulWidget {
@@ -46,7 +45,6 @@ class _CourseCardState extends State<CourseCard> {
 
   Future<void> _loadStates() async {
     final prefs = await SharedPreferences.getInstance();
-    final wishlist = prefs.getStringList('wishlisted_course_ids') ?? [];
     final cart = await CartManager.getCartIds();
     final enrolledLocal = prefs.getBool('enrolled_course_id_${widget.course.id}') ?? false;
     final roles = prefs.getStringList('user_roles') ?? [];

@@ -3,7 +3,8 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../../data/repositories/pathway_repository.dart';
 import '../../../domain/entities/learning_pathway.dart';
 import '../../../utils/language_manager.dart';
-import '../../pages/exam/list_exams_page.dart';
+import 'package:go_router/go_router.dart';
+import '../../../routes/app_routes.dart';
 
 class AIMentorSidePanel extends StatefulWidget {
   final LearningPathway pathway;
@@ -728,12 +729,7 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
           width: double.infinity,
           child: ElevatedButton.icon(
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ListExamsPage(),
-                ),
-              );
+              context.go(AppRoutes.exams);
             },
             icon: const Icon(Icons.rocket_launch_rounded),
             label: Text(

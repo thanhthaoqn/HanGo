@@ -296,11 +296,7 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
           if (widget.showLogo)
             InkWell(
               onTap: () {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LearnerShellPage()),
-                  (route) => false,
-                );
+                context.go(AppRoutes.home);
               },
               child: Row(
                 mainAxisSize: MainAxisSize.min,

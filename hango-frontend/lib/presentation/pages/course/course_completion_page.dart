@@ -1,14 +1,13 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../routes/app_routes.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/repositories/course_repository.dart';
 import '../../../domain/model/course_detail.dart';
 import '../../../utils/language_manager.dart';
 import '../../../utils/toast_helper.dart';
-import '../learner/learning_pathway_page.dart';
-import '../learner/my_learning_page.dart';
 import 'course_detail_page.dart';
 
 const String _hangoLogoUrl =
@@ -217,10 +216,7 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
             icon: const Icon(Icons.close_rounded, color: Color(0xFF1E293B)),
             tooltip: isVi ? 'Đóng' : 'Close',
             onPressed: () {
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (context) => const MyLearningPage()),
-                (route) => route.isFirst,
-              );
+              context.go(AppRoutes.myLearning);
             },
           ),
         ),
@@ -1400,11 +1396,7 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
                   cursor: SystemMouseCursors.click,
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const LearningPathwayPage(),
-                        ),
-                      );
+                      context.go(AppRoutes.pathway);
                     },
                     icon: const Icon(
                       Icons.auto_awesome_rounded,
@@ -1437,12 +1429,7 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
                   cursor: SystemMouseCursors.click,
                   child: OutlinedButton.icon(
                     onPressed: () {
-                      Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(
-                          builder: (context) => const MyLearningPage(),
-                        ),
-                        (route) => route.isFirst,
-                      );
+                      context.go(AppRoutes.myLearning);
                     },
                     icon: const Icon(Icons.dashboard_rounded, size: 18),
                     label: Text(

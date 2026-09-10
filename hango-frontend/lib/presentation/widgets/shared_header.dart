@@ -3,19 +3,10 @@ import 'package:go_router/go_router.dart';
 import '../../routes/app_routes.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
-import '../pages/login_page.dart';
-import '../pages/register_page.dart';
-import '../pages/exam/list_exams_page.dart';
-import '../pages/course/list_courses_page.dart';
-import '../pages/course/cart_page.dart';
 import '../pages/course/course_detail_page.dart';
 import '../pages/learner/learner_shell_page.dart';
-import '../pages/learner/learning_pathway_page.dart';
-import '../pages/learner/my_information_page.dart';
 import '../pages/course_manager/course_manager_my_information_page.dart';
 import '../pages/course_manager/course_manager_shell_page.dart';
-import '../pages/learner/my_learning_page.dart';
-import '../pages/admin/admin_dashboard_page.dart';
 
 import '../pages/trainer/trainer_shell_page.dart';
 import '../../../domain/model/course.dart';
@@ -367,7 +358,7 @@ class _SharedHeaderState extends State<SharedHeader> {
                 InkWell(
                   onTap: () {
                     _hideCartOverlay();
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const CartPage()));
+                    _navigateToLearnerTab(6);
                   },
                   child: Text(
                     isVi ? 'Xem giỏ hàng' : 'View cart',
@@ -427,7 +418,7 @@ class _SharedHeaderState extends State<SharedHeader> {
                   ),
                   onPressed: () {
                     _hideCartOverlay();
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const CartPage()));
+                    _navigateToLearnerTab(6);
                   },
                   child: Text(
                     isVi ? 'Thanh toán' : 'Checkout',
@@ -746,13 +737,27 @@ class _SharedHeaderState extends State<SharedHeader> {
     );
   }
 
-  // Nav links/logo/cart in this header always used to assume a Learner
-  // destination, wiping the whole Navigator stack via pushAndRemoveUntil when
-  // no LearnerShellPage ancestor was found. That's wrong whenever this header
-  // is reached from a Trainer/Course Manager screen (e.g. viewing a course's
-  // detail page) -- it force-switched them to the learner shell and left the
-  // browser Back button with nothing to return to. Prefer popping back to
-  // whichever shell is actually hosting this page.
+  String _getLearnerRoute(int tabIndex, {int subTab = 0}) {
+    switch (tabIndex) {
+      case 0:
+        return AppRoutes.home;
+      case 1:
+        return AppRoutes.courses;
+      case 2:
+        return AppRoutes.exams;
+      case 3:
+        return AppRoutes.pathway;
+      case 4:
+        return AppRoutes.myLearning;
+      case 5:
+        return subTab > 0 ? '${AppRoutes.profile}?tab=$subTab' : AppRoutes.profile;
+      case 6:
+        return AppRoutes.cart;
+      default:
+        return AppRoutes.home;
+    }
+  }
+
   void _navigateToLearnerTab(int tabIndex, {int subTab = 0}) {
     final learnerShell = LearnerShellPage.of(context);
     if (learnerShell != null) {
@@ -780,17 +785,20 @@ class _SharedHeaderState extends State<SharedHeader> {
       }
       return;
     }
-    if (Navigator.canPop(context)) {
-      Navigator.pop(context);
-      return;
+    // When outside any shell (e.g. on CourseDetailPage, LessonDetailPage, TakeExamPage),
+    // navigate via GoRouter so the active route and browser address bar update cleanly.
+    final targetRoute = _getLearnerRoute(tabIndex, subTab: subTab);
+    try {
+      context.go(targetRoute);
+    } catch (_) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (context) => LearnerShellPage(initialIndex: tabIndex, initialSubTab: subTab),
+        ),
+        (route) => false,
+      );
     }
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(
-        builder: (context) => LearnerShellPage(initialIndex: tabIndex, initialSubTab: subTab),
-      ),
-      (route) => false,
-    );
   }
 
   @override

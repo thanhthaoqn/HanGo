@@ -326,7 +326,12 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
     return PopupMenuButton<String>(
       onSelected: (val) {
         if (val == 'profile') {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerProfilePage()));
+          final shell = TrainerShellPage.of(context);
+          if (shell != null) {
+            shell.selectTab(5);
+          } else {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerProfilePage()));
+          }
         } else if (val == 'logout') {
           _handleLogout();
         }
@@ -1034,7 +1039,14 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
           children: [
             const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Your Top Courses', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), fontFamily: 'Outfit')), SizedBox(height: 4), Text('Highest enrollment and learner activity', style: TextStyle(fontSize: 14, color: Color(0xFF64748B), fontFamily: 'Outfit'))]),
             InkWell(
-              onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerCoursesPage())),
+              onTap: () {
+                final shell = TrainerShellPage.of(context);
+                if (shell != null) {
+                  shell.selectTab(1);
+                } else {
+                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerCoursesPage()));
+                }
+              },
               borderRadius: BorderRadius.circular(12),
               child: const Padding(padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8), child: Text('View all courses →', style: TextStyle(color: Color(0xFF20B486), fontWeight: FontWeight.w700, fontSize: 14, fontFamily: 'Outfit'))),
             ),
@@ -1073,7 +1085,14 @@ class _TrainerDashboardPageState extends State<TrainerDashboardPage> {
     return _HoverCard(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(20),
-      onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerCoursesPage())),
+      onTap: () {
+        final shell = TrainerShellPage.of(context);
+        if (shell != null) {
+          shell.selectTab(1);
+        } else {
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const TrainerCoursesPage()));
+        }
+      },
       child: Row(
         children: [
           Container(
