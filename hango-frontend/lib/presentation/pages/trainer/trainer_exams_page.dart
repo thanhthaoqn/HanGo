@@ -365,7 +365,6 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
         _trainerInitials = initials;
         _trainerAvatarUrl = avatarUrl;
         _currentUserId = prefs.getInt('user_id');
-
         _isCourseManager = PermissionUtils.canManageExamsAsCourseManager(roles);
       });
     }

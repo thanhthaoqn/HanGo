@@ -45,7 +45,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private String getBaseCode(String code, Long id) {
-        if (code == null || code.isBlank()) return String.valueOf(id);
+        if (code == null || code.isBlank())
+            return String.valueOf(id);
         return code.replaceAll("-V\\d+$", "").toUpperCase();
     }
 
@@ -71,7 +72,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
         List<TrainerCourseDetailProjection> baseProjections = courseRepository.findTrainerCoursesDetailBase(trainerId,
                 "ALL", null);
-        
+
         Map<String, List<TrainerCourseDetailProjection>> groupedByCode = baseProjections.stream()
                 .collect(Collectors.groupingBy(p -> getBaseCode(p.getCode(), p.getId())));
 
@@ -82,10 +83,10 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         List<Long> allFamilyIds = baseProjections.stream()
                 .map(p -> p.getId())
                 .collect(Collectors.toList());
-                
+
         Map<Long, Double> sumMap = new java.util.HashMap<>();
         Map<Long, Long> countMap = new java.util.HashMap<>();
-        
+
         if (!allFamilyIds.isEmpty()) {
             List<Object[]> ratingStats = courseRatingRepository.getRatingStatsByCourseIds(allFamilyIds);
             for (Object[] stat : ratingStats) {
@@ -105,20 +106,25 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                     TrainerCourseDetailProjection latest = group.stream()
                             .filter(p -> "PUBLISHED".equalsIgnoreCase(p.getStatus()))
                             .max((p1, p2) -> {
-                                if (p1.getCreatedAt() == null) return -1;
-                                if (p2.getCreatedAt() == null) return 1;
+                                if (p1.getCreatedAt() == null)
+                                    return -1;
+                                if (p2.getCreatedAt() == null)
+                                    return 1;
                                 return p1.getCreatedAt().compareTo(p2.getCreatedAt());
                             })
                             // If no PUBLISHED version, fallback to the latest version of ANY status
                             .orElseGet(() -> group.stream()
                                     .max((p1, p2) -> {
-                                        if (p1.getCreatedAt() == null) return -1;
-                                        if (p2.getCreatedAt() == null) return 1;
+                                        if (p1.getCreatedAt() == null)
+                                            return -1;
+                                        if (p2.getCreatedAt() == null)
+                                            return 1;
                                         return p1.getCreatedAt().compareTo(p2.getCreatedAt());
-                                    }).orElse(group.get(0))
-                            );
-                            
-                    List<Long> familyIds = group.stream().map(com.hango.hango_backend.repository.TrainerCourseDetailProjection::getId).collect(Collectors.toList());
+                                    }).orElse(group.get(0)));
+
+                    List<Long> familyIds = group.stream()
+                            .map(com.hango.hango_backend.repository.TrainerCourseDetailProjection::getId)
+                            .collect(Collectors.toList());
                     double totalSum = 0;
                     long totalCount = 0;
                     for (Long fid : familyIds) {
@@ -128,11 +134,12 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                         }
                     }
                     Double avgRating = totalCount > 0 ? totalSum / totalCount : 0.0;
-                    
+
                     return TrainerCourseDTO.builder()
                             .id(latest.getId())
                             .title(latest.getTitle())
-                            .learnersCount(group.stream().mapToLong(p -> p.getLearnersCount() != null ? p.getLearnersCount() : 0L).sum())
+                            .learnersCount(group.stream()
+                                    .mapToLong(p -> p.getLearnersCount() != null ? p.getLearnersCount() : 0L).sum())
                             .lessonsCount(latest.getLessonsCount() != null ? latest.getLessonsCount() : 0L)
                             .thumbnailUrl(latest.getThumbnailUrl())
                             .versionsCount((long) group.size())
@@ -142,9 +149,12 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 })
                 .sorted((c1, c2) -> {
                     int learnerCompare = Long.compare(c2.getLearnersCount(), c1.getLearnersCount());
-                    if (learnerCompare != 0) return learnerCompare;
-                    int ratingCompare = Double.compare(c2.getRating() != null ? c2.getRating() : 0.0, c1.getRating() != null ? c1.getRating() : 0.0);
-                    if (ratingCompare != 0) return ratingCompare;
+                    if (learnerCompare != 0)
+                        return learnerCompare;
+                    int ratingCompare = Double.compare(c2.getRating() != null ? c2.getRating() : 0.0,
+                            c1.getRating() != null ? c1.getRating() : 0.0);
+                    if (ratingCompare != 0)
+                        return ratingCompare;
                     return c2.getId().compareTo(c1.getId());
                 })
                 .collect(Collectors.toList());
@@ -253,7 +263,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         java.time.LocalDateTime endDate = startOfWeek.plusDays(7).atStartOfDay();
 
         List<Object[]> rawRevenues = paymentRepository.getRevenueByDay(trainerId, startDate, endDate);
-        
+
         List<com.hango.hango_backend.dto.DailyRevenueDTO> weeklyRevenues = new ArrayList<>();
         java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd");
         java.time.format.DateTimeFormatter dayFormatter = java.time.format.DateTimeFormatter.ofPattern("EEE");
@@ -270,7 +280,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         for (Object[] row : rawRevenues) {
             String dateStr = row[0].toString();
             java.math.BigDecimal rev = new java.math.BigDecimal(row[1].toString());
-            
+
             for (com.hango.hango_backend.dto.DailyRevenueDTO dto : weeklyRevenues) {
                 if (dto.getDate().equals(dateStr)) {
                     dto.setRevenue(rev);
@@ -520,12 +530,14 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
         com.hango.hango_backend.entity.SystemParameter difficulty = systemParameterRepository
                 .findByParamTypeAndParamKey("ACADEMIC_LEVEL", diffKey)
-                .orElseThrow(() -> new ApiException("Academic Level not found: " + request.getDifficultyKey(), HttpStatus.BAD_REQUEST));
+                .orElseThrow(() -> new ApiException("Academic Level not found: " + request.getDifficultyKey(),
+                        HttpStatus.BAD_REQUEST));
 
         // Auto-generate a unique course code to avoid DB unique constraint violations
         String generatedCode = generateUniqueCourseCode();
 
-        com.hango.hango_backend.entity.TrainerProfile profile = trainerProfileRepository.findById(user.getId()).orElse(null);
+        com.hango.hango_backend.entity.TrainerProfile profile = trainerProfileRepository.findById(user.getId())
+                .orElse(null);
         int durationMinutes = request.getEstimatedDuration() != null ? request.getEstimatedDuration() : 0;
         java.math.BigDecimal suggestedPrice = calculateSuggestedPrice(profile, difficulty, 0, durationMinutes);
         // Trainer tu chon gia ban that su qua request.getPrice(); neu vi ly do
@@ -598,7 +610,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             sessionDTOs = new java.util.ArrayList<>();
         }
 
-        com.hango.hango_backend.entity.TrainerProfile profile = trainerProfileRepository.findById(course.getCreator().getId()).orElse(null);
+        com.hango.hango_backend.entity.TrainerProfile profile = trainerProfileRepository
+                .findById(course.getCreator().getId()).orElse(null);
         int lessonCount = 0;
         int durationMinutes = 0;
         if (sessionDTOs != null) {
@@ -615,7 +628,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 }
             }
         }
-        java.math.BigDecimal suggestedPrice = calculateSuggestedPrice(profile, difficulty, lessonCount, durationMinutes);
+        java.math.BigDecimal suggestedPrice = calculateSuggestedPrice(profile, difficulty, lessonCount,
+                durationMinutes);
         // Trainer tu chon gia qua request.getPrice() (mac dinh ve gia tham
         // khao neu request khong kem gia).
         java.math.BigDecimal trainerPrice = request.getPrice() != null ? request.getPrice() : suggestedPrice;
@@ -707,9 +721,11 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         // Delete sections that were removed
         for (com.hango.hango_backend.entity.Section existingSection : existingSections) {
             if (!requestSectionIds.contains(existingSection.getId())) {
-                List<com.hango.hango_backend.entity.Lesson> lessonsToDel = lessonRepository.findBySectionIdOrderByDisplayOrderAsc(existingSection.getId());
+                List<com.hango.hango_backend.entity.Lesson> lessonsToDel = lessonRepository
+                        .findBySectionIdOrderByDisplayOrderAsc(existingSection.getId());
                 for (com.hango.hango_backend.entity.Lesson l : lessonsToDel) {
-                    if (l.getContent() != null) cloudinaryService.deleteFile(l.getContent());
+                    if (l.getContent() != null)
+                        cloudinaryService.deleteFile(l.getContent());
                 }
                 sectionRepository.delete(existingSection);
             }
@@ -745,7 +761,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
             for (com.hango.hango_backend.entity.Lesson existingLesson : existingLessons) {
                 if (!requestLessonIds.contains(existingLesson.getId())) {
-                    if (existingLesson.getContent() != null) cloudinaryService.deleteFile(existingLesson.getContent());
+                    if (existingLesson.getContent() != null)
+                        cloudinaryService.deleteFile(existingLesson.getContent());
                     lessonRepository.delete(existingLesson);
                 }
             }
@@ -756,12 +773,12 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 if (lDto.getId() != null && lDto.getId() < 1000000000000L) {
                     lesson = lessonRepository.findById(lDto.getId())
                             .orElse(new com.hango.hango_backend.entity.Lesson());
-                            
+
                     // Check if old content changed
                     String oldContent = lesson.getContent();
-                    
+
                     String newContent = lDto.getQuestionText();
-                    
+
                     if (oldContent != null && !oldContent.equals(newContent)) {
                         cloudinaryService.deleteFile(oldContent);
                     }
@@ -790,7 +807,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
                 lesson.setPdfName(lDto.getPdfName());
                 lesson.setQuestionImageUrl(lDto.getQuestionImageUrl());
-                
+
                 lesson.setEstimatedTime(lDto.getEstimatedTime());
                 lesson.setCode(lDto.getLessonCode());
                 lesson.setMediaDurationSeconds(lDto.getMediaDurationSeconds());
@@ -882,7 +899,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         }
 
         if (!"DRAFT".equalsIgnoreCase(course.getStatus()) && !"REJECTED".equalsIgnoreCase(course.getStatus())) {
-            throw new ApiException("Only draft or rejected courses can be submitted for review", HttpStatus.BAD_REQUEST);
+            throw new ApiException("Only draft or rejected courses can be submitted for review",
+                    HttpStatus.BAD_REQUEST);
         }
 
         // Neu chinh nguoi tao khoa hoc da la COURSE_MANAGER/ADMINISTRATOR thi
@@ -938,9 +956,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
         boolean isManager = user.getRoles().stream()
                 .anyMatch(r -> r.getRoleName().equalsIgnoreCase("COURSE_MANAGER")
-                        || r.getRoleName().equalsIgnoreCase("COURSE_MANAGER")
                         || r.getRoleName().equalsIgnoreCase("ADMINISTRATOR")
-                        || r.getRoleName().equalsIgnoreCase("ADMIN"));
 
         List<Object[]> exams;
         if (isManager) {
@@ -1051,11 +1067,13 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
     @Override
     @Transactional
-    public void updateTrainerExamBasicInfo(Long examId, String email, com.hango.hango_backend.dto.TrainerUpdateExamInfoRequestDTO request) {
+    public void updateTrainerExamBasicInfo(Long examId, String email,
+            com.hango.hango_backend.dto.TrainerUpdateExamInfoRequestDTO request) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
         boolean isCourseManagerOrAdmin = user.getRoles().stream()
-                .anyMatch(role -> role.getRoleName().equals("COURSE_MANAGER") || role.getRoleName().equals("ADMINISTRATOR"));
+                .anyMatch(role -> role.getRoleName().equals("COURSE_MANAGER")
+                        || role.getRoleName().equals("ADMINISTRATOR"));
 
         com.hango.hango_backend.entity.Exam exam = examRepository.findById(examId)
                 .orElseThrow(() -> new RuntimeException("Exam not found"));
@@ -1081,9 +1099,11 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
         String newStatus = exam.getStatus();
         if (!oldStatus.equals(newStatus)) {
-            examHistoryService.log(exam, ExamHistoryService.ACTION_SUBMITTED, oldStatus, newStatus, null, "Exam metadata updated, status downgraded to SUBMITTED");
+            examHistoryService.log(exam, ExamHistoryService.ACTION_SUBMITTED, oldStatus, newStatus, null,
+                    "Exam metadata updated, status downgraded to SUBMITTED");
         } else {
-            examHistoryService.log(exam, ExamHistoryService.ACTION_EDITED, oldStatus, newStatus, null, "Exam basic info updated");
+            examHistoryService.log(exam, ExamHistoryService.ACTION_EDITED, oldStatus, newStatus, null,
+                    "Exam basic info updated");
         }
     }
 
@@ -1102,7 +1122,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             User user = userRepository.findByEmail(email)
                     .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
             boolean isCourseManagerOrAdmin = user.getRoles().stream()
-                    .anyMatch(role -> role.getRoleName().equals("COURSE_MANAGER") || role.getRoleName().equals("ADMINISTRATOR"));
+                    .anyMatch(role -> role.getRoleName().equals("COURSE_MANAGER")
+                            || role.getRoleName().equals("ADMINISTRATOR"));
             if (!isCourseManagerOrAdmin) {
                 exam.setStatus("SUBMITTED");
                 exam = examRepository.save(exam);
@@ -1328,9 +1349,10 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         }
 
         // Hard delete sections which will cascade to lessons, questions, etc.
-        java.util.List<com.hango.hango_backend.entity.Section> sections = sectionRepository.findByCourseIdOrderByDisplayOrderAsc(course.getId());
+        java.util.List<com.hango.hango_backend.entity.Section> sections = sectionRepository
+                .findByCourseIdOrderByDisplayOrderAsc(course.getId());
         sectionRepository.deleteAll(sections);
-        
+
         // Hard delete the course itself
         courseRepository.delete(course);
     }
@@ -1453,7 +1475,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         java.util.List<com.hango.hango_backend.entity.Section> sections = sectionRepository
                 .findByCourseIdOrderByDisplayOrderAsc(course.getId());
         for (com.hango.hango_backend.entity.Section sec : sections) {
-            java.util.List<com.hango.hango_backend.entity.Lesson> lessons = lessonRepository.findBySectionIdOrderByDisplayOrderAsc(sec.getId());
+            java.util.List<com.hango.hango_backend.entity.Lesson> lessons = lessonRepository
+                    .findBySectionIdOrderByDisplayOrderAsc(sec.getId());
             lessonCount += lessons.size();
             for (com.hango.hango_backend.entity.Lesson l : lessons) {
                 if (l.getEstimatedTimeMinutes() != null) {
@@ -1469,7 +1492,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         // bai hoc - KHONG con dung de ghi de gia ban that su (price) Trainer da
         // tu chon nua. Nut "Refresh" o Frontend gio chi co nghia la "tinh lai gia
         // tham khao", khong con la "dat lai gia ban cua toi".
-        java.math.BigDecimal suggestedPrice = calculateSuggestedPrice(profile, course.getDifficulty(), lessonCount, durationMinutes);
+        java.math.BigDecimal suggestedPrice = calculateSuggestedPrice(profile, course.getDifficulty(), lessonCount,
+                durationMinutes);
         course.setSuggestedPrice(suggestedPrice);
         courseRepository.save(course);
     }
@@ -1486,15 +1510,18 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
     @Transactional
     public void seedMockPayments(Long trainerId) {
         // Find courses by trainer
-        List<com.hango.hango_backend.entity.Course> courses = courseRepository.findByCreatorIdAndDeletedAtIsNull(trainerId);
-        if (courses.isEmpty()) return;
+        List<com.hango.hango_backend.entity.Course> courses = courseRepository
+                .findByCreatorIdAndDeletedAtIsNull(trainerId);
+        if (courses.isEmpty())
+            return;
 
         // Find some learners
         List<User> learners = userRepository.findAll().stream()
                 .filter(u -> u.getRoles().stream().anyMatch(r -> "LEARNER".equals(r.getRoleName())))
                 .limit(10)
                 .collect(Collectors.toList());
-        if (learners.isEmpty()) learners = userRepository.findAll();
+        if (learners.isEmpty())
+            learners = userRepository.findAll();
 
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
         java.util.Random rand = new java.util.Random();
@@ -1508,7 +1535,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         for (int i = 0; i < 50; i++) {
             com.hango.hango_backend.entity.Course c = courses.get(rand.nextInt(courses.size()));
             User learner = learners.get(rand.nextInt(learners.size()));
-            
+
             java.math.BigDecimal price = c.getPrice() != null ? c.getPrice() : new java.math.BigDecimal("500000");
             java.math.BigDecimal trainerEarnings = price.multiply(splitRatio);
             java.math.BigDecimal platformFee = price.subtract(trainerEarnings);
@@ -1518,16 +1545,15 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             String txnRef = "MOCK-" + java.util.UUID.randomUUID().toString().substring(0, 8);
 
             paymentRepository.insertMockPayment(
-                price,
-                createdAt,
-                "SUCCESS",
-                c.getId(),
-                learner.getId(),
-                trainerEarnings,
-                platformFee,
-                "PENDING",
-                txnRef
-            );
+                    price,
+                    createdAt,
+                    "SUCCESS",
+                    c.getId(),
+                    learner.getId(),
+                    trainerEarnings,
+                    platformFee,
+                    "PENDING",
+                    txnRef);
         }
     }
 
