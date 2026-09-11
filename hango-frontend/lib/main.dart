@@ -13,6 +13,7 @@ import 'routes/app_router.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   usePathUrlStrategy();
+  GoRouter.optionURLReflectsImperativeAPIs = true;
 
   // Clear persistent session only on a cold run or new tab (not on F5 refresh),
   // unless the user checked "Remember me" at login -- then keep it across restarts.

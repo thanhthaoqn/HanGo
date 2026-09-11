@@ -812,7 +812,9 @@ class _SharedHeaderState extends State<SharedHeader> {
             IconButton(
               icon: const Icon(Icons.arrow_back, color: Color(0xFF1F2937)),
               onPressed: () {
-                if (Navigator.canPop(context)) {
+                if (context.canPop()) {
+                  context.pop();
+                } else if (Navigator.canPop(context)) {
                   Navigator.pop(context);
                 } else {
                   context.go(AppRoutes.courses);

@@ -301,31 +301,38 @@ class _ExamResultPageState extends State<ExamResultPage> {
     final isDesktop = size.width > 900;
     final isPassed = widget.score >= 5.0;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
-      appBar: SharedHeader(isDesktop: isDesktop, activeTab: 'Exams'),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            Center(
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 1440),
-                padding: EdgeInsets.symmetric(
-                  horizontal: isDesktop ? 24 : 20,
-                  vertical: 32,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Result title & Back Button
-                    Row(
-                      children: [
-                        if (Navigator.canPop(context))
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        context.go(AppRoutes.myLearning);
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF9FAFB),
+        appBar: SharedHeader(isDesktop: isDesktop, activeTab: 'Exams'),
+        body: SingleChildScrollView(
+          child: Column(
+            children: [
+              Center(
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 1440),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isDesktop ? 24 : 20,
+                    vertical: 32,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Result title & Back Button
+                      Row(
+                        children: [
                           Padding(
                             padding: const EdgeInsets.only(right: 16.0),
                             child: IconButton(
                               icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF1F2937)),
-                              onPressed: () => Navigator.pop(context),
+                              onPressed: () {
+                                context.go(AppRoutes.myLearning);
+                              },
                               tooltip: 'Go back',
                             ),
                           ),
@@ -383,8 +390,9 @@ class _ExamResultPageState extends State<ExamResultPage> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildResultDetails(bool isPassed) {
     return Container(

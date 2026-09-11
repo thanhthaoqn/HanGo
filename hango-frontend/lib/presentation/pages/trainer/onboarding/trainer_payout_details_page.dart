@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import '../../../../routes/app_routes.dart';
 import 'package:flutter/services.dart';
 import '../../../../data/services/trainer_onboarding_service.dart';
 import '../../../../utils/toast_helper.dart';
 import '../../../../utils/language_manager.dart';
 import '../../../../utils/trainer_onboarding_validation_utils.dart';
+import '../../../../utils/trainer_onboarding_stage.dart';
 import 'trainer_onboarding_shell_page.dart';
 import '../trainer_shell_page.dart';
 
@@ -111,6 +110,7 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
         .trim()
         .toUpperCase();
     payload['agreementSigned'] = true;
+    payload['agreementVersion'] = trainerAgreementVersion;
 
     final result = await _onboardingService.saveProfileDraft(payload);
 
@@ -127,7 +127,12 @@ class _TrainerPayoutDetailsPageState extends State<TrainerPayoutDetailsPage> {
             : 'Payout details saved successfully! Welcome to your Trainer Dashboard.',
       );
 
-      context.go(AppRoutes.trainer);
+      Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (context) => const TrainerShellPage(initialIndex: 0),
+        ),
+        (route) => false,
+      );
     } else {
       ToastHelper.showError(
         context,

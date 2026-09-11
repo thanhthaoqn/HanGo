@@ -15,7 +15,7 @@ import 'trainer_onboarding_agreement_page.dart';
 import 'trainer_payout_details_page.dart';
 import 'trainer_onboarding_shell_page.dart';
 import 'package:hango/presentation/widgets/document_preview_dialog.dart';
-import '../trainer_dashboard_page.dart';
+import '../trainer_shell_page.dart';
 
 class TrainerOnboardingStatusPage extends StatefulWidget {
   final Map<String, dynamic> initialProfile;
@@ -925,11 +925,11 @@ class _TrainerOnboardingStatusPageState
           else
             ElevatedButton.icon(
               onPressed: () {
-                Navigator.pushReplacement(
-                  context,
+                Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
                   MaterialPageRoute(
-                    builder: (context) => const TrainerDashboardPage(),
+                    builder: (context) => const TrainerShellPage(initialIndex: 0),
                   ),
+                  (route) => false,
                 );
               },
               icon: const Icon(Icons.dashboard_rounded, size: 16),

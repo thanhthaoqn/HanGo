@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../domain/entities/exam.dart';
 import '../../../data/repositories/exam_repository.dart';
 import '../../../utils/fullscreen_helper.dart';
+import 'package:go_router/go_router.dart';
+import '../../../routes/app_routes.dart';
 import 'exam_result_page.dart';
 
 class TakeExamPage extends StatefulWidget {
@@ -247,31 +249,46 @@ class _TakeExamPageState extends State<TakeExamPage>
 
     int correctCount = (score * _examQuestions.length / 10).round();
 
-    Navigator.of(context, rootNavigator: true).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => ExamResultPage(
-          exam: widget.exam,
-          score: score,
-          correctCount: correctCount,
-          examQuestions: _examQuestions,
-          userAnswers: _userAnswers,
-          attempt:
-              attemptMap ??
-              {
-                "attemptNumber": 1,
-                "date": DateTime.now()
-                    .toString()
-                    .substring(0, 16)
-                    .replaceFirst('T', ' '),
-                "score": score,
-                "status": score >= 5.0 ? "PASSED" : "FAILED",
-                "answers": _userAnswers.map(
-                  (key, value) => MapEntry((key + 1).toString(), value),
-                ),
-              },
+    final resultExtra = {
+      'exam': widget.exam,
+      'score': score,
+      'correctCount': correctCount,
+      'examQuestions': _examQuestions,
+      'userAnswers': _userAnswers,
+      'attempt': attemptMap ??
+          {
+            "attemptNumber": 1,
+            "date": DateTime.now()
+                .toString()
+                .substring(0, 16)
+                .replaceFirst('T', ' '),
+            "score": score,
+            "status": score >= 5.0 ? "PASSED" : "FAILED",
+            "answers": _userAnswers.map(
+              (key, value) => MapEntry((key + 1).toString(), value),
+            ),
+            "correctness": {},
+          },
+    };
+
+    if (!mounted) return;
+    try {
+      context.pushReplacement(AppRoutes.examResult, extra: resultExtra);
+    } catch (_) {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => ExamResultPage(
+            exam: widget.exam,
+            score: score,
+            correctCount: correctCount,
+            examQuestions: _examQuestions,
+            userAnswers: _userAnswers,
+            attempt: resultExtra['attempt'] as Map<String, dynamic>,
+          ),
         ),
-      ),
-    );
+      );
+    }
   }
 
   void _confirmSubmit() {
@@ -360,35 +377,49 @@ class _TakeExamPageState extends State<TakeExamPage>
                         int correctCount = (score * _examQuestions.length / 10)
                             .round();
 
-                        Navigator.of(this.context, rootNavigator: true).pushReplacement(
-                          MaterialPageRoute(
-                            builder: (context) => ExamResultPage(
-                              exam: widget.exam,
-                              score: score,
-                              correctCount: correctCount,
-                              userAnswers: _userAnswers,
-                              examQuestions: _examQuestions,
-                              attempt:
-                                  attemptMap ??
-                                  {
-                                    "attemptNumber": 1,
-                                    "date": DateTime.now()
-                                        .toString()
-                                        .substring(0, 16)
-                                        .replaceFirst('T', ' '),
-                                    "score": score,
-                                    "status": score >= 5.0
-                                        ? "PASSED"
-                                        : "FAILED",
-                                    "answers": _userAnswers.map(
-                                      (key, value) =>
-                                          MapEntry((key + 1).toString(), value),
-                                    ),
-                                    "correctness": {},
-                                  },
+                        final resultExtra = {
+                          'exam': widget.exam,
+                          'score': score,
+                          'correctCount': correctCount,
+                          'userAnswers': _userAnswers,
+                          'examQuestions': _examQuestions,
+                          'attempt': attemptMap ??
+                              {
+                                "attemptNumber": 1,
+                                "date": DateTime.now()
+                                    .toString()
+                                    .substring(0, 16)
+                                    .replaceFirst('T', ' '),
+                                "score": score,
+                                "status": score >= 5.0
+                                    ? "PASSED"
+                                    : "FAILED",
+                                "answers": _userAnswers.map(
+                                  (key, value) =>
+                                      MapEntry((key + 1).toString(), value),
+                                ),
+                                "correctness": {},
+                              },
+                        };
+
+                        if (!mounted) return;
+                        try {
+                          context.pushReplacement(AppRoutes.examResult, extra: resultExtra);
+                        } catch (_) {
+                          if (!mounted) return;
+                          Navigator.of(context, rootNavigator: true).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (context) => ExamResultPage(
+                                exam: widget.exam,
+                                score: score,
+                                correctCount: correctCount,
+                                userAnswers: _userAnswers,
+                                examQuestions: _examQuestions,
+                                attempt: resultExtra['attempt'] as Map<String, dynamic>,
+                              ),
                             ),
-                          ),
-                        );
+                          );
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF28B79B),

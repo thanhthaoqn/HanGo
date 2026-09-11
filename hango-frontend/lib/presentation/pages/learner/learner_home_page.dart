@@ -652,15 +652,17 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       pageBuilder: (ctx, anim1, anim2) {
         return _EntryExamPromoDialog(
           onLater: () async {
+            final navigator = Navigator.of(ctx, rootNavigator: true);
             final prefs = await SharedPreferences.getInstance();
             final userId = prefs.getInt('user_id') ?? 0;
             await prefs.setBool('dismissed_entry_exam_$userId', true);
-            if (!mounted) return;
-            Navigator.pop(ctx);
+            if (ctx.mounted) {
+              navigator.pop();
+            }
           },
           onTakeNow: () {
-            Navigator.pop(ctx);
-            _navigateToEntryExam();
+            Navigator.of(ctx, rootNavigator: true).pop();
+            context.go(AppRoutes.entryExam);
           },
         );
       },
@@ -672,42 +674,6 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
         );
       },
     );
-  }
-
-  void _navigateToEntryExam() async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (loadingCtx) => const Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF28B79B)),
-        ),
-      ),
-    );
-    try {
-      final entryExam = await _examRepository.fetchEntryExam();
-      if (!mounted) return;
-      Navigator.pop(context); // Close loading
-
-      if (entryExam == null) {
-        ToastHelper.showError(
-          context,
-          'No Entry Exam is configured yet. Please check back later.',
-        );
-        return;
-      }
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => EntryExamInstructionPage(exam: entryExam),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      Navigator.pop(context);
-      ToastHelper.showError(context, 'Error to server');
-    }
   }
 
   // Load courses depending on selected tab

@@ -238,11 +238,23 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       } else {
         toggleFullscreen(false);
       }
+      if (!mounted) return;
+      final query = startQuiz ? '?startQuiz=true' : '';
+      context.go('/courses/${widget.courseId}/lessons/$lessonId$query');
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isNavigatingLesson = false;
       });
       ToastHelper.showError(context, 'Failed to load lesson: $e');
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant LessonDetailPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.lessonId != oldWidget.lessonId && widget.lessonId != _currentLessonId) {
+      _navigateToLesson(widget.lessonId, startQuiz: widget.startQuizImmediately);
     }
   }
 
@@ -1146,21 +1158,10 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                     InkWell(
                       onTap: () async {
                         _clearLastVisitedSession();
-                        if (widget.cameFromCourseDetail && Navigator.canPop(context)) {
-                          Navigator.pop(context);
+                        if (context.canPop()) {
+                          context.pop();
                         } else {
-                          try {
-                            context.push('/courses/${widget.courseId}');
-                          } catch (_) {
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => CourseDetailPage(
-                                  courseId: widget.courseId,
-                                ),
-                              ),
-                            );
-                          }
+                          context.go('/courses/${widget.courseId}');
                         }
                       },
                       borderRadius: BorderRadius.circular(20),

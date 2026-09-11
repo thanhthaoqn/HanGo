@@ -12,6 +12,8 @@ class AppRoutes {
   static const String courseDetail = '/courses/:id';
   static const String courseLesson = '/courses/:courseId/lessons/:lessonId';
   static const String takeExam = '/take-exam/:id';
+  static const String entryExam = '/entry-exam';
+  static const String examResult = '/exam-results';
 
   // Auth routes
   static const String login = '/login';

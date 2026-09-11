@@ -1318,15 +1318,8 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                   return InkWell(
                     onTap: course.isEnrolled
                         ? () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => LessonDetailPage(
-                                  courseId: course.id,
-                                  lessonId: lesson.id,
-                                  cameFromCourseDetail: true,
-                                ),
-                              ),
+                            context.push(
+                              '/courses/${course.id}/lessons/${lesson.id}',
                             );
                           }
                         : () {
@@ -1377,17 +1370,8 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                             TextButton(
                               onPressed: course.isEnrolled
                                   ? () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              LessonDetailPage(
-                                                courseId: course.id,
-                                                lessonId: lesson.id,
-                                                startQuizImmediately: true,
-                                                cameFromCourseDetail: true,
-                                              ),
-                                        ),
+                                      context.push(
+                                        '/courses/${course.id}/lessons/${lesson.id}?startQuiz=true',
                                       );
                                     }
                                   : null,
@@ -1721,14 +1705,8 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                       course.sessions.first.lessons.isNotEmpty) {
                     final firstLessonId =
                         course.sessions.first.lessons.first.id;
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => LessonDetailPage(
-                          courseId: course.id,
-                          lessonId: firstLessonId,
-                        ),
-                      ),
+                    context.push(
+                      '/courses/${course.id}/lessons/$firstLessonId',
                     );
                   } else {
                     _showNotification(

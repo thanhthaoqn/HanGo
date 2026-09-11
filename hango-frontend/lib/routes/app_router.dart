@@ -10,6 +10,9 @@ import '../presentation/pages/course/course_detail_page.dart';
 import '../presentation/pages/course/lesson_detail_page.dart';
 import '../presentation/pages/course/cart_page.dart';
 import '../presentation/pages/exam/list_exams_page.dart';
+import '../presentation/pages/exam/entry_exam_instruction_page.dart';
+import '../presentation/pages/exam/exam_result_page.dart';
+import '../domain/entities/exam.dart';
 import '../presentation/pages/learner/learning_pathway_page.dart';
 import '../presentation/pages/learner/my_learning_page.dart';
 import '../presentation/pages/learner/my_information_page.dart';
@@ -183,7 +186,48 @@ class AppRouter {
             final lessonIdStr = state.pathParameters['lessonId'];
             final courseId = int.tryParse(courseIdStr ?? '') ?? 0;
             final lessonId = int.tryParse(lessonIdStr ?? '') ?? 0;
-            return LessonDetailPage(courseId: courseId, lessonId: lessonId);
+            final startQuiz = state.uri.queryParameters['startQuiz'] == 'true';
+            return LessonDetailPage(
+              courseId: courseId,
+              lessonId: lessonId,
+              startQuizImmediately: startQuiz,
+              cameFromCourseDetail: true,
+            );
+          },
+        ),
+        GoRoute(
+          path: AppRoutes.entryExam,
+          parentNavigatorKey: rootNavigatorKey,
+          builder: (context, state) {
+            final exam = state.extra as Exam?;
+            return EntryExamInstructionPage(exam: exam);
+          },
+        ),
+        GoRoute(
+          path: AppRoutes.examResult,
+          parentNavigatorKey: rootNavigatorKey,
+          builder: (context, state) {
+            final extra = state.extra;
+            if (extra is Map<String, dynamic>) {
+              final exam = extra['exam'] as Exam?;
+              final score = (extra['score'] as num?)?.toDouble() ?? 0.0;
+              final correctCount = extra['correctCount'] as int? ?? 0;
+              final attempt = extra['attempt'] as Map<String, dynamic>? ?? {};
+              final userAnswers = extra['userAnswers'] as Map<int, int>?;
+              final examQuestions =
+                  extra['examQuestions'] as List<Map<String, dynamic>>?;
+              if (exam != null) {
+                return ExamResultPage(
+                  exam: exam,
+                  score: score,
+                  correctCount: correctCount,
+                  attempt: attempt,
+                  userAnswers: userAnswers,
+                  examQuestions: examQuestions,
+                );
+              }
+            }
+            return const MyLearningPage();
           },
         ),
 

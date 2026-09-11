@@ -53,160 +53,195 @@ class SkillAnalysisPanel extends StatelessWidget {
     final titleColor = isDarkMode ? const Color(0xFFF0F6FC) : const Color(0xFF0F172A);
     final subColor = isDarkMode ? const Color(0xFF8B949E) : const Color(0xFF64748B);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-        border: Border.all(color: cardBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDarkMode ? 0.4 : 0.08),
-            blurRadius: 24,
-            offset: const Offset(0, -8),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            margin: const EdgeInsets.only(top: 12, bottom: 8),
-            width: 36, height: 4,
-            decoration: BoxDecoration(
-              color: isDarkMode ? const Color(0xFF30363D) : const Color(0xFFCBD5E1),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF6366F1).withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.analytics_rounded, color: Color(0xFF6366F1), size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isVi ? 'Phân tích lỗ hổng kiến thức' : 'Learning Gap Analysis',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: titleColor, fontFamily: 'Outfit'),
-                      ),
-                      if (attemptsUsed > 0)
-                        Text(
-                          isVi ? 'Dựa trên $attemptsUsed bài thi thực tế' : 'Based on $attemptsUsed analyzed attempt(s)',
-                          style: TextStyle(fontSize: 12, color: subColor, fontFamily: 'Outfit'),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          
-          if (weakSkills.isEmpty && latestWeakSkills.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                children: [
-                  Icon(Icons.emoji_events_rounded, size: 48, color: Colors.amber.shade400),
-                  const SizedBox(height: 12),
-                  Text(
-                    isVi ? 'Không phát hiện điểm yếu rõ ràng.\nTiếp tục luyện tập để duy trì!' : 'No major weaknesses found!\nKeep practicing to maintain!',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: subColor, fontFamily: 'Outfit', height: 1.5),
-                  ),
-                ],
-              ),
-            )
-          else ...[
-            // Section 1: Latest Exam Vulnerabilities
-            if (latestWeakSkills.isNotEmpty) ...[
-              _buildSectionHeader(
-                isVi ? 'Lỗi sai từ bài thi gần nhất' : 'Latest Exam Vulnerabilities',
-                Icons.warning_amber_rounded,
-                const Color(0xFFEF4444),
-                titleColor,
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-                child: Column(
-                  children: latestWeakSkills.asMap().entries.map((entry) {
-                    final meta = _getSkillMeta(entry.value);
-                    return _SkillBar(
-                      skill: entry.value,
-                      severityLabel: isVi ? 'Nghiêm trọng (Bài thi cuối)' : 'Critical (Latest Exam)',
-                      barValue: 0.9,
-                      color: const Color(0xFFEF4444), // Đỏ cảnh báo
-                      icon: meta['icon'] as IconData,
-                      isDarkMode: isDarkMode,
-                      delay: Duration(milliseconds: entry.key * 100),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ],
+    final screenHeight = MediaQuery.of(context).size.height;
+    final maxHeight = screenHeight * 0.85;
 
-            // Section 2: Chronic Areas for Improvement
-            if (weakSkills.isNotEmpty) ...[
-              _buildSectionHeader(
-                isVi ? 'Điểm yếu cần củng cố dài hạn' : 'Chronic Areas for Improvement',
-                Icons.history_rounded,
-                const Color(0xFF8B5CF6),
-                titleColor,
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-                child: Column(
-                  children: weakSkills.asMap().entries.map((entry) {
-                    final meta = _getSkillMeta(entry.value);
-                    return _SkillBar(
-                      skill: entry.value,
-                      severityLabel: _getSeverityLabel(entry.key, isVi),
-                      barValue: _getSeverityBarValue(entry.key),
-                      color: meta['color'] as Color,
-                      icon: meta['icon'] as IconData,
-                      isDarkMode: isDarkMode,
-                      delay: Duration(milliseconds: entry.key * 100),
-                    );
-                  }).toList(),
-                ),
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 640,
+          maxHeight: maxHeight,
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: cardBorder),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(isDarkMode ? 0.4 : 0.08),
+                blurRadius: 24,
+                offset: const Offset(0, -4),
               ),
             ],
-            
-            // Suggestion Box
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag Handle
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                width: 36,
+                height: 4,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF6366F1).withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.2)),
+                  color: isDarkMode ? const Color(0xFF30363D) : const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(2),
                 ),
+              ),
+              // Header Row (Fixed)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 4, 16, 12),
                 child: Row(
                   children: [
-                    const Icon(Icons.auto_awesome_rounded, color: Color(0xFF6366F1), size: 16),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        isVi ? 'AI đã phân bổ khóa học ưu tiên sửa lỗi mới trước.' : 'AI structured the pathway to fix recent vulnerabilities first.',
-                        style: const TextStyle(color: Color(0xFF6366F1), fontSize: 13, fontWeight: FontWeight.w600, fontFamily: 'Outfit'),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6366F1).withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(8),
                       ),
+                      child: const Icon(Icons.analytics_rounded, color: Color(0xFF6366F1), size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isVi ? 'Phân tích lỗ hổng kiến thức' : 'Learning Gap Analysis',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: titleColor, fontFamily: 'Outfit'),
+                          ),
+                          if (attemptsUsed > 0)
+                            Text(
+                              isVi ? 'Dựa trên $attemptsUsed bài thi thực tế' : 'Based on $attemptsUsed analyzed attempt(s)',
+                              style: TextStyle(fontSize: 12, color: subColor, fontFamily: 'Outfit'),
+                            ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close_rounded, color: subColor, size: 22),
+                      tooltip: isVi ? 'Đóng' : 'Close',
+                      onPressed: () => Navigator.of(context).pop(),
                     ),
                   ],
                 ),
               ),
-            ),
-          ],
-        ],
+              Divider(height: 1, thickness: 1, color: cardBorder),
+
+              // Scrollable Content
+              Flexible(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.only(top: 16, bottom: 8),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (weakSkills.isEmpty && latestWeakSkills.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Center(
+                            child: Column(
+                              children: [
+                                Icon(Icons.emoji_events_rounded, size: 48, color: Colors.amber.shade400),
+                                const SizedBox(height: 12),
+                                Text(
+                                  isVi ? 'Không phát hiện điểm yếu rõ ràng.\nTiếp tục luyện tập để duy trì!' : 'No major weaknesses found!\nKeep practicing to maintain!',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: subColor, fontFamily: 'Outfit', height: 1.5),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      else ...[
+                        // Section 1: Latest Exam Vulnerabilities
+                        if (latestWeakSkills.isNotEmpty) ...[
+                          _buildSectionHeader(
+                            isVi ? 'Lỗi sai từ bài thi gần nhất' : 'Latest Exam Vulnerabilities',
+                            Icons.warning_amber_rounded,
+                            const Color(0xFFEF4444),
+                            titleColor,
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                            child: Column(
+                              children: latestWeakSkills.asMap().entries.map((entry) {
+                                final meta = _getSkillMeta(entry.value);
+                                return _SkillBar(
+                                  skill: entry.value,
+                                  severityLabel: isVi ? 'Nghiêm trọng (Bài thi cuối)' : 'Critical (Latest Exam)',
+                                  barValue: 0.9,
+                                  color: const Color(0xFFEF4444), // Đỏ cảnh báo
+                                  icon: meta['icon'] as IconData,
+                                  isDarkMode: isDarkMode,
+                                  delay: Duration(milliseconds: entry.key * 100),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ],
+
+                        // Section 2: Chronic Areas for Improvement
+                        if (weakSkills.isNotEmpty) ...[
+                          _buildSectionHeader(
+                            isVi ? 'Điểm yếu cần củng cố dài hạn' : 'Chronic Areas for Improvement',
+                            Icons.history_rounded,
+                            const Color(0xFF8B5CF6),
+                            titleColor,
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                            child: Column(
+                              children: weakSkills.asMap().entries.map((entry) {
+                                final meta = _getSkillMeta(entry.value);
+                                return _SkillBar(
+                                  skill: entry.value,
+                                  severityLabel: _getSeverityLabel(entry.key, isVi),
+                                  barValue: _getSeverityBarValue(entry.key),
+                                  color: meta['color'] as Color,
+                                  icon: meta['icon'] as IconData,
+                                  isDarkMode: isDarkMode,
+                                  delay: Duration(milliseconds: entry.key * 100),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ],
+
+                        // Suggestion Box
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF6366F1).withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.2)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.auto_awesome_rounded, color: Color(0xFF6366F1), size: 16),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    isVi ? 'AI đã phân bổ khóa học ưu tiên sửa lỗi mới trước.' : 'AI structured the pathway to fix recent vulnerabilities first.',
+                                    style: const TextStyle(color: Color(0xFF6366F1), fontSize: 13, fontWeight: FontWeight.w600, fontFamily: 'Outfit'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -297,7 +332,7 @@ class _SkillBarState extends State<_SkillBar> with SingleTickerProviderStateMixi
             borderRadius: BorderRadius.circular(4),
             child: AnimatedBuilder(
               animation: _anim,
-              builder: (_, __) => LinearProgressIndicator(
+              builder: (context, child) => LinearProgressIndicator(
                 value: widget.barValue * _anim.value,
                 backgroundColor: trackColor,
                 valueColor: AlwaysStoppedAnimation<Color>(widget.color),

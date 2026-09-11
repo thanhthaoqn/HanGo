@@ -12,7 +12,6 @@ import '../course/lesson_detail_page.dart';
 import '../course/course_completion_page.dart';
 import '../../../domain/model/course_detail.dart';
 import '../../../utils/language_manager.dart';
-import '../exam/exam_result_page.dart';
 import '../../../domain/entities/exam.dart';
 
 class MyLearningPage extends StatefulWidget {
@@ -440,14 +439,8 @@ class _MyLearningPageState extends State<MyLearningPage> {
                 if (lastLessonId != null) {
                   if (!mounted) return;
                   Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => LessonDetailPage(
-                        courseId: course.id,
-                        lessonId: lastLessonId,
-                      ),
-                    ),
+                  context.push(
+                    '/courses/${course.id}/lessons/$lastLessonId',
                   );
                   return;
                 }
@@ -477,14 +470,8 @@ class _MyLearningPageState extends State<MyLearningPage> {
                 }
 
                 if (targetLesson != null) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => LessonDetailPage(
-                        courseId: course.id,
-                        lessonId: targetLesson!.id,
-                      ),
-                    ),
+                  context.push(
+                    '/courses/${course.id}/lessons/${targetLesson.id}',
                   );
                 } else {
                   try {
@@ -1115,17 +1102,14 @@ class _MyLearningPageState extends State<MyLearningPage> {
                       learnerCountFormatted: '0',
                     );
 
-                    Navigator.of(context, rootNavigator: true).push(
-                      MaterialPageRoute(
-                        builder: (context) => ExamResultPage(
-                          exam: exam,
-                          score: scoreVal,
-                          correctCount: (scoreVal * questionCount / 10).round(),
-                          attempt: attempt,
-                          // examQuestions & userAnswers omitted — ExamResultPage
-                          // will lazy-load them from the API automatically.
-                        ),
-                      ),
+                    context.push(
+                      AppRoutes.examResult,
+                      extra: {
+                        'exam': exam,
+                        'score': scoreVal,
+                        'correctCount': (scoreVal * questionCount / 10).round(),
+                        'attempt': attempt,
+                      },
                     );
                   },
                   contentPadding: const EdgeInsets.symmetric(

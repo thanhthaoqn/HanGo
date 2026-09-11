@@ -191,14 +191,27 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
 
   /// E1 (spec 20): mo khoa hoc va refresh pathway khi quay ve de tien do/status khong bi stale.
   Future<void> _openCourseAndRefresh(PathwayNode node) async {
+    if (node.courseId <= 0) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Course information is not available.'),
+          ),
+        );
+      }
+      return;
+    }
     try {
       await context.push('/courses/${node.courseId}');
-    } catch (_) {
-      await Navigator.of(context, rootNavigator: true).push(
-        MaterialPageRoute(
-          builder: (_) => CourseDetailPage(courseId: node.courseId),
-        ),
-      );
+    } catch (e) {
+      debugPrint('[Pathway] context.push error: $e, falling back to Navigator');
+      if (mounted) {
+        await Navigator.of(context, rootNavigator: true).push(
+          MaterialPageRoute(
+            builder: (_) => CourseDetailPage(courseId: node.courseId),
+          ),
+        );
+      }
     }
     if (mounted) _loadPathway();
   }
@@ -211,6 +224,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Padding(
         padding: EdgeInsets.only(
@@ -228,25 +242,135 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
     );
   }
 
+  Widget _buildConfirmationDialog({
+    required BuildContext ctx,
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBgColor,
+    required String title,
+    required String content,
+    required String confirmText,
+    required Color confirmButtonColor,
+    String? cancelText,
+  }) {
+    final bg = _isDarkMode ? const Color(0xFF161B22) : Colors.white;
+    final cardBorder = _isDarkMode ? const Color(0xFF30363D) : const Color(0xFFE2E8F0);
+    final titleColor = _isDarkMode ? const Color(0xFFF0F6FC) : const Color(0xFF0F172A);
+    final subColor = _isDarkMode ? const Color(0xFF8B949E) : const Color(0xFF64748B);
+
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: cardBorder),
+      ),
+      backgroundColor: bg,
+      elevation: 10,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 400),
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: iconBgColor,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: iconColor, size: 28),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: titleColor,
+                fontFamily: 'Outfit',
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              content,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: subColor,
+                fontSize: 14,
+                height: 1.5,
+                fontFamily: 'Outfit',
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      side: BorderSide(
+                        color: _isDarkMode ? const Color(0xFF30363D) : Colors.grey.shade300,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: Text(
+                      cancelText ?? (LanguageManager.isVi ? 'Hủy' : 'Cancel'),
+                      style: TextStyle(
+                        color: subColor,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: confirmButtonColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: Text(
+                      confirmText,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _handleFastTrack(PathwayNode node) async {
+    final isVi = LanguageManager.isVi;
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Fast-track Course'),
-        content: const Text('To fast-track this course, you must take the Mastery Quiz to prove your knowledge. Are you ready?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFF59E0B),
-            ),
-            child: const Text('Take Mastery Quiz'),
-          ),
-        ],
+      builder: (ctx) => _buildConfirmationDialog(
+        ctx: ctx,
+        icon: Icons.bolt_rounded,
+        iconColor: const Color(0xFFF59E0B),
+        iconBgColor: _isDarkMode ? const Color(0xFF78350F).withValues(alpha: 0.3) : const Color(0xFFFEF3C7),
+        title: isVi ? 'Học nhanh khóa học' : 'Fast-track Course',
+        content: isVi
+            ? 'Để học nhanh khóa học này, bạn cần làm bài kiểm tra Mastery Quiz để chứng minh năng lực. Bạn đã sẵn sàng?'
+            : 'To fast-track this course, you must take the Mastery Quiz to prove your knowledge. Are you ready?',
+        confirmText: isVi ? 'Làm bài kiểm tra' : 'Take Mastery Quiz',
+        confirmButtonColor: const Color(0xFFF59E0B),
       ),
     );
     
@@ -256,26 +380,20 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
   }
 
   Future<void> _handleSkipNode(PathwayNode node) async {
+    final isVi = LanguageManager.isVi;
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Skip Course?'),
-        content: const Text(
-          'If you skip this course, you will not receive a Mastery Score for it, and the next course will be unlocked. Are you sure you want to proceed?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF64748B),
-            ),
-            child: const Text('Skip Course'),
-          ),
-        ],
+      builder: (ctx) => _buildConfirmationDialog(
+        ctx: ctx,
+        icon: Icons.skip_next_rounded,
+        iconColor: const Color(0xFF64748B),
+        iconBgColor: _isDarkMode ? const Color(0xFF334155).withValues(alpha: 0.3) : const Color(0xFFF1F5F9),
+        title: isVi ? 'Bỏ qua khóa học?' : 'Skip Course?',
+        content: isVi
+            ? 'Nếu bạn bỏ qua khóa học này, bạn sẽ không nhận được điểm Mastery cho khóa học, và khóa học tiếp theo sẽ được mở khóa. Bạn có chắc chắn muốn tiếp tục?'
+            : 'If you skip this course, you will not receive a Mastery Score for it, and the next course will be unlocked. Are you sure you want to proceed?',
+        confirmText: isVi ? 'Bỏ qua khóa học' : 'Skip Course',
+        confirmButtonColor: const Color(0xFF64748B),
       ),
     );
     
@@ -315,27 +433,20 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
       return;
     }
 
+    final isVi = LanguageManager.isVi;
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Limitation Warning ⚠️'),
-        content: const Text(
-          'A learning pathway containing only free courses might not cover all the advanced knowledge needed to reach your goal.\n\n'
-          'You can still start with this free pathway and purchase premium courses later to fill any gaps. Do you want to continue generating a free-only pathway?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFF59E0B),
-            ),
-            child: const Text('Continue (Free Only)'),
-          ),
-        ],
+      builder: (ctx) => _buildConfirmationDialog(
+        ctx: ctx,
+        icon: Icons.warning_amber_rounded,
+        iconColor: const Color(0xFFF59E0B),
+        iconBgColor: _isDarkMode ? const Color(0xFF78350F).withValues(alpha: 0.3) : const Color(0xFFFEF3C7),
+        title: isVi ? 'Cảnh báo giới hạn ⚠️' : 'Limitation Warning ⚠️',
+        content: isVi
+            ? 'Lộ trình học chỉ gồm các khóa miễn phí có thể không bao quát hết các kiến thức nâng cao cần thiết để đạt mục tiêu của bạn.\n\nBạn vẫn có thể bắt đầu với lộ trình miễn phí này và mua thêm các khóa trả phí sau. Bạn có muốn tiếp tục tạo lộ trình miễn phí không?'
+            : 'A learning pathway containing only free courses might not cover all the advanced knowledge needed to reach your goal.\n\nYou can still start with this free pathway and purchase premium courses later to fill any gaps. Do you want to continue generating a free-only pathway?',
+        confirmText: isVi ? 'Tiếp tục (Miễn phí)' : 'Continue (Free Only)',
+        confirmButtonColor: const Color(0xFFF59E0B),
       ),
     );
 

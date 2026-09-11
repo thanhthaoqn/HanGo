@@ -19,6 +19,12 @@ class _TrainerRouteGateState extends State<TrainerRouteGate> {
     _destinationFuture = _resolveDestination();
   }
 
+  @override
+  void didUpdateWidget(TrainerRouteGate oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _destinationFuture = _resolveDestination();
+  }
+
   Future<Widget> _resolveDestination() async {
     final onboardingService = TrainerOnboardingService();
     final result = await onboardingService.getTrainerProfile();
