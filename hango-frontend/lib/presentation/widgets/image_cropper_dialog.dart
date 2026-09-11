@@ -59,6 +59,7 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
   String? _errorMessage;
 
   double _currentZoom = 1.0;
+  double _brightness = 0.0;
   int _rotationQuarterTurns = 0; // 0, 1, 2, 3
 
   static const double _viewportSize = 320.0;
@@ -127,6 +128,7 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
 
     _transformController.value = Matrix4.identity()
       ..setTranslationRaw(dx, dy, 0.0)
+      // ignore: deprecated_member_use
       ..scale(baseScale, baseScale, 1.0);
 
     setState(() {});
@@ -153,6 +155,7 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
 
     _transformController.value = Matrix4.identity()
       ..setTranslationRaw(newDx, newDy, 0.0)
+      // ignore: deprecated_member_use
       ..scale(targetScale, targetScale, 1.0);
 
     setState(() {});
@@ -205,7 +208,7 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
     // 3. Apply exact InteractiveViewer transform matrix
     canvas.transform(matrix.storage);
 
-    // 4. Draw image with same rotation
+    // 4. Draw image with same rotation & brightness
     final w = uiImage.width.toDouble();
     final h = uiImage.height.toDouble();
     final rotW = (_rotationQuarterTurns % 2 == 0) ? w : h;
@@ -217,6 +220,7 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
       rotW: rotW,
       rotH: rotH,
       quarterTurns: _rotationQuarterTurns,
+      brightness: _brightness,
     );
 
     canvas.restore();
@@ -240,6 +244,7 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
     required double rotW,
     required double rotH,
     required int quarterTurns,
+    double brightness = 0.0,
   }) {
     canvas.save();
     if (quarterTurns == 1) {
@@ -255,6 +260,17 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
     final paint = Paint()
       ..filterQuality = FilterQuality.high
       ..isAntiAlias = true;
+
+    if (brightness != 0.0) {
+      final offset = brightness * 255.0;
+      paint.colorFilter = ColorFilter.matrix(<double>[
+        1, 0, 0, 0, offset,
+        0, 1, 0, 0, offset,
+        0, 0, 1, 0, offset,
+        0, 0, 0, 1, 0,
+      ]);
+    }
+
     canvas.drawImage(image, Offset.zero, paint);
     canvas.restore();
   }
@@ -321,9 +337,35 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
                       ],
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Color(0xFF64748B), size: 20),
-                    onPressed: () => Navigator.pop(context, null),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: isVi ? 'Xoay 90°' : 'Rotate 90°',
+                        icon: const Icon(
+                          Icons.rotate_right_rounded,
+                          color: Color(0xFF64748B),
+                          size: 20,
+                        ),
+                        onPressed: _decodedImage != null
+                            ? () {
+                                setState(() {
+                                  _rotationQuarterTurns =
+                                      (_rotationQuarterTurns + 1) % 4;
+                                  _resetTransform();
+                                });
+                              }
+                            : null,
+                      ),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.close,
+                          color: Color(0xFF64748B),
+                          size: 20,
+                        ),
+                        onPressed: () => Navigator.pop(context, null),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -348,8 +390,8 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
                     Expanded(
                       child: Text(
                         isVi
-                            ? 'Kéo di chuyển hoặc thu phóng để điều chỉnh khuôn mặt vào giữa khung tròn.'
-                            : 'Drag to position or zoom to fit your face inside the circle.',
+                            ? 'Kéo di chuyển, thu phóng hoặc điều chỉnh độ sáng để khuôn mặt rõ đẹp nhất.'
+                            : 'Drag to position, zoom, or adjust brightness to fit your face clearly.',
                         style: const TextStyle(
                           fontSize: 12,
                           color: Color(0xFF64748B),
@@ -368,8 +410,16 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
                   width: _viewportSize,
                   height: _viewportSize,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A),
+                    color: const Color(0xFF1E293B),
                     borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: _isLoading
@@ -423,6 +473,7 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
                                         painter: _ImageCanvasPainter(
                                           image: _decodedImage!,
                                           quarterTurns: _rotationQuarterTurns,
+                                          brightness: _brightness,
                                         ),
                                       ),
                                     ),
@@ -446,34 +497,156 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
               ),
               const SizedBox(height: 14),
 
-              // Zoom Slider Controls
-              Row(
-                children: [
-                  const Icon(Icons.zoom_out, color: Color(0xFF64748B), size: 18),
-                  Expanded(
-                    child: SliderTheme(
-                      data: SliderTheme.of(context).copyWith(
-                        activeTrackColor: const Color(0xFF28B79B),
-                        inactiveTrackColor: const Color(0xFFE2E8F0),
-                        thumbColor: const Color(0xFF28B79B),
-                        overlayColor: const Color(0x3328B79B),
-                        trackHeight: 3.5,
-                        thumbShape: const RoundSliderThumbShape(
-                          enabledThumbRadius: 7.0,
+              // Adjustment Controls (Zoom & Brightness)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Zoom Slider Row
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.zoom_in_rounded,
+                          color: Color(0xFF64748B),
+                          size: 16,
                         ),
-                      ),
-                      child: Slider(
-                        value: _currentZoom.clamp(1.0, 4.0),
-                        min: 1.0,
-                        max: 4.0,
-                        onChanged: _decodedImage != null
-                            ? _onZoomSliderChanged
-                            : null,
-                      ),
+                        const SizedBox(width: 6),
+                        SizedBox(
+                          width: 68,
+                          child: Text(
+                            isVi ? 'Thu phóng' : 'Zoom',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF475569),
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: SliderTheme(
+                            data: SliderTheme.of(context).copyWith(
+                              activeTrackColor: const Color(0xFF28B79B),
+                              inactiveTrackColor: const Color(0xFFE2E8F0),
+                              thumbColor: const Color(0xFF28B79B),
+                              overlayColor: const Color(0x3328B79B),
+                              trackHeight: 3.0,
+                              thumbShape: const RoundSliderThumbShape(
+                                enabledThumbRadius: 6.0,
+                              ),
+                            ),
+                            child: Slider(
+                              value: _currentZoom.clamp(1.0, 4.0),
+                              min: 1.0,
+                              max: 4.0,
+                              onChanged: _decodedImage != null
+                                  ? _onZoomSliderChanged
+                                  : null,
+                            ),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 38,
+                          child: Text(
+                            '${_currentZoom.toStringAsFixed(1)}x',
+                            textAlign: TextAlign.end,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF64748B),
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const Icon(Icons.zoom_in, color: Color(0xFF64748B), size: 18),
-                ],
+                    const SizedBox(height: 6),
+                    // Brightness Slider Row
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.wb_sunny_outlined,
+                          color: Color(0xFF64748B),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 6),
+                        SizedBox(
+                          width: 68,
+                          child: Text(
+                            isVi ? 'Độ sáng' : 'Brightness',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF475569),
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: SliderTheme(
+                            data: SliderTheme.of(context).copyWith(
+                              activeTrackColor: const Color(0xFF28B79B),
+                              inactiveTrackColor: const Color(0xFFE2E8F0),
+                              thumbColor: const Color(0xFF28B79B),
+                              overlayColor: const Color(0x3328B79B),
+                              trackHeight: 3.0,
+                              thumbShape: const RoundSliderThumbShape(
+                                enabledThumbRadius: 6.0,
+                              ),
+                            ),
+                            child: Slider(
+                              value: _brightness.clamp(-0.4, 0.4),
+                              min: -0.4,
+                              max: 0.4,
+                              onChanged: _decodedImage != null
+                                  ? (val) => setState(() => _brightness = val)
+                                  : null,
+                            ),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 38,
+                          child: Tooltip(
+                            message: isVi
+                                ? 'Nhấn để đặt lại độ sáng'
+                                : 'Click to reset brightness',
+                            child: InkWell(
+                              onTap: _brightness != 0.0
+                                  ? () => setState(() => _brightness = 0.0)
+                                  : null,
+                              borderRadius: BorderRadius.circular(4),
+                              child: Text(
+                                _brightness > 0
+                                    ? '+${(_brightness * 100).round()}%'
+                                    : _brightness < 0
+                                        ? '${(_brightness * 100).round()}%'
+                                        : '0%',
+                                textAlign: TextAlign.end,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: _brightness != 0.0
+                                      ? const Color(0xFF28B79B)
+                                      : const Color(0xFF64748B),
+                                  fontFamily: 'Outfit',
+                                  decoration: _brightness != 0.0
+                                      ? TextDecoration.underline
+                                      : TextDecoration.none,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 16),
 
@@ -553,10 +726,12 @@ class _ImageCropperDialogState extends State<ImageCropperDialog> {
 class _ImageCanvasPainter extends CustomPainter {
   final ui.Image image;
   final int quarterTurns;
+  final double brightness;
 
   _ImageCanvasPainter({
     required this.image,
     required this.quarterTurns,
+    this.brightness = 0.0,
   });
 
   @override
@@ -567,13 +742,15 @@ class _ImageCanvasPainter extends CustomPainter {
       rotW: size.width,
       rotH: size.height,
       quarterTurns: quarterTurns,
+      brightness: brightness,
     );
   }
 
   @override
   bool shouldRepaint(covariant _ImageCanvasPainter oldDelegate) {
     return oldDelegate.image != image ||
-        oldDelegate.quarterTurns != quarterTurns;
+        oldDelegate.quarterTurns != quarterTurns ||
+        oldDelegate.brightness != brightness;
   }
 }
 
@@ -597,7 +774,7 @@ class _CropMaskPainter extends CustomPainter {
       height: cropDiameter,
     );
 
-    // 1. Draw dark background mask outside the crop window
+    // 1. Draw soft background mask outside the crop window (reduced darkness)
     final bgPath = Path()..addRect(rect);
     final cropPath = Path();
     if (isCircular) {
@@ -610,7 +787,7 @@ class _CropMaskPainter extends CustomPainter {
 
     final maskPath = Path.combine(PathOperation.difference, bgPath, cropPath);
     final maskPaint = Paint()
-      ..color = const Color(0xAA0F172A)
+      ..color = const Color(0x550F172A) // Soft 33% scrim instead of harsh 67%
       ..style = PaintingStyle.fill;
     canvas.drawPath(maskPath, maskPaint);
 
@@ -631,7 +808,7 @@ class _CropMaskPainter extends CustomPainter {
 
     // 3. Subtle grid lines inside crop window (Rule of Thirds)
     final gridPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.25)
+      ..color = Colors.white.withValues(alpha: 0.28)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.8;
 

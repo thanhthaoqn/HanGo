@@ -41,7 +41,9 @@ TrainerOnboardingStage resolveTrainerOnboardingStage(
     return TrainerOnboardingStage.status;
   }
 
-  if (trainerType == null || trainerType.isEmpty) {
+  if (trainerType == null ||
+      trainerType.isEmpty ||
+      profile['agreementSigned'] != true) {
     return TrainerOnboardingStage.typeSelection;
   }
 

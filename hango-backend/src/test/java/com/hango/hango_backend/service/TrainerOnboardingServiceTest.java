@@ -289,8 +289,8 @@ class TrainerOnboardingServiceTest {
         TrainerProfileDTO dto = service.getTrainerProfile("known@example.com");
 
         assertEquals("PENDING_VERIFICATION", dto.getStatus());
-        assertEquals(0.70, dto.getRevenueShare());
-        assertEquals("PROFESSIONAL", dto.getTrainerType());
+        assertNull(dto.getRevenueShare());
+        assertNull(dto.getTrainerType());
         verify(trainerProfileRepository).save(any(TrainerProfile.class));
     }
 
@@ -501,19 +501,47 @@ class TrainerOnboardingServiceTest {
     }
 
     @Test
-    void saveProfileDraftShouldRejectDummyPayoutNumber() {
+    void saveProfileDraftShouldRejectInvalidBankAccountWithLettersOrSpecialChars() {
         User user = learnerUser(1L, "known@example.com");
         TrainerProfile existing = profile(1L, "PENDING_VERIFICATION", "PROFESSIONAL");
         when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
         when(trainerProfileRepository.findById(1L)).thenReturn(Optional.of(existing));
 
-        TrainerProfileDTO dto = new TrainerProfileDTO();
-        dto.setBankAccount("0000000000");
+        TrainerProfileDTO dtoLetters = new TrainerProfileDTO();
+        dtoLetters.setBankAccount("123456ABC");
+        ApiException exLetters = assertThrows(ApiException.class,
+                () -> service.saveProfileDraft("known@example.com", dtoLetters));
+        assertEquals(HttpStatus.BAD_REQUEST, exLetters.getStatus());
+        assertTrue(exLetters.getMessage().contains("Bank account"));
 
-        ApiException ex = assertThrows(ApiException.class,
-                () -> service.saveProfileDraft("known@example.com", dto));
-        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
-        assertTrue(ex.getMessage().contains("Bank account"));
+        TrainerProfileDTO dtoSpecial = new TrainerProfileDTO();
+        dtoSpecial.setBankAccount("123-456-789");
+        ApiException exSpecial = assertThrows(ApiException.class,
+                () -> service.saveProfileDraft("known@example.com", dtoSpecial));
+        assertEquals(HttpStatus.BAD_REQUEST, exSpecial.getStatus());
+        assertTrue(exSpecial.getMessage().contains("Bank account"));
+    }
+
+    @Test
+    void saveProfileDraftShouldAcceptVanityOrRepeatedBankAccountNumber() {
+        User user = learnerUser(1L, "known@example.com");
+        TrainerProfile existing = profile(1L, "PENDING_VERIFICATION", "PROFESSIONAL");
+        when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(user));
+        when(trainerProfileRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(trainerProfileRepository.save(any(TrainerProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Test repeat vanity digits (e.g. 8888888888)
+        TrainerProfileDTO dto = new TrainerProfileDTO();
+        dto.setBankAccount("8888888888");
+        TrainerProfileDTO result = service.saveProfileDraft("known@example.com", dto);
+        assertNotNull(result);
+        assertEquals("8888888888", existing.getBankAccount());
+
+        // Test decreasing digits (e.g. 9876543210)
+        dto.setBankAccount("9876543210");
+        TrainerProfileDTO resultDescending = service.saveProfileDraft("known@example.com", dto);
+        assertNotNull(resultDescending);
+        assertEquals("9876543210", existing.getBankAccount());
     }
 
     @Test

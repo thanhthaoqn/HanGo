@@ -356,5 +356,27 @@ void main() {
         isTrue,
       );
     });
+
+    test('Validates bank account: accepts vanity/repeated numbers, rejects letters/special chars', () {
+      // Vanity / repeated numbers / increasing / decreasing must be accepted
+      expect(validateTrainerBankAccount('8888888888', isVi: true), isNull);
+      expect(validateTrainerBankAccount('1234567890', isVi: true), isNull); // Số tăng dần
+      expect(validateTrainerBankAccount('9876543210', isVi: true), isNull); // Số giảm dần
+      expect(validateTrainerBankAccount('0000000000', isVi: true), isNull);
+      expect(validateTrainerBankAccount('999999', isVi: true), isNull);
+
+      // Rejects non-digits (letters or special characters)
+      expect(validateTrainerBankAccount('123456ABC', isVi: true), isNotNull);
+      expect(validateTrainerBankAccount('123-456-789', isVi: true), isNotNull);
+      expect(validateTrainerBankAccount('12345 6789', isVi: true), isNotNull);
+
+      // Rejects invalid length (< 6 or > 20)
+      expect(validateTrainerBankAccount('12345', isVi: true), isNotNull);
+      expect(validateTrainerBankAccount('123456789012345678901', isVi: true), isNotNull);
+
+      // Empty handling
+      expect(validateTrainerBankAccount('', isVi: true, requiredField: true), isNotNull);
+      expect(validateTrainerBankAccount('', isVi: true, requiredField: false), isNull);
+    });
   });
 }

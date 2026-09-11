@@ -8,6 +8,7 @@ import 'trainer_onboarding_status_page.dart';
 import 'trainer_onboarding_details_page.dart';
 import 'trainer_payout_details_page.dart';
 import 'trainer_onboarding_shell_page.dart';
+import 'trainer_type_selection_page.dart';
 
 class TrainerOnboardingAgreementPage extends StatefulWidget {
   final Map<String, dynamic> profilePayload;
@@ -245,8 +246,47 @@ class _TrainerOnboardingAgreementPageState
               const SizedBox(height: 24),
               // Submit action
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  OutlinedButton.icon(
+                    onPressed: _isSubmitting
+                        ? null
+                        : () {
+                            final shellState =
+                                TrainerOnboardingShellPage.of(context);
+                            const backPage = TrainerTypeSelectionPage(
+                              isEmbedded: true,
+                            );
+                            if (shellState != null) {
+                              shellState.updateBody(backPage);
+                            } else {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const TrainerOnboardingShellPage(
+                                    initialBody: backPage,
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                    icon: const Icon(Icons.arrow_back_rounded, size: 16),
+                    label: Text(
+                      isVi ? 'Chọn lại vai trò' : 'Change Role',
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF64748B),
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 16,
+                      ),
+                    ),
+                  ),
                   ElevatedButton.icon(
                     onPressed:
                         (_agreementSigned && !_isSubmitting)

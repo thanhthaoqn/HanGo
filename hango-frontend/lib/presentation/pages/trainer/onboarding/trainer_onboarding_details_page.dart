@@ -248,6 +248,8 @@ class _TrainerOnboardingDetailsPageState
       Uint8List bytesToUpload = Uint8List.fromList(picked.bytes);
       String fileNameToUpload = picked.name;
 
+      if (!mounted) return null;
+
       if (!allowPdf) {
         final croppedBytes = await ImageCropperDialog.show(
           context,
@@ -1381,52 +1383,60 @@ class _TrainerOnboardingDetailsPageState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(
-                      Icons.arrow_back_rounded,
-                      color: Color(0xFF0F172A),
-                    ),
-                    tooltip: 'Back to Terms & Agreement',
-                    onPressed: () {
-                      final payload = _buildPayload();
-                      _onboardingService.saveProfileDraft(payload);
-                      final trainerType =
-                          payload['trainerType'] ?? 'PROFESSIONAL';
-                      final agreementPage = TrainerOnboardingAgreementPage(
-                        profilePayload: payload,
-                        trainerType: trainerType,
-                        isEmbedded: true,
-                      );
-                      final shellState = TrainerOnboardingShellPage.of(context);
-                      if (shellState != null) {
-                        shellState.updateBody(agreementPage);
-                      } else {
-                        Navigator.pop(context);
-                      }
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'Complete Teaching Profile & Application',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A),
-                        fontFamily: 'Outfit',
-                      ),
-                    ),
-                  ),
-                ],
+              Text(
+                isVi
+                    ? 'Hoàn thiện hồ sơ giảng dạy'
+                    : 'Complete Teaching Profile & Application',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A),
+                  fontFamily: 'Outfit',
+                ),
               ),
               const SizedBox(height: 32),
               _buildFormBody(isVi),
               const SizedBox(height: 40),
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  OutlinedButton.icon(
+                    onPressed: _isLoading
+                        ? null
+                        : () {
+                            final payload = _buildPayload();
+                            _onboardingService.saveProfileDraft(payload);
+                            final trainerType =
+                                payload['trainerType'] ?? 'PROFESSIONAL';
+                            final agreementPage = TrainerOnboardingAgreementPage(
+                              profilePayload: payload,
+                              trainerType: trainerType,
+                              isEmbedded: true,
+                            );
+                            final shellState =
+                                TrainerOnboardingShellPage.of(context);
+                            if (shellState != null) {
+                              shellState.updateBody(agreementPage);
+                            } else {
+                              Navigator.pop(context);
+                            }
+                          },
+                    icon: const Icon(Icons.arrow_back_rounded, size: 16),
+                    label: Text(
+                      isVi ? 'Xem lại điều khoản' : 'Back to Terms',
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF64748B),
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 18,
+                      ),
+                    ),
+                  ),
                   ElevatedButton.icon(
                     onPressed: _isLoading ? null : _handleSubmit,
                     icon: _isLoading

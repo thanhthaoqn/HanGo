@@ -76,13 +76,15 @@ String? validateTrainerBankAccount(
         ? 'Vui lòng nhập số tài khoản ngân hàng.'
         : 'Please enter the bank account number.';
   }
-  if (!_digitsOnlyRegex.hasMatch(account) ||
-      account.length < 6 ||
-      account.length > 20 ||
-      _isDummyFinancialNumber(account)) {
+  if (!_digitsOnlyRegex.hasMatch(account)) {
     return isVi
-        ? 'Số tài khoản phải gồm 6-20 chữ số hợp lệ.'
-        : 'Bank account must contain 6-20 valid digits.';
+        ? 'Số tài khoản chỉ được chứa chữ số (không chứa chữ hoặc ký tự đặc biệt).'
+        : 'Bank account must contain digits only (no letters or special characters).';
+  }
+  if (account.length < 6 || account.length > 20) {
+    return isVi
+        ? 'Số tài khoản phải gồm 6-20 chữ số.'
+        : 'Bank account must contain 6-20 digits.';
   }
   return null;
 }

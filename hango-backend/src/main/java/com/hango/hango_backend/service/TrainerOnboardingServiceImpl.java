@@ -152,8 +152,8 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
             }
             profile = trainerProfileRepository.save(TrainerProfile.builder()
                     .user(user)
-                    .trainerType(TRAINER_TYPE_PROFESSIONAL)
-                    .revenueShare(defaultRevenueShareForTrainerType(TRAINER_TYPE_PROFESSIONAL))
+                    .trainerType(null)
+                    .revenueShare(null)
                     .status(STATUS_PENDING)
                     .build());
         }
@@ -826,9 +826,8 @@ public class TrainerOnboardingServiceImpl implements TrainerOnboardingService {
             throw new ApiException("A valid Vietnamese contact phone number is required.", HttpStatus.BAD_REQUEST);
         }
         String bankAccount = trimToNull(dto.getBankAccount());
-        if (bankAccount != null
-                && (!bankAccount.matches("\\d{6,20}") || isDummyFinancialNumber(bankAccount))) {
-            throw new ApiException("Bank account number must contain 6 to 20 digits.", HttpStatus.BAD_REQUEST);
+        if (bankAccount != null && !bankAccount.matches("\\d{6,20}")) {
+            throw new ApiException("Bank account number must contain 6 to 20 digits (digits only).", HttpStatus.BAD_REQUEST);
         }
         String accountName = trimToNull(dto.getBankAccountName());
         if (accountName != null && !accountName.toUpperCase(Locale.ROOT).matches("[A-Z ]{2,100}")) {
