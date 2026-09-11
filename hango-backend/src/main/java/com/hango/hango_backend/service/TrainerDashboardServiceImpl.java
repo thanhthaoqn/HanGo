@@ -956,7 +956,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
         boolean isManager = user.getRoles().stream()
                 .anyMatch(r -> r.getRoleName().equalsIgnoreCase("COURSE_MANAGER")
-                        || r.getRoleName().equalsIgnoreCase("ADMINISTRATOR")
+                        || r.getRoleName().equalsIgnoreCase("ADMINISTRATOR"));
 
         List<Object[]> exams;
         if (isManager) {
