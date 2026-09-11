@@ -125,6 +125,8 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
         const SizedBox(height: 24),
         _buildMainCharts(widget.isDesktop),
         const SizedBox(height: 24),
+        _buildPlatformGrowthChart(), // NEW
+        const SizedBox(height: 24),
         _buildBottomSection(widget.isDesktop), // Pipeline & Quick Actions
         const SizedBox(height: 24),
         _buildLearningAnalytics(widget.isDesktop), // Phase 2
@@ -365,7 +367,7 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
 
   Widget _buildMainCharts(bool isDesktop) {
     final revenueChart = _buildRevenueChart();
-    final userGrowthChart = _buildUserGrowthChart();
+    final userDistributionChart = _buildUserDistributionChart();
 
     if (isDesktop) {
       return Row(
@@ -373,12 +375,12 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
         children: [
           Expanded(flex: 2, child: revenueChart),
           const SizedBox(width: 24),
-          Expanded(flex: 1, child: userGrowthChart),
+          Expanded(flex: 1, child: userDistributionChart),
         ],
       );
     } else {
       return Column(
-        children: [revenueChart, const SizedBox(height: 24), userGrowthChart],
+        children: [revenueChart, const SizedBox(height: 24), userDistributionChart],
       );
     }
   }
@@ -389,8 +391,10 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
     final revenue = _stats!['revenue'] ?? {};
 
     List<FlSpot> spots = [];
+    double maxY = 0;
     for (int i = 0; i < revenueByDay.length; i++) {
       double val = (revenueByDay[i]['amount'] ?? 0).toDouble();
+      if (val > maxY) maxY = val;
       spots.add(FlSpot(i.toDouble(), val));
     }
 
@@ -451,6 +455,7 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
                 ? const Center(child: Text('No data for selected period'))
                 : LineChart(
                     LineChartData(
+                      minY: 0,
                       gridData: FlGridData(
                         show: true,
                         drawVerticalLine: false,
@@ -464,6 +469,7 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
                           sideTitles: SideTitles(
                             showTitles: true,
                             reservedSize: 60,
+                            interval: maxY > 0 ? (maxY / 5) : null,
                             getTitlesWidget: (value, meta) {
                               return Text(
                                 _formatCompactCurrency(value),
@@ -478,16 +484,12 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
                         bottomTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
+                            interval: revenueByDay.length > 0 ? (revenueByDay.length / 6).ceilToDouble() : 1,
                             getTitlesWidget: (value, meta) {
-                              if (value.toInt() >= 0 &&
-                                  value.toInt() < revenueByDay.length) {
-                                final dateStr =
-                                    revenueByDay[value.toInt()]['date'];
+                              if (value == value.toInt().toDouble() && value.toInt() >= 0 && value.toInt() < revenueByDay.length) {
+                                final dateStr = revenueByDay[value.toInt()]['date'];
                                 final date = DateTime.tryParse(dateStr);
-                                if (date != null &&
-                                    (value.toInt() %
-                                            (revenueByDay.length > 7 ? 3 : 1) ==
-                                        0)) {
+                                if (date != null) {
                                   return Padding(
                                     padding: const EdgeInsets.only(top: 8),
                                     child: Text(
@@ -516,6 +518,7 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
                         LineChartBarData(
                           spots: spots,
                           isCurved: true,
+                          preventCurveOverShooting: true,
                           curveSmoothness: 0.35,
                           color: const Color(0xFF10B981),
                           barWidth: 4,
@@ -601,7 +604,190 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
     );
   }
 
-  Widget _buildUserGrowthChart() {
+  Widget _buildPlatformGrowthChart() {
+    final trends = _stats!['trends'] ?? {};
+    final userGrowthByDay = (trends['userGrowthByDay'] as List?) ?? [];
+    
+    if (userGrowthByDay.isEmpty) return const SizedBox.shrink();
+
+    List<FlSpot> userSpots = [];
+    List<FlSpot> enrollSpots = [];
+    double maxY = 0;
+
+    for (int i = 0; i < userGrowthByDay.length; i++) {
+      double users = (userGrowthByDay[i]['newUsers'] ?? 0).toDouble();
+      double enrolls = (userGrowthByDay[i]['newEnrollments'] ?? 0).toDouble();
+      
+      if (users > maxY) maxY = users;
+      if (enrolls > maxY) maxY = enrolls;
+      
+      userSpots.add(FlSpot(i.toDouble(), users));
+      enrollSpots.add(FlSpot(i.toDouble(), enrolls));
+    }
+
+    return Container(
+      height: 480,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+        border: Border.all(color: const Color(0xFFF1F5F9)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Platform Growth Trend',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
+                  fontFamily: 'Outfit',
+                ),
+              ),
+              Row(
+                children: [
+                  Row(
+                    children: [
+                      Container(width: 12, height: 12, decoration: BoxDecoration(color: const Color(0xFF3B82F6), borderRadius: BorderRadius.circular(2))),
+                      const SizedBox(width: 6),
+                      const Text('New Users', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                    ],
+                  ),
+                  const SizedBox(width: 16),
+                  Row(
+                    children: [
+                      Container(width: 12, height: 12, decoration: BoxDecoration(color: const Color(0xFFF59E0B), borderRadius: BorderRadius.circular(2))),
+                      const SizedBox(width: 6),
+                      const Text('New Enrollments', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Expanded(
+            child: LineChart(
+              LineChartData(
+                minY: 0,
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  getDrawingHorizontalLine: (value) => FlLine(
+                    color: const Color(0xFFF1F5F9),
+                    strokeWidth: 1,
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 40,
+                      interval: maxY > 0 ? (maxY / 5).ceilToDouble() : null,
+                      getTitlesWidget: (value, meta) {
+                        return Text(
+                          value.toInt().toString(),
+                          style: const TextStyle(
+                            color: Color(0xFF94A3B8),
+                            fontSize: 11,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      interval: userGrowthByDay.length > 0 ? (userGrowthByDay.length / 6).ceilToDouble() : 1,
+                      getTitlesWidget: (value, meta) {
+                        if (value == value.toInt().toDouble() && value.toInt() >= 0 && value.toInt() < userGrowthByDay.length) {
+                          final dateStr = userGrowthByDay[value.toInt()]['date'];
+                          final date = DateTime.tryParse(dateStr);
+                          if (date != null) {
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                DateFormat('MMM d').format(date),
+                                style: const TextStyle(
+                                  color: Color(0xFF94A3B8),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            );
+                          }
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                ),
+                borderData: FlBorderData(show: false),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: userSpots,
+                    isCurved: true,
+                    preventCurveOverShooting: true,
+                    curveSmoothness: 0.35,
+                    color: const Color(0xFF3B82F6),
+                    barWidth: 3,
+                    isStrokeCapRound: true,
+                    dotData: const FlDotData(show: false),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFF3B82F6).withOpacity(0.3),
+                          const Color(0xFF3B82F6).withOpacity(0.0),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                    ),
+                  ),
+                  LineChartBarData(
+                    spots: enrollSpots,
+                    isCurved: true,
+                    preventCurveOverShooting: true,
+                    curveSmoothness: 0.35,
+                    color: const Color(0xFFF59E0B),
+                    barWidth: 3,
+                    isStrokeCapRound: true,
+                    dotData: const FlDotData(show: false),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFFF59E0B).withOpacity(0.3),
+                          const Color(0xFFF59E0B).withOpacity(0.0),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUserDistributionChart() {
     final overview = _stats!['overview'] ?? {};
     final totalUsers = (overview['totalActiveUsers'] ?? 0) as int;
     if (totalUsers == 0) return const SizedBox.shrink();

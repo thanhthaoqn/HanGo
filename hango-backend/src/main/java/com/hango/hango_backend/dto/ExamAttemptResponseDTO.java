@@ -23,4 +23,5 @@ public class ExamAttemptResponseDTO {
     private Map<String, Integer> answers;
     private Map<String, Boolean> correctness;
     private Map<String, Integer> correctAnswers;
+    private Integer questionCount;
 }

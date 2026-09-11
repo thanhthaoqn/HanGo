@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../routes/app_routes.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/shared_footer.dart';
 import '../../../data/repositories/course_repository.dart';
 import '../../../data/repositories/exam_repository.dart';
 import '../../../domain/model/course.dart';
-import 'learning_pathway_page.dart';
 import '../course/course_detail_page.dart';
 import '../course/lesson_detail_page.dart';
 import '../course/course_completion_page.dart';
 import '../../../domain/model/course_detail.dart';
 import '../../../utils/language_manager.dart';
-import '../exam/exam_result_page.dart';
 import '../../../domain/entities/exam.dart';
 
 class MyLearningPage extends StatefulWidget {
@@ -439,14 +439,8 @@ class _MyLearningPageState extends State<MyLearningPage> {
                 if (lastLessonId != null) {
                   if (!mounted) return;
                   Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => LessonDetailPage(
-                        courseId: course.id,
-                        lessonId: lastLessonId,
-                      ),
-                    ),
+                  context.push(
+                    '/courses/${course.id}/lessons/$lastLessonId',
                   );
                   return;
                 }
@@ -476,33 +470,33 @@ class _MyLearningPageState extends State<MyLearningPage> {
                 }
 
                 if (targetLesson != null) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => LessonDetailPage(
-                        courseId: course.id,
-                        lessonId: targetLesson!.id,
-                      ),
-                    ),
+                  context.push(
+                    '/courses/${course.id}/lessons/${targetLesson.id}',
                   );
                 } else {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          CourseDetailPage(courseId: course.id),
-                    ),
-                  );
+                  try {
+                    context.push('/courses/${course.id}');
+                  } catch (_) {
+                    Navigator.of(context, rootNavigator: true).push(
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            CourseDetailPage(courseId: course.id),
+                      ),
+                    );
+                  }
                 }
               } catch (e) {
                 if (!mounted) return;
                 Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => CourseDetailPage(courseId: course.id),
-                  ),
-                );
+                try {
+                  context.push('/courses/${course.id}');
+                } catch (_) {
+                  Navigator.of(context, rootNavigator: true).push(
+                    MaterialPageRoute(
+                      builder: (context) => CourseDetailPage(courseId: course.id),
+                    ),
+                  );
+                }
               }
             },
             style: ElevatedButton.styleFrom(
@@ -629,12 +623,15 @@ class _MyLearningPageState extends State<MyLearningPage> {
                   ),
                 );
               } else {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => CourseDetailPage(courseId: course.id),
-                  ),
-                );
+                try {
+                  context.push('/courses/${course.id}');
+                } catch (_) {
+                  Navigator.of(context, rootNavigator: true).push(
+                    MaterialPageRoute(
+                      builder: (context) => CourseDetailPage(courseId: course.id),
+                    ),
+                  );
+                }
               }
             },
             borderRadius: BorderRadius.circular(12),
@@ -1088,68 +1085,32 @@ class _MyLearningPageState extends State<MyLearningPage> {
                   ],
                 ),
                 child: ListTile(
-                  onTap: () async {
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (ctx) => const Center(
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Color(0xFF28B79B),
-                          ),
-                        ),
-                      ),
+                  onTap: () {
+                    // Navigate to ExamResultPage — it lazy-loads questions
+                    // and shows AI recommendations, skill breakdown, etc.
+                    final examId = attempt['examId']?.toString() ?? '1';
+                    final qCount = attempt['questionCount'] ?? 50;
+                    final int questionCount = qCount is int ? qCount : int.tryParse(qCount.toString()) ?? 50;
+
+                    final exam = Exam(
+                      id: examId,
+                      title: examTitle,
+                      creatorName: 'System',
+                      questionCount: questionCount,
+                      durationMinutes: 60,
+                      rating: 5.0,
+                      learnerCountFormatted: '0',
                     );
 
-                    try {
-                      final examId = attempt['examId']?.toString() ?? '1';
-                      final questions = await _examRepository.fetchExamQuestions(examId);
-
-                      // Parse user answers
-                      Map<int, int> userAnswers = {};
-                      final answersMap = attempt['answers'] as Map?;
-                      if (answersMap != null) {
-                        answersMap.forEach((key, value) {
-                          int parsedKey = int.tryParse(key.toString()) ?? 1;
-                          int parsedVal = (value is num) ? value.toInt() : int.tryParse(value.toString()) ?? -1;
-                          userAnswers[parsedKey - 1] = parsedVal;
-                        });
-                      }
-
-                      // Dummy exam
-                      final dummyExam = Exam(
-                        id: examId,
-                        title: examTitle,
-                        creatorName: 'System',
-                        questionCount: questions.length,
-                        durationMinutes: 60,
-                        rating: 5.0,
-                        learnerCountFormatted: '0',
-                      );
-
-                      if (!mounted) return;
-                      Navigator.pop(context); // Close loading dialog
-
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ExamResultPage(
-                            exam: dummyExam,
-                            score: scoreVal,
-                            correctCount: (scoreVal * questions.length / 10).round(),
-                            userAnswers: userAnswers,
-                            examQuestions: questions,
-                            attempt: attempt,
-                          ),
-                        ),
-                      );
-                    } catch (e) {
-                      if (!mounted) return;
-                      Navigator.pop(context); // Close loading dialog
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Failed to load details: $e')),
-                      );
-                    }
+                    context.push(
+                      AppRoutes.examResult,
+                      extra: {
+                        'exam': exam,
+                        'score': scoreVal,
+                        'correctCount': (scoreVal * questionCount / 10).round(),
+                        'attempt': attempt,
+                      },
+                    );
                   },
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 20,
@@ -1367,12 +1328,7 @@ class _MyLearningPageState extends State<MyLearningPage> {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const LearningPathwayPage(),
-                  ),
-                );
+                context.go(AppRoutes.pathway);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF28B79B),

@@ -41,6 +41,14 @@ class _EditCoursePageState extends State<EditCoursePage> {
 
   // Import-template compatible fields
   final TextEditingController _codeController = TextEditingController();
+  // Trainer tu nhap gia ban that su cua khoa hoc (thay vi truoc day Backend
+  // tu tinh va ghi de - xem TrainerDashboardServiceImpl.updateTrainerCourse).
+  final TextEditingController _priceController = TextEditingController();
+  // Ly do dat gia (hien thi cho Course Manager tham khao khi gia thuc te khac
+  // gia goi y - xem panel "Price Negotiation" trong course_review_dashboard_dialog.dart).
+  final TextEditingController _priceNoteController = TextEditingController();
+  // Gia THAM KHAO do he thong tinh (lam tron 50k, gioi han 300k-700k) - chi
+  // hien thi de Trainer/Course Manager doi chieu, KHONG con la gia ban that.
   num? _suggestedPrice;
   final TextEditingController _objectivesController = TextEditingController();
 
@@ -83,6 +91,11 @@ class _EditCoursePageState extends State<EditCoursePage> {
     _loadTrainerInfo();
     _loadSystemParameters();
     _loadCourseDetail();
+    // Rebuild ngay khi Trainer go gia, de o "Why this price?" hien/an dung luc
+    // khi gia thuc te bat dau khac gia goi y (khong phai doi den lan save tiep theo).
+    _priceController.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -91,6 +104,8 @@ class _EditCoursePageState extends State<EditCoursePage> {
     _descriptionController.dispose();
     _versionController.dispose();
     _codeController.dispose();
+    _priceController.dispose();
+    _priceNoteController.dispose();
     _objectivesController.dispose();
     super.dispose();
   }
@@ -179,6 +194,15 @@ class _EditCoursePageState extends State<EditCoursePage> {
     }
   }
 
+  // Chuyen gia tri price (num, co the la double vd 500000.0) tu JSON thanh
+  // chuoi so nguyen sach de hien thi trong TextFormField (vd "500000").
+  String _formatPriceForInput(dynamic rawPrice) {
+    if (rawPrice == null) return '';
+    final numValue = rawPrice is num ? rawPrice : num.tryParse(rawPrice.toString());
+    if (numValue == null) return '';
+    return numValue.round().toString();
+  }
+
   Future<void> _loadCourseDetail() async {
     setState(() {
       _isLoadingCourse = true;
@@ -208,6 +232,8 @@ class _EditCoursePageState extends State<EditCoursePage> {
           _uploadedImageUrl = data['thumbnailUrl'] ?? '';
           _versionController.text = data['version'] ?? 'v1.0';
           _codeController.text = data['code'] ?? '';
+          _priceController.text = _formatPriceForInput(data['price']);
+          _priceNoteController.text = data['priceNote'] ?? '';
           _suggestedPrice = data['suggestedPrice'];
           _rejectionReason = data['rejectionReason'];
           _objectivesController.text = data['objectives'] ?? '';
@@ -359,6 +385,12 @@ class _EditCoursePageState extends State<EditCoursePage> {
       return false;
     }
 
+    final priceValue = double.tryParse(_priceController.text.trim());
+    if (priceValue == null || priceValue < 0) {
+      if (showToast) ToastHelper.showError(context, 'Please enter a valid, non-negative price');
+      return false;
+    }
+
     setState(() {
       _isSaving = true;
     });
@@ -369,6 +401,10 @@ class _EditCoursePageState extends State<EditCoursePage> {
         throw Exception('Authentication token not found');
       }
 
+      // '_sections' la toan bo cay du lieu Section -> Lesson dang duoc soan
+      // thao tren man hinh nay (Content Building). PUT nguyen ca cay len,
+      // Backend (TrainerDashboardServiceImpl.updateTrainerCourse) se tu doi
+      // chieu voi DB de biet Section/Lesson nao them/sua/xoa.
       final uri = Uri.parse('$apiBaseUrl/trainer/courses/$_currentCourseId');
       final body = jsonEncode({
         'title': _titleController.text.trim(),
@@ -379,6 +415,8 @@ class _EditCoursePageState extends State<EditCoursePage> {
         'categoryKey': _selectedCategoryKey,
         'difficultyKey': _selectedLevelKey,
         'thumbnailUrl': _uploadedImageUrl ?? '',
+        'price': double.tryParse(_priceController.text.trim()) ?? 0,
+        'priceNote': _priceNoteController.text.trim(),
         'sessions': _sections,
       });
 
@@ -395,7 +433,10 @@ class _EditCoursePageState extends State<EditCoursePage> {
         final respData = jsonDecode(response.body);
         final newCourseId = respData['courseId'] as int?;
         bool isNewDraft = false;
-        
+
+        // Neu khoa hoc dang sua da PUBLISHED, Backend tra ve courseId KHAC
+        // (id cua ban DRAFT V2 moi tao) - phai chuyen sang lam viec voi id moi
+        // nay cho cac lan luu tiep theo, neu khong se PUT nham vao course cu.
         if (newCourseId != null && newCourseId != _currentCourseId) {
           _currentCourseId = newCourseId;
           isNewDraft = true;
@@ -454,6 +495,10 @@ class _EditCoursePageState extends State<EditCoursePage> {
           _courseStatus = data['status'] ?? 'DRAFT';
           _versionController.text = data['version'] ?? 'v1.0';
           _codeController.text = data['code'] ?? '';
+          // Dong bo lai price tu server (vd truong hop khoa hoc dau tien bi
+          // Backend tu dong ep ve 0d do khuyen mai - xem submitTrainerCourse).
+          _priceController.text = _formatPriceForInput(data['price']);
+          _priceNoteController.text = data['priceNote'] ?? '';
           _suggestedPrice = data['suggestedPrice'];
         });
       }
@@ -486,6 +531,8 @@ class _EditCoursePageState extends State<EditCoursePage> {
         'categoryKey': _selectedCategoryKey,
         'difficultyKey': _selectedLevelKey,
         'thumbnailUrl': _uploadedImageUrl ?? '',
+        'price': double.tryParse(_priceController.text.trim()) ?? 0,
+        'priceNote': _priceNoteController.text.trim(),
         'sessions': _sections,
       });
 
@@ -847,7 +894,11 @@ class _EditCoursePageState extends State<EditCoursePage> {
             ),
           ],
         ),
-        if (_suggestedPrice == 0) ...[
+        // Ngưỡng nhận biết "khoa hoc dau tien mien phi": kiem tra GIA THAT
+        // (_priceController, do Backend tu ep ve 0 khi submit lan dau - xem
+        // TrainerDashboardServiceImpl.submitTrainerCourse), KHONG con dung
+        // _suggestedPrice nua vi gia tham khao gio luon nam trong 300k-700k.
+        if (_priceController.text.trim() == '0') ...[
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1502,65 +1553,125 @@ class _EditCoursePageState extends State<EditCoursePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'System Auto-Price',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF4B5563),
-                            fontFamily: 'Outfit',
-                          ),
+                    const Text(
+                      'Course Price (VNĐ) *',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF4B5563),
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Trainer tu nhap gia ban - day la nguon "su that" duy nhat
+                    // cho gia thuc te cua khoa hoc, khac voi o duoi (chi la gia
+                    // tham khao he thong tinh, khong con tu dong ghi de len day).
+                    TextFormField(
+                      controller: _priceController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: false),
+                      decoration: InputDecoration(
+                        hintText: 'e.g. 500000',
+                        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                         ),
-                      ],
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Color(0xFF20B486)),
+                        ),
+                      ),
+                      style: const TextStyle(fontFamily: 'Outfit', fontSize: 14),
+                      validator: (value) {
+                        final parsed = double.tryParse((value ?? '').trim());
+                        if (parsed == null || parsed < 0) {
+                          return 'Enter a valid, non-negative price';
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
                         Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            decoration: BoxDecoration(
-                              color: _suggestedPrice == 0 ? const Color(0xFFE6F4EA) : const Color(0xFFF1F5F9), // Light green if free
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: _suggestedPrice == 0 ? const Color(0xFFCEEAD6) : const Color(0xFFE2E8F0)),
-                            ),
-                            child: Text(
-                              _suggestedPrice != null 
-                                  ? (_suggestedPrice == 0 ? 'Free (First course promotion)' : '${_suggestedPrice} VNĐ') 
-                                  : 'Calculating...',
-                              style: TextStyle(
-                                fontFamily: 'Outfit',
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: _suggestedPrice == 0 ? const Color(0xFF137333) : const Color(0xFF0F172A),
-                              ),
+                          child: Text(
+                            _suggestedPrice != null
+                                ? 'Suggested reference price: ${_suggestedPrice} VNĐ'
+                                : 'Suggested reference price: calculating...',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF64748B),
+                              fontFamily: 'Outfit',
+                              height: 1.4,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
                         Tooltip(
-                          message: 'Refresh system price (Base + Lessons + Duration)',
+                          message: 'Refresh suggested price (Base + Lessons + Duration)',
                           child: IconButton(
-                            icon: const Icon(Icons.refresh, color: Color(0xFF20B486)),
+                            icon: const Icon(Icons.refresh, size: 18, color: Color(0xFF20B486)),
                             onPressed: _reEvaluatePrice,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     const Text(
-                      'Price is automatically calculated by the system based on Trainer Profile, Academic Level, Lesson Count, and Total Duration.',
+                      'This is just a system-computed reference (based on Trainer Profile, Academic Level, Lesson Count, Total Duration) - you decide the actual selling price above.',
                       style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF64748B),
+                        fontSize: 11,
+                        color: Color(0xFF94A3B8),
                         fontFamily: 'Outfit',
-                        height: 1.4,
+                        height: 1.3,
                       ),
                     ),
-
+                    const SizedBox(height: 12),
+                    // Chi hien thi khi gia thuc te khac gia goi y - de Course
+                    // Manager thay ro ly do trong panel "Price Negotiation"
+                    // (course_review_dashboard_dialog.dart) khi duyet khoa hoc.
+                    if (_priceController.text.trim().isNotEmpty &&
+                        _suggestedPrice != null &&
+                        double.tryParse(_priceController.text.trim()) != _suggestedPrice) ...[
+                      const Text(
+                        'Why this price? (optional, shown to Course Manager)',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF4B5563),
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextFormField(
+                        controller: _priceNoteController,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          hintText: 'e.g. Includes 1-on-1 mentoring sessions',
+                          hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: Color(0xFF20B486)),
+                          ),
+                        ),
+                        style: const TextStyle(fontFamily: 'Outfit', fontSize: 13),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -2066,6 +2177,10 @@ class _EditCoursePageState extends State<EditCoursePage> {
     );
   }
 
+  // User action: Trainer bam "Submit for review". Goi POST .../submit -> khoa
+  // hoc chuyen sang PENDING_APPROVAL (hoac PUBLISHED ngay neu nguoi tao la
+  // Course Manager/Admin - xem comment trong TrainerDashboardServiceImpl
+  // .submitTrainerCourse ben backend).
   Future<void> _submitCourseForReview() async {
     showDialog(
       context: context,

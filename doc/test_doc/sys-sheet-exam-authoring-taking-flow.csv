@@ -1,10 +1,10 @@
 Workflow,Exam Authoring- Matrix Generation- Review & Taking Flow
 Test requirement,"Verify the complete end-to-end Exam lifecycle through the actual UI: Trainer/Course Manager authoring (manual, matrix auto-generate, Excel import — including the confirmed Excel-import non-rollback gap), review/publish, and the Learner-side exam-taking, submission, scoring, and attempt-history experience — cross-checked against current ExamController/ExamService behavior, which enforces no fixed question-count/duration validation and runs the exam timer entirely client-side with no server-side deadline or double-submit check."
-Number of TCs,22
+Number of TCs,25
 Testing Round,Passed,Failed,Pending,N/A
-Round 1,0,0,22,0
-Round 2,0,0,22,0
-Round 3,0,0,22,0
+Round 1,0,0,25,0
+Round 2,0,0,25,0
+Round 3,0,0,25,0
 
 Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
 Exam Authoring,,,,
@@ -35,3 +35,11 @@ SYS_FLOW_EXM_TC20,"An anonymous status-filter query leaks non-public Exam metada
 SYS_FLOW_EXM_TC21,"A Trainer cannot edit or delete another Trainer's Exam.","1. Log in as Trainer A. 2. Attempt to open Trainer B's Exam in the authoring UI and edit/delete it (via a guessed/shared Exam id if the UI doesn't list it).","The action is blocked — either the Exam is not shown in Trainer A's own list at all, or the edit/delete action is rejected with an ownership error.","- Two different Trainer accounts each own at least one Exam."
 End-to-End,,,,
 SYS_FLOW_EXM_TC22,"Full journey: Trainer authors an Exam, Course Manager publishes it, a Learner takes and submits it, and the score is recorded.","1. Trainer authors an Exam (SYS_FLOW_EXM_TC01) and submits it (SYS_FLOW_EXM_TC06). 2. Course Manager publishes it (SYS_FLOW_EXM_TC07). 3. Learner takes and submits the Exam (SYS_FLOW_EXM_TC11-TC13). 4. Confirm the attempt appears in the Learner's history with the correct score.","Every stage transitions correctly end-to-end; the final scored attempt is available for downstream Weakness Analysis / Recommendation (see SYS_FLOW_PWY and SYS_FLOW_AIR flows).","- Fresh Exam authored for this journey."
+Exam Activity History,,,,
+SYS_FLOW_EXM_TC23,"Trainer/Course Manager opens the read-only Exam History dialog and sees a chronological timeline of everything that happened to the Exam (create, edit, submit, reject, publish, hide/unhide) - a plain append-only log, unlike Course versioning which spawns a new version row per change.","1. Open Trainer > Exams (or Course Manager > Exams for Review), select an Exam that has been through several actions (created, edited, submitted, rejected, re-edited, published). 2. Tap ""History"".","The dialog lists each recorded action with who did it and when, in chronological order; the SAME Exam id is used throughout (no new exam/version was created by any of the edits)."
+SYS_FLOW_EXM_TC24,"A Trainer who does not own the Exam cannot open its History even by direct link/id - correctly rejected, unlike several sibling authoring actions on the same Trainer Exams area that only manage a 400 instead of the technically-correct 403.","1. Log in as Trainer B (not the owner, no manager role). 2. Attempt to open the History dialog for an Exam owned by Trainer A (via a guessed/shared Exam id if the UI itself never surfaces it).","The request is rejected with a clear ""not authorized"" error (backend returns 403, distinct from the 400 seen on several other own-vs-others' Exam actions in this app)."
+Entry Placement Exam Suggestion,,,,
+SYS_FLOW_EXM_TC25,"A Learner who has not yet completed the auto-seeded ""Global Entry Placement Test"" (Exam id 1035) sees a one-time suggestion dialog on the Learner Home screen prompting them to take it; a Learner who has already completed it does not.","1. Log in as a LEARNER who has never attempted the Entry Placement Test. 2. Open the Learner Home screen and observe.
+3. Tap ""Take Now"" to confirm it opens the Entry Exam instruction/start screen for that specific exam.
+4. Separately, log in as a Learner who HAS already completed it and reload Learner Home.","Step 2-3: the suggestion dialog appears (client-side check against GET /api/v1/exams/my-attempts for examId 1035) and ""Take Now"" navigates into the real Entry Placement Test (auto-seeded at startup, 40 questions across 25 skill domains, PUBLISHED/PUBLIC with no manual authoring needed).
+Step 4: the dialog does NOT appear for a Learner who already has a completed attempt on exam 1035; dismissing the dialog on a first visit does not block any other app functionality.","- A LEARNER account with no prior attempt on exam id 1035, and a second LEARNER account that has already completed it."

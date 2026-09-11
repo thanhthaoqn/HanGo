@@ -21,4 +21,5 @@ public class ExamResponseDTO {
     private String thumbnailUrl;
     private String rejectionReason;
     private java.time.LocalDateTime createdAt;
+    private Boolean isEntryExam;
 }

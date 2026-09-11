@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../routes/app_routes.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:hango/presentation/widgets/internal_app_header.dart';
 import '../../../utils/config.dart';
@@ -9,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
 import '../login_page.dart';
 import 'trainer_dashboard_page.dart';
+import 'trainer_shell_page.dart';
 
 import 'edit_course_page.dart';
 import '../course/course_detail_page.dart';
@@ -16,6 +19,8 @@ import '../../../utils/download_helper.dart';
 import '../../../utils/toast_helper.dart';
 import 'trainer_profile_page.dart';
 import '../../widgets/trainer/trainer_sidebar.dart';
+import '../../../domain/model/exam_import_error.dart';
+import '../course_manager/exam_import_error_dialog.dart';
 
 class TrainerCoursesPage extends StatefulWidget {
   final bool isEmbedded;
@@ -184,11 +189,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
   void _handleLogout() async {
     await _authService.logout();
     if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-        (route) => false,
-      );
+      context.go(AppRoutes.login);
     }
   }
 
@@ -545,6 +546,16 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
           }
         }
       } else {
+        final errors = _extractImportErrors(responseBody);
+        if (errors != null && errors.isNotEmpty) {
+          if (mounted) {
+            await showDialog(
+              context: context,
+              builder: (_) => ExamImportErrorDialog(errors: errors),
+            );
+          }
+          return;
+        }
         throw Exception(_extractErrorMessage(responseBody));
       }
     } catch (e) {
@@ -571,6 +582,24 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
       // Fall back to the raw response below.
     }
     return responseBody.isEmpty ? 'Import failed' : responseBody;
+  }
+
+  // Same "errors" list shape as the Exam Excel import
+  // (CourseImportValidationException on the backend), so the row/field-level
+  // popup can be reused as-is instead of just a flat toast message.
+  List<ExamImportError>? _extractImportErrors(String responseBody) {
+    try {
+      final data = jsonDecode(responseBody);
+      if (data is Map && data['errors'] is List) {
+        return (data['errors'] as List)
+            .whereType<Map<String, dynamic>>()
+            .map(ExamImportError.fromJson)
+            .toList();
+      }
+    } catch (_) {
+      // Not a structured-error response; fall back to the plain message.
+    }
+    return null;
   }
 
   String _formatDate(dynamic dateStr) {
@@ -781,19 +810,29 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
           PopupMenuButton<String>(
             onSelected: (val) {
               if (val == 'dashboard') {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const TrainerDashboardPage(),
-                  ),
-                );
+                final shell = TrainerShellPage.of(context);
+                if (shell != null) {
+                  shell.selectTab(0);
+                } else {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const TrainerDashboardPage(),
+                    ),
+                  );
+                }
               } else if (val == 'profile') {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const TrainerProfilePage(),
-                  ),
-                );
+                final shell = TrainerShellPage.of(context);
+                if (shell != null) {
+                  shell.selectTab(5);
+                } else {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const TrainerProfilePage(),
+                    ),
+                  );
+                }
               } else if (val == 'logout') {
                 _handleLogout();
               }
@@ -1616,13 +1655,16 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
               icon: Icons.visibility_outlined,
               label: 'View',
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        CourseDetailPage(courseId: extractId(course)),
-                  ),
-                );
+                try {
+                  context.push('/courses/${extractId(course)}');
+                } catch (_) {
+                  Navigator.of(context, rootNavigator: true).push(
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          CourseDetailPage(courseId: extractId(course)),
+                    ),
+                  );
+                }
               },
             ),
             if (_canManageCourses) ...[
@@ -2029,13 +2071,16 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                             OutlinedButton(
                               onPressed: () {
                                 Navigator.pop(context);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        CourseDetailPage(courseId: courseId),
-                                  ),
-                                );
+                                try {
+                                  context.push('/courses/$courseId');
+                                } catch (_) {
+                                  Navigator.of(context, rootNavigator: true).push(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          CourseDetailPage(courseId: courseId),
+                                    ),
+                                  );
+                                }
                               },
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: const Color(0xFF475569),

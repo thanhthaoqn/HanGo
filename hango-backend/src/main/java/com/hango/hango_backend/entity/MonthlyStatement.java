@@ -80,7 +80,13 @@ public class MonthlyStatement {
     @Column(name = "payout_receipt_url", length = 500)
     private String payoutReceiptUrl;
 
-    @Column(name = "created_at", insertable = false, updatable = false)
+    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+    }
 }

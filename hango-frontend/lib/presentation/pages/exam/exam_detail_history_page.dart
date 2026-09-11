@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../routes/app_routes.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../domain/entities/exam.dart';
 import '../../../data/repositories/exam_repository.dart';
@@ -374,17 +376,11 @@ class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
                   final token = prefs.getString('auth_token');
                   if (token == null || token.isEmpty) {
                     if (context.mounted) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const LoginPage(),
-                        ),
-                      );
+                      context.go(AppRoutes.login);
                     }
                   } else {
                     if (context.mounted) {
-                      Navigator.push(
-                        context,
+                      Navigator.of(context, rootNavigator: true).push(
                         MaterialPageRoute(
                           builder: (context) => TakeExamPage(exam: widget.exam),
                         ),

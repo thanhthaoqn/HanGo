@@ -31,6 +31,7 @@ public class TicketController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('TRAINER')")
     public ResponseEntity<?> createTicket(@RequestBody TicketCreateDTO dto) {
         try {
             Long userId = getCurrentUserId();
@@ -45,6 +46,7 @@ public class TicketController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('TRAINER')")
     public ResponseEntity<TicketResponseDTO> updateTicket(@PathVariable Long id, @RequestBody TicketCreateDTO dto) {
         Long userId = getCurrentUserId();
         if (userId == null) {
@@ -63,6 +65,7 @@ public class TicketController {
     }
 
     @GetMapping("/my-tickets")
+    @PreAuthorize("hasRole('TRAINER')")
     public ResponseEntity<Page<TicketResponseDTO>> getMyTickets(
             @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "0") int page,
@@ -85,7 +88,6 @@ public class TicketController {
             return ResponseEntity.status(401).build();
         }
         String message = body.get("message");
-        String attachmentUrls = body.get("attachmentUrls");
-        return ResponseEntity.ok(ticketService.addMessage(userId, id, message, attachmentUrls));
+        return ResponseEntity.ok(ticketService.addMessage(userId, id, message));
     }
 }

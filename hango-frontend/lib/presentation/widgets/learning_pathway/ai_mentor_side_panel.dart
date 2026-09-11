@@ -3,12 +3,15 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../../data/repositories/pathway_repository.dart';
 import '../../../domain/entities/learning_pathway.dart';
 import '../../../utils/language_manager.dart';
-import '../../pages/exam/list_exams_page.dart';
+import 'package:go_router/go_router.dart';
+import '../../../routes/app_routes.dart';
 
 class AIMentorSidePanel extends StatefulWidget {
   final LearningPathway pathway;
   final PathwayNode? selectedNode;
   final ValueChanged<LearningPathway>? onPathwayUpdated;
+  final VoidCallback? onRegenerateFree;
+  final ValueChanged<PathwayNode>? onOpenCourse;
   final bool isDarkMode;
 
   const AIMentorSidePanel({
@@ -16,6 +19,8 @@ class AIMentorSidePanel extends StatefulWidget {
     required this.pathway,
     this.selectedNode,
     this.onPathwayUpdated,
+    this.onRegenerateFree,
+    this.onOpenCourse,
     this.isDarkMode = false,
   });
 
@@ -57,13 +62,6 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
         setState(() {
           final isPathwayCompleted = widget.pathway.totalSteps > 0 && 
                                      widget.pathway.completedSteps >= widget.pathway.totalSteps;
-          
-          // Only remove the initial summary if the pathway is NOT completed.
-          // If completed, the summary is the final congratulatory message, so keep it!
-          if (!isPathwayCompleted && _messages.isNotEmpty &&
-              _messages.first['content'] == widget.pathway.mentorSummary) {
-            _messages.removeAt(0);
-          }
 
           final List<Map<String, String>> historyMessages = [];
           for (var item in history) {
@@ -80,9 +78,36 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
             }
           }
           
-          // Insert the loaded history at the beginning of _messages, so that
-          // dynamic messages (like mentorSummary or unlock announcements) remain at the bottom.
-          _messages.insertAll(0, historyMessages);
+          final List<Map<String, String>> newMessagesList = [];
+          
+          // 1. Initial greeting
+          if (!isPathwayCompleted && widget.pathway.mentorSummary.trim().isNotEmpty) {
+            newMessagesList.add({
+              'role': 'mentor',
+              'content': widget.pathway.mentorSummary,
+            });
+          }
+          
+          // 2. Chat History
+          newMessagesList.addAll(historyMessages);
+          
+          // 3. Final Congratulatory Message
+          if (isPathwayCompleted && widget.pathway.mentorSummary.trim().isNotEmpty) {
+            newMessagesList.add({
+              'role': 'mentor',
+              'content': widget.pathway.mentorSummary,
+            });
+          }
+          
+          // 4. Preserve dynamic unlock announcements generated during THIS session
+          final dynamicAnnouncements = _messages.where((m) => 
+            m['content'] != widget.pathway.mentorSummary
+          ).toList();
+          
+          newMessagesList.addAll(dynamicAnnouncements);
+          
+          _messages.clear();
+          _messages.addAll(newMessagesList);
         });
         _scrollToBottom();
       }
@@ -181,7 +206,11 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
   }
 
   void _syncCourseUnlockMessage() {
+    final isVi = LanguageManager.isVi;
     final nodes = widget.pathway.nodes;
+    final isPathwayRequiresPayment =
+        widget.pathway.suggestedActions.contains('ENROLL_OR_REGENERATE');
+
     for (var i = 0; i < nodes.length - 1; i++) {
       final completedNode = nodes[i];
       final nextNode = nodes[i + 1];
@@ -195,10 +224,20 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
       if (_unlockAnnouncements.contains(key)) continue;
       _unlockAnnouncements.add(key);
 
+      final String messageContent;
+      if (isPathwayRequiresPayment) {
+        messageContent = isVi
+            ? 'Bạn đã hoàn thành **${completedNode.courseTitle}**! 🎉\n\nBước tiếp theo là **${nextNode.courseTitle}** (khóa học Premium). Bạn có thể mua khóa học để tiếp tục, hoặc chọn bỏ qua (skip), hay để tôi tìm lộ trình thay thế miễn phí cho bạn nhé!'
+            : 'You completed **${completedNode.courseTitle}**! 🎉\n\nThe next step is **${nextNode.courseTitle}** (Premium course). You can purchase the course, skip it, or let me find a free alternative route for you.';
+      } else {
+        messageContent = isVi
+            ? 'Bạn đã hoàn thành **${completedNode.courseTitle}**! 🎉 Tôi đã mở khóa **${nextNode.courseTitle}** để bạn tiếp tục duy trì đà học tập.'
+            : '**${completedNode.courseTitle}** is completed! 🎉 I have unlocked **${nextNode.courseTitle}** so you can keep the momentum going.';
+      }
+
       _messages.add({
         'role': 'mentor',
-        'content':
-            '**${completedNode.courseTitle}** is completed. I have unlocked **${nextNode.courseTitle}** so you can keep the momentum going.',
+        'content': messageContent,
       });
       _scrollToBottom();
     }
@@ -218,6 +257,7 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
     _scrollToBottom();
 
     try {
+      // POST /pathways/{id}/chat: gui cau hoi + id node dang chon de AI co context
       final response = await _repository.sendChatMessage(
         pathwayId: widget.pathway.pathwayId,
         message: userMsg,
@@ -227,6 +267,7 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
 
       if (!mounted) return;
 
+      // Luu conversationId de duy tri cung 1 cuoc hoi thoai o cac lan gui sau
       setState(() {
         _conversationId = response['conversation_id'] as int?;
         _messages.add({
@@ -600,6 +641,13 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
                         pathwayId: widget.pathway.pathwayId,
                       );
                       widget.onPathwayUpdated?.call(updatedPathway);
+                      setState(() {
+                        _messages.add({
+                          'role': 'mentor',
+                          'content': 'Đã cập nhật lộ trình: chèn khóa học bổ trợ để bạn củng cố kiến thức.',
+                        });
+                      });
+                      _scrollToBottom();
                     } catch (e) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text('Failed to accept: $e')),
@@ -681,12 +729,7 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
           width: double.infinity,
           child: ElevatedButton.icon(
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ListExamsPage(),
-                ),
-              );
+              context.go(AppRoutes.exams);
             },
             icon: const Icon(Icons.rocket_launch_rounded),
             label: Text(
@@ -702,6 +745,76 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
               elevation: 4,
             ),
           ),
+        ),
+      );
+    }
+
+    if (widget.pathway.suggestedActions.contains('ENROLL_OR_REGENERATE')) {
+      final isVi = LanguageManager.isVi;
+      final targetNode = widget.selectedNode ??
+          widget.pathway.nodes.firstWhere(
+            (n) => n.status == NodeStatus.inProgress,
+            orElse: () => widget.pathway.nodes.first,
+          );
+
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ElevatedButton.icon(
+              onPressed: () {
+                if (widget.onOpenCourse != null) {
+                  widget.onOpenCourse!(targetNode);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        isVi
+                            ? 'Đang mở chi tiết khóa học ${targetNode.courseTitle}...'
+                            : 'Opening details for ${targetNode.courseTitle}...',
+                      ),
+                    ),
+                  );
+                }
+              },
+              icon: const Icon(Icons.shopping_cart_rounded),
+              label: Text(
+                isVi ? 'Mua Khóa Học' : 'Buy Course',
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF59E0B),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 4,
+              ),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () {
+                if (widget.onRegenerateFree != null) {
+                  widget.onRegenerateFree!();
+                }
+              },
+              icon: const Icon(Icons.autorenew_rounded),
+              label: Text(
+                isVi ? 'Tìm Khóa Học Miễn Phí' : 'Find Free Alternative',
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: dark ? const Color(0xFFF0F6FC) : const Color(0xFF334155),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                side: BorderSide(
+                  color: dark ? const Color(0xFF30363D) : const Color(0xFFE2E8F0),
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }

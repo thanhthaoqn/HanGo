@@ -17,4 +17,5 @@ public interface CourseManagerDashboardService {
     List<ExamResponseDTO> getExamsForReview(String status);
     void publishExam(Long examId);
     void returnExamToDraft(Long examId, String reason);
+    void setEntryExamStatus(Long examId, boolean isEntryExam);
 }

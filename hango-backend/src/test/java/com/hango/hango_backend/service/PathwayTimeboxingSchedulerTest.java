@@ -102,5 +102,106 @@ class PathwayTimeboxingSchedulerTest {
     assertNotNull(s.get(2).getDeadline());
 
   }
+
+  // =================================================================
+  // scheduleForward
+  // =================================================================
+
+  @Test
+  void scheduleForwardShouldReturnEmptyListWhenNodeCountIsZero() {
+    List<PathwayTimeboxingScheduler.NodeSchedule> result = PathwayTimeboxingScheduler.scheduleForward(
+        LocalDate.of(2026, 10, 15),
+        10,
+        null,
+        null,
+        0
+    );
+
+    assertTrue(result.isEmpty());
+  }
+
+  @Test
+  void scheduleForwardShouldPinAllNodesToStartDateWithZeroHoursWhenHoursPerWeekIsZero() {
+    LocalDate start = LocalDate.of(2026, 10, 15);
+
+    List<PathwayTimeboxingScheduler.NodeSchedule> result = PathwayTimeboxingScheduler.scheduleForward(
+        start,
+        0,
+        null,
+        null,
+        3
+    );
+
+    assertEquals(3, result.size());
+    for (PathwayTimeboxingScheduler.NodeSchedule nodeSchedule : result) {
+      assertEquals(start, nodeSchedule.getStartDate());
+      assertEquals(start, nodeSchedule.getDeadline());
+      assertEquals(0, nodeSchedule.getEstimatedHours());
+    }
+  }
+
+  @Test
+  void scheduleForward_isDeterministic_for_sameInputs() {
+    LocalDate start = LocalDate.of(2026, 10, 15);
+
+    List<PathwayTimeboxingScheduler.NodeSchedule> s1 = PathwayTimeboxingScheduler.scheduleForward(
+        start,
+        10,
+        List.of(1, 2, 3, 4, 5),
+        null,
+        4
+    );
+
+    List<PathwayTimeboxingScheduler.NodeSchedule> s2 = PathwayTimeboxingScheduler.scheduleForward(
+        start,
+        10,
+        List.of(1, 2, 3, 4, 5),
+        null,
+        4
+    );
+
+    assertEquals(s1.size(), s2.size());
+    for (int i = 0; i < s1.size(); i++) {
+      assertEquals(s1.get(i).getStartDate(), s2.get(i).getStartDate());
+      assertEquals(s1.get(i).getDeadline(), s2.get(i).getDeadline());
+      assertEquals(s1.get(i).getEstimatedHours(), s2.get(i).getEstimatedHours());
+    }
+  }
+
+  @Test
+  void scheduleForward_startDate_neverBeforeInputStartDate_and_nodesAreSequential() {
+    LocalDate start = LocalDate.of(2026, 10, 15);
+
+    List<PathwayTimeboxingScheduler.NodeSchedule> s = PathwayTimeboxingScheduler.scheduleForward(
+        start,
+        9,
+        List.of(6, 7),
+        null,
+        3
+    );
+
+    assertEquals(3, s.size());
+    assertFalse(s.get(0).getStartDate().isBefore(start), "first start date is before the requested start date");
+    for (int i = 0; i < s.size() - 1; i++) {
+      assertFalse(s.get(i + 1).getStartDate().isBefore(s.get(i).getStartDate()), "node start dates are not sequential");
+    }
+  }
+
+  @Test
+  void scheduleForwardShouldRespectExplicitEstimatedHoursPerNode() {
+    LocalDate start = LocalDate.of(2026, 10, 15);
+
+    List<PathwayTimeboxingScheduler.NodeSchedule> s = PathwayTimeboxingScheduler.scheduleForward(
+        start,
+        10,
+        List.of(1, 2, 3, 4, 5),
+        List.of(5, 10),
+        2
+    );
+
+    assertEquals(2, s.size());
+    assertEquals(5, s.get(0).getEstimatedHours());
+    assertEquals(10, s.get(1).getEstimatedHours());
+  }
 }
 

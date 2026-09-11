@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:google_sign_in_web/web_only.dart' as web;
+import 'package:go_router/go_router.dart';
+import '../../routes/app_routes.dart';
 import '../../data/services/auth_service.dart';
 import '../../utils/toast_helper.dart';
 import 'register_page.dart';
 import 'forgot_password_page.dart';
-import 'learner/learner_home_page.dart';
+import 'learner/learner_shell_page.dart';
 import 'admin/admin_dashboard_page.dart';
 import 'trainer/trainer_dashboard_page.dart';
 import 'trainer/trainer_shell_page.dart';
@@ -79,9 +81,7 @@ class _LoginPageState extends State<LoginPage> {
     if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
     } else {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const LearnerHomePage()),
-      );
+      context.go(AppRoutes.home);
     }
   }
 
@@ -119,6 +119,9 @@ class _LoginPageState extends State<LoginPage> {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
+    // Goi AuthService.login() -> gui POST /api/auth/login xuong backend.
+    // Day la noi DUY NHAT tren man hinh nay lam viec voi mang; toan bo phan
+    // giao dien ben duoi chi phan ung lai ket qua tra ve.
     final result = await _authService.login(email, password, rememberMe: _rememberMe);
 
     setState(() {
@@ -221,17 +224,11 @@ class _LoginPageState extends State<LoginPage> {
     if (redirectFlag) {
       await prefs.setBool('redirect_to_trainer_onboarding', false);
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const TrainerTypeSelectionPage(),
-          ),
-        );
+        context.go(AppRoutes.trainer);
       }
       return;
     }
 
-    // Determine role flags
     final isAdmin = roles.any((r) => r.toUpperCase().contains('ADMIN'));
     final isTrainerLead = roles.any(
       (r) => r.toUpperCase().contains('COURSE_MANAGER'),
@@ -246,28 +243,19 @@ class _LoginPageState extends State<LoginPage> {
 
     if (isAdmin) {
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const AdminDashboardPage()),
-        );
+        context.go(AppRoutes.admin);
       }
     } else if (isCourseManager || isTrainerLead) {
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const CourseManagerShellPage(),
-          ),
-        );
+        context.go(AppRoutes.courseManager);
       }
     } else if (isTrainer) {
-      _checkStatusAndRouteForLogin();
+      if (mounted) {
+        context.go(AppRoutes.trainer);
+      }
     } else {
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const LearnerHomePage()),
-        );
+        context.go(AppRoutes.home);
       }
     }
   }
@@ -860,13 +848,7 @@ class _LoginPageState extends State<LoginPage> {
                               cursor: SystemMouseCursors.click,
                               child: GestureDetector(
                                 onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const ForgotPasswordPage(),
-                                    ),
-                                  );
+                                  context.go(AppRoutes.forgotPassword);
                                 },
                                 child: const Text(
                                   'Forgot password?',
@@ -967,15 +949,7 @@ class _LoginPageState extends State<LoginPage> {
                                     cursor: SystemMouseCursors.click,
                                     child: GestureDetector(
                                       onTap: () {
-                                        // push (not pushReplacement) so Register's
-                                        // "Sign In" link can pop back here correctly.
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                const RegisterPage(),
-                                          ),
-                                        );
+                                        context.go(AppRoutes.register);
                                       },
                                       child: const Text(
                                         'Sign up',

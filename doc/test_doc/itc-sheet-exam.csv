@@ -1,10 +1,10 @@
 Feature,Exam Management
-Test requirement,Functional integration tests for exam browsing/taking (ExamController), trainer authoring (TrainerDashboardController exam endpoints, ExamImportController), and exam-matrix auto-generation (CourseManagerExamMatrixController, TrainerExamMatrixController)
-Number of TCs,41
+Test requirement,Functional integration tests for exam browsing/taking (ExamController), trainer authoring (TrainerDashboardController exam endpoints, ExamImportController), exam-matrix auto-generation (CourseManagerExamMatrixController, TrainerExamMatrixController), and the seeded Entry Placement Exam (EntryExamDataInitializer)
+Number of TCs,46
 Testing Round,Passed,Failed,Pending,N/A
-Round 1,0,0,41,0
-Round 2,0,0,41,0
-Round 3,0,0,41,0
+Round 1,0,0,46,0
+Round 2,0,0,46,0
+Round 3,0,0,46,0
 
 Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
 Browse Exam List (Learner),,,,
@@ -85,14 +85,14 @@ EXAM_FT18,"Viewing an exam's answer key from the trainer side has no ownership c
 3. Inspect the response status and whether isCorrect is included for each option.
 4. Compare against EXAM_FT15's write-side ownership rejection on the same resource.","1. 200 OK; the full question set INCLUDING isCorrect for every option is returned to Trainer B, despite B not owning the exam — contrast with EXAM_FT15's write-side ownership enforcement on the same resource.","- An exam exists owned by Trainer A; Trainer B holds an authorized exam-management authority but is not the owner."
 Update Exam Status / Visibility / Delete,,,,
-EXAM_FT19,"A manager who also creates their own exam self-publishes it immediately upon ""submitting"", bypassing any separate review step entirely.","1. Log in as a user holding COURSE_MANAGER or ADMINISTRATOR and create an exam under their own account.
-2. Prepare PATCH /api/v1/trainer/exams/{id}/status body {""status"":""SUBMITTED""}.
+EXAM_FT19,"A manager can self-publish their own DRAFT exam directly through the generic status endpoint, skipping the SUBMITTED/PENDING_APPROVAL review queue entirely (unlike a plain trainer, who is blocked from setting PUBLISHED on this same endpoint per EXAM_FT20).","1. Log in as a user holding COURSE_MANAGER or ADMINISTRATOR and create a DRAFT exam under their own account.
+2. Prepare PATCH /api/v1/trainer/exams/{id}/status body {""status"":""PUBLISHED""} directly against the DRAFT exam (no intermediate SUBMITTED step).
 3. Send the request.
-4. Inspect the exam's resulting status.","1. 200 OK; exam status becomes PUBLISHED immediately (not SUBMITTED/PENDING), bypassing any review queue.","- Caller holds COURSE_MANAGER/ADMINISTRATOR and owns the target exam."
+4. Inspect the exam's resulting status.","1. 200 OK, {""message"": ""Exam status updated to PUBLISHED""}; exam status becomes PUBLISHED immediately straight from DRAFT — TrainerDashboardServiceImpl.updateExamStatus only blocks the PUBLISHED/APPROVED/REJECTED transitions for non-managers and otherwise sets the status field to the literal request value with no state-machine check, so a manager is never forced through SUBMITTED/PENDING_APPROVAL. Note: setting status to ""SUBMITTED"" via this endpoint does NOT auto-publish — it just literally persists ""SUBMITTED""; the review-queue publish only happens via the separate /course-manager/exams/{id}/publish endpoint (EXAM_FT40) or this direct-PUBLISHED shortcut for managers.","- Caller holds COURSE_MANAGER/ADMINISTRATOR and owns a DRAFT exam."
 EXAM_FT20,"A plain trainer attempting to set an exam's status directly to PUBLISHED/APPROVED is blocked, but the block is delivered as 400 rather than the expected 403.","1. Log in as a plain TRAINER who owns a non-PUBLISHED exam.
 2. Prepare PATCH /api/v1/trainer/exams/{id}/status body {""status"":""PUBLISHED""}.
 3. Send the request.
-4. Inspect the ACTUAL HTTP status code returned, explicitly confirming whether it is 400 or 403.","1. 400 Bad Request, {""error"": ""Only managers can publish or approve exams""} — the underlying exception is an AccessDeniedException, but the controller's own catch-all intercepts it before it reaches the 403 handler, so the DELIVERED status is 400, not 403. Explicitly verify the actual HTTP status is 400, not 403.","- Owned exam in a non-PUBLISHED status; caller is a plain TRAINER."
+4. Inspect the ACTUAL HTTP status code returned, explicitly confirming whether it is 400 or 403.","1. 400 Bad Request, {""error"": ""Only managers can publish, approve, or reject exams""} — the underlying exception is an AccessDeniedException, but the controller's own catch-all intercepts it before it reaches the 403 handler, so the DELIVERED status is 400, not 403. Explicitly verify the actual HTTP status is 400, not 403, and the exact message wording (it now also covers REJECTED, not just publish/approve).","- Owned exam in a non-PUBLISHED status; caller is a plain TRAINER."
 EXAM_FT21,"An arbitrary, unrecognized status string is accepted verbatim with no enum validation, for any value other than PUBLISHED/APPROVED.","1. Log in as the owning trainer.
 2. Prepare PATCH /api/v1/trainer/exams/{id}/status body {""status"":""banana""}.
 3. Send the request.
@@ -110,23 +110,23 @@ EXAM_FT24,"Deleting an exam is strictly owner-only, with no manager override at 
 3. Inspect the response status.
 4. Confirm the exam was not deleted.","1. 400 Bad Request; exam not deleted.","- Exam owned by a different trainer."
 Import Exam from Excel + Template,,,,
-EXAM_FT25,"Importing a well-formed workbook with an EXAM sheet and a QUESTIONS sheet successfully creates the exams and questions described.","1. Prepare a valid .xlsx workbook (sheet 1=EXAM, sheet 2=QUESTIONS, positional not name-based) using the official template as a base.
+EXAM_FT25,"Importing a well-formed workbook with an EXAM sheet and a QUESTIONS sheet successfully creates the exams and questions described.","1. Prepare a valid .xlsx workbook using the official template as a base — the template has 4 sheets in order (README_AND_RULES, EXAM, QUESTIONS, hidden LISTS_DATA); the parser reads POSITIONALLY (getSheetAt(1)=EXAM, getSheetAt(2)=QUESTIONS), not by sheet name, so the 2nd and 3rd sheet positions must hold the EXAM/QUESTIONS data respectively (do not reorder/delete sheets when building a custom file from scratch).
 2. Log in as an eligible authoring role.
 3. Prepare and send POST /api/v1/trainer/exams/import-excel-multiple (multipart file) with that workbook.
 4. Inspect the response counts and query the created exams' status/version.","1. 200 OK, {""message"":""Import successful"", ""totalExamsCreated"": N, ""totalQuestionsImported"": M}; each imported exam is status=DRAFT, version=""v0.1"".","- A valid template-based .xlsx file prepared."
 EXAM_FT26,"A validation failure partway through the file (e.g. row 5 of 10 has a missing Title) still leaves the earlier valid rows (1-4) PERSISTED in the database — the whole import is NOT rolled back despite @Transactional (confirmed non-rollback gap, the single highest-priority finding in this module).","1. Prepare a workbook whose EXAM sheet has 4 fully valid rows followed by 1 row with a blank Title.
 2. Log in and prepare/send POST /api/v1/trainer/exams/import-excel-multiple with this file.
 3. Inspect the response status and error message.
-4. Prepare and send GET /api/v1/trainer/exams to check what was actually created.","1. Step 3: 400 Bad Request, {""error"": ""Failed to parse Excel: Title is required at row 5""}.
+4. Prepare and send GET /api/v1/trainer/exams to check what was actually created.","1. Step 3: 400 Bad Request, {""error"": ""Title is required at row 5""} — NOT prefixed with ""Failed to parse Excel:""; the explicit IllegalArgumentException is caught by the controller's dedicated ""custom validation message"" catch block, which returns e.getMessage() verbatim (the ""Failed to parse Excel: ...""-prefixed wording is reserved for the separate generic-Exception catch block, e.g. a corrupt/non-xlsx upload).
 2. Step 4: the 4 EARLIER valid exam rows DO appear in the trainer's exam list, despite the overall call reporting failure — the transaction did not roll back because the controller catches its own exception before it propagates.","- Workbook prepared with 4 valid rows + 1 invalid row, in that order."
-EXAM_FT27,"A non-numeric value in a numeric Excel column (QuestionCount/PassingScore/Time) surfaces as a raw parser exception message rather than a friendly validation message.","1. Prepare a workbook whose ""Time"" column contains text (e.g. ""fifty"") instead of a number.
+EXAM_FT27,"A non-numeric value in a numeric Excel column (QuestionCount/PassingScore/Time) surfaces as a raw, un-prefixed parser exception message rather than a friendly validation message — because java.lang.NumberFormatException is itself a subclass of IllegalArgumentException, it is caught by the SAME ""custom validation message"" branch as the deliberate validation errors (EXAM_FT26/28), not by the generic catch-all that adds the ""Failed to parse Excel:"" prefix.","1. Prepare a workbook whose ""Time"" column contains text (e.g. ""fifty"") instead of a number.
 2. Log in and prepare/send POST /api/v1/trainer/exams/import-excel-multiple with that file.
-3. Inspect the response status and error message.
-4. Compare the wording against the dedicated ""Time is required""/""must be greater than 0"" messages.","1. 400 Bad Request, {""error"": ""Failed to parse Excel: For input string: """fifty"""...""} — a raw NumberFormatException message, distinct wording from the dedicated ""Time is required""/""must be greater than 0"" messages.","- Workbook prepared with a non-numeric Time value."
+3. Inspect the response status and error message, verifying the EXACT body (no prefix).
+4. Compare the wording against the dedicated ""Time is required""/""must be greater than 0"" messages.","1. 400 Bad Request; error body is the raw NumberFormatException.getMessage() verbatim — literally the text: For input string: fifty (quoted around 'fifty' by Java itself) — with NO ""Failed to parse Excel:"" prefix (since NumberFormatException extends IllegalArgumentException, it hits the same catch block as EXAM_FT26/28) — distinct wording from the dedicated ""Time is required""/""must be greater than 0"" messages, and easy to mis-assume it carries the generic-exception prefix.","- Workbook prepared with a non-numeric Time value."
 EXAM_FT28,"An unrecognized Skill Type, Difficulty, or Group Type value in the QUESTIONS sheet is rejected outright, unlike Course import's silent-fallback policy for the same kind of input.","1. Prepare a workbook whose QUESTIONS sheet has a SkillType value not in the recognized/remappable set (e.g. ""Astrology"").
 2. Log in and prepare/send POST /api/v1/trainer/exams/import-excel-multiple with that file.
 3. Inspect the response status and error message.
-4. Confirm no new exams/questions from this file were committed (per EXAM_FT26's caveat about earlier rows in the same file).","1. 400 Bad Request, {""error"": ""Failed to parse Excel: Invalid Skill Type 'Astrology' at Exam <code>""}; no exams/questions from this file are new (though per EXAM_FT26, any earlier-processed exam rows in the SAME file may still have been committed).","- Workbook prepared with an invalid SkillType value."
+4. Confirm no new exams/questions from this file were committed (per EXAM_FT26's caveat about earlier rows in the same file).","1. 400 Bad Request, {""error"": ""Invalid Skill Type 'Astrology' at Exam <code>""} — NOT prefixed with ""Failed to parse Excel:"" (same IllegalArgumentException catch-block behavior as EXAM_FT26/27); no exams/questions from this file are new (though per EXAM_FT26, any earlier-processed exam rows in the SAME file may still have been committed).","- Workbook prepared with an invalid SkillType value."
 EXAM_FT29,"A legacy/deprecated label (e.g. ""Grammar"", ""Sentence Meaning"") in the Excel sheet is silently remapped to its current equivalent during import, with no warning of the substitution.","1. Prepare a workbook whose SkillType column uses the legacy label ""Grammar"".
 2. Log in and prepare/send POST /api/v1/trainer/exams/import-excel-multiple with that file.
 3. Inspect the response status.
@@ -135,8 +135,8 @@ EXAM_FT29,"A legacy/deprecated label (e.g. ""Grammar"", ""Sentence Meaning"") in
 EXAM_FT30,"Downloading the exam import template succeeds for an eligible role, while a missing template file on disk fails with a completely empty 500 body.","1. Log in as an eligible role.
 2. Prepare and send GET /api/v1/trainer/exams/import-excel/template.
 3. Inspect the response's status and Content-Disposition header.
-4. (Environment-dependent) Deliberately relocate/remove the template file from all 4 candidate paths and repeat the call, inspecting the resulting response body.","1. Step 3: 200 OK, binary .xlsx with the correct Content-Disposition.
-2. Step 4: 500 Internal Server Error with a completely EMPTY response body (no JSON error envelope at all) — distinct from the app's normal ApiErrorDTO shape.","- Eligible role logged in; step 4 requires deliberately relocating/removing the template file."
+4. (Environment-dependent) Deliberately remove/rename the template file from its single lookup location, classpath:templates/Hango_Exam_Import_Template.xlsx, and repeat the call, inspecting the resulting response body.","1. Step 3: 200 OK, binary .xlsx with the correct Content-Disposition.
+2. Step 4: 500 Internal Server Error with a completely EMPTY response body (no JSON error envelope at all) — distinct from the app's normal ApiErrorDTO shape. The controller checks only ONE classpath location (ClassPathResource(""templates/"" + fileName)), not multiple fallback paths.","- Eligible role logged in; step 4 requires deliberately relocating/removing the template file from its one classpath location."
 Exam Matrix CRUD + Generate,,,,
 EXAM_FT31,"A Course Manager can create an exam matrix, which is always public by default and accepts an empty criteria list with no validation.","1. Log in as COURSE_MANAGER/ADMINISTRATOR.
 2. Prepare POST /api/v1/course-manager/matrices body {""title"":""B1 Mock"",""description"":""..."",""details"":[]} (empty details).
@@ -188,3 +188,27 @@ EXAM_FT41,"Rejecting an exam requires a reason, which IS persisted and surfaced 
 4. Log in as the exam's trainer and prepare/send GET /api/v1/trainer/exams (or the exam detail) to confirm the reason is visible.","1. Step 2: 400 Bad Request, {""error"":""Rejection reason is required""}.
 2. Step 3: 200 OK; exam status becomes REJECTED (not DRAFT); creator notified (TYPE_CONTENT_REJECTED) with the reason embedded.
 3. Step 4: the exam's rejectionReason field shows ""Needs more questions"".","- A PENDING_APPROVAL exam exists; COURSE_MANAGER/ADMINISTRATOR logged in."
+Update Exam Basic Info / Activity History,,,,
+EXAM_FT42,"Editing a PUBLISHED exam's basic info as a plain trainer silently demotes it back to SUBMITTED (for re-review), while a manager editing the same field leaves the status untouched.","1. Log in as the owning plain TRAINER of a PUBLISHED exam.
+2. Prepare and send PUT /api/v1/trainer/exams/{id}/info with a full body (title/description/expectedQuestionCount/passingScore/durationMinutes) changing only the description.
+3. Inspect the response and the exam's resulting status.
+4. Repeat the same call as COURSE_MANAGER/ADMINISTRATOR (owner or not) and compare the resulting status.","1. Steps 2-3: 200 OK, {""message"": ""Exam metadata updated successfully""}; the exam's status silently changes from PUBLISHED to SUBMITTED (TrainerDashboardServiceImpl.updateTrainerExamBasicInfo demotes on any edit to a PUBLISHED exam by a non-manager) — an ExamHistoryLog SUBMITTED entry is recorded with diff note ""Exam metadata updated, status downgraded to SUBMITTED"".
+2. Step 4: 200 OK; status stays PUBLISHED for a manager/admin editor; an EDITED history entry is recorded instead.","- A PUBLISHED exam owned by a plain TRAINER exists."
+EXAM_FT43,"Editing an exam's basic info is blocked for a non-owning plain trainer, but a Course Manager/Administrator can edit ANY trainer's exam info regardless of ownership.","1. Log in as Trainer B (not the owner, no manager role) and prepare/send PUT /api/v1/trainer/exams/{examOwnedByTrainerA}/info; inspect the response.
+2. Log in as COURSE_MANAGER/ADMINISTRATOR (not the owner) and repeat the same call against the same exam.
+3. Compare both outcomes.","1. Step 1: 400 Bad Request, {""error"": ""You do not have permission to edit this exam""}.
+2. Step 2: 200 OK — managers/admins bypass the ownership check entirely on this endpoint.","- An exam exists owned by Trainer A; Trainer B (non-owner, non-manager) and a COURSE_MANAGER/ADMINISTRATOR account are both available."
+EXAM_FT44,"The exam activity-history endpoint is an append-only audit log (created/edited/submitted/rejected/published/hidden/unhidden), viewable by the owner or any manager, and explicitly returns 403 (not 400) for anyone else — unlike most other trainer-exam endpoints on the same controller.","1. Perform a few actions on an exam (create, save questions, submit for review) to generate history entries.
+2. Log in as the owning trainer and prepare/send GET /api/v1/trainer/exams/{id}/history; inspect the entries (action, oldStatus, newStatus, actorName, reason, createdAt).
+3. Log in as an unrelated Trainer B (non-owner, non-manager) and repeat the same call; inspect the response status specifically.","1. Step 2: 200 OK; chronological list of ExamHistoryLogDTO entries matching the actions performed, each with actorName (or ""System"" if no actor recorded).
+2. Step 3: 403 Forbidden, {""error"": ""Not authorized to view this exam's history""} — ExamHistoryService throws AccessDeniedException, and getExamHistory's controller method has a DEDICATED catch clause for it (unlike sibling endpoints such as EXAM_FT15/FT20, which flatten AccessDeniedException down to 400 via their generic catch-all).","- An exam exists with recorded history entries; Trainer B holds CREATE_EXAMS_TRAINER but is not the owner."
+Update Exam Matrix (full replace),,,,
+EXAM_FT45,"Updating an exam matrix fully replaces its title/description and deletes+recreates every detail row — and has NO ownership check, letting any Course Manager/Administrator edit a matrix authored by someone else.","1. Log in as COURSE_MANAGER A and create a matrix with 2 detail rows; note its id.
+2. Log in as a DIFFERENT COURSE_MANAGER B (not the creator).
+3. Prepare and send PUT /api/v1/course-manager/matrices/{id} with a new title/description and a single, different detail row.
+4. Inspect the response and re-fetch the matrix to confirm the old 2 rows are gone and only the 1 new row remains.","1. 200 OK, {""message"": ""Exam matrix updated successfully""} — succeeds despite Manager B not being the matrix's creator (CourseManagerExamMatrixServiceImpl.updateExamMatrix performs no createdBy check); the old detail rows are deleted and replaced entirely by the new list (not merged/appended).","- A matrix created by a different Course Manager exists."
+Entry Placement Exam (Auto-Seeded),,,,
+EXAM_FT46,"A fixed ""Global Entry Placement Test"" exam (id=1035) is auto-seeded at application startup by EntryExamDataInitializer and is always publicly visible with its full 40-question set, with no manual authoring/publish step required.","1. With no manual setup, prepare and send GET /api/v1/exams (no auth, default status filter).
+2. Locate the entry with id=1035 in the response.
+3. Prepare and send GET /api/v1/exams/1035/questions and count the returned questions.","1. Step 2: an exam titled ""Global Entry Placement Test"", status=PUBLISHED, durationMinutes=50, present in the default PUBLISHED-only listing with no auth required (EntryExamDataInitializer inserts/updates id=1035 as PUBLISHED/PUBLIC on every startup if it doesn't already have >=40 linked questions).
+2. Step 3: exactly 40 questions are returned, spanning the 25 skill domains and multiple question-group types (Notice Completion, Leaflet/Advertisement, Paragraph Reordering, Guided Cloze Test, 8- and 10-question Reading Comprehension).","- Application has started at least once (no other pre-condition; this exam is seeded automatically, not authored manually)."

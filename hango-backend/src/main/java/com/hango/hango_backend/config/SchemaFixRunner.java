@@ -3,6 +3,7 @@ package com.hango.hango_backend.config;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Component;
  * Dùng thay thế Flyway/Liquibase cho các schema fix nhỏ, idempotent.
  */
 @Component
+@Order(0)
 @RequiredArgsConstructor
 @Slf4j
 public class SchemaFixRunner implements CommandLineRunner {
@@ -19,8 +21,18 @@ public class SchemaFixRunner implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        fixSystemParametersColumn();
         fixExamMatrixDetailsCategoryNullable();
         fixOrphanedData();
+    }
+
+    private void fixSystemParametersColumn() {
+        try {
+            jdbcTemplate.execute("ALTER TABLE system_parameters MODIFY COLUMN param_value LONGTEXT NULL");
+            log.info("[SchemaFix] system_parameters.param_value -> đã đổi thành LONGTEXT thành công.");
+        } catch (Exception e) {
+            log.warn("[SchemaFix] system_parameters.param_value: {}", e.getMessage());
+        }
     }
 
     /**

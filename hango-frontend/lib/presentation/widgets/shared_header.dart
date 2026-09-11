@@ -1,20 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../routes/app_routes.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
-import '../pages/login_page.dart';
-import '../pages/register_page.dart';
-import '../pages/exam/list_exams_page.dart';
-import '../pages/course/list_courses_page.dart';
-import '../pages/course/cart_page.dart';
 import '../pages/course/course_detail_page.dart';
-import '../pages/learner/learner_home_page.dart';
 import '../pages/learner/learner_shell_page.dart';
-import '../pages/learner/learning_pathway_page.dart';
-import '../pages/learner/my_information_page.dart';
 import '../pages/course_manager/course_manager_my_information_page.dart';
 import '../pages/course_manager/course_manager_shell_page.dart';
-import '../pages/learner/my_learning_page.dart';
-import '../pages/admin/admin_dashboard_page.dart';
 
 import '../pages/trainer/trainer_shell_page.dart';
 import '../../../domain/model/course.dart';
@@ -366,7 +358,7 @@ class _SharedHeaderState extends State<SharedHeader> {
                 InkWell(
                   onTap: () {
                     _hideCartOverlay();
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const CartPage()));
+                    _navigateToLearnerTab(6);
                   },
                   child: Text(
                     isVi ? 'Xem giỏ hàng' : 'View cart',
@@ -426,7 +418,7 @@ class _SharedHeaderState extends State<SharedHeader> {
                   ),
                   onPressed: () {
                     _hideCartOverlay();
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const CartPage()));
+                    _navigateToLearnerTab(6);
                   },
                   child: Text(
                     isVi ? 'Thanh toán' : 'Checkout',
@@ -449,10 +441,13 @@ class _SharedHeaderState extends State<SharedHeader> {
     return InkWell(
       onTap: () {
         _hideCartOverlay();
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => CourseDetailPage(courseId: course.id)),
-        );
+        try {
+          context.push('/courses/${course.id}');
+        } catch (_) {
+          Navigator.of(context, rootNavigator: true).push(
+            MaterialPageRoute(builder: (context) => CourseDetailPage(courseId: course.id)),
+          );
+        }
       },
       child: Row(
         children: [
@@ -561,11 +556,7 @@ class _SharedHeaderState extends State<SharedHeader> {
   void _handleLogout() async {
     await _authService.logout();
     if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LearnerHomePage()),
-        (route) => false,
-      );
+      context.go(AppRoutes.home);
     }
   }
 
@@ -746,11 +737,60 @@ class _SharedHeaderState extends State<SharedHeader> {
     );
   }
 
+  String _getLearnerRoute(int tabIndex, {int subTab = 0}) {
+    switch (tabIndex) {
+      case 0:
+        return AppRoutes.home;
+      case 1:
+        return AppRoutes.courses;
+      case 2:
+        return AppRoutes.exams;
+      case 3:
+        return AppRoutes.pathway;
+      case 4:
+        return AppRoutes.myLearning;
+      case 5:
+        return subTab > 0 ? '${AppRoutes.profile}?tab=$subTab' : AppRoutes.profile;
+      case 6:
+        return AppRoutes.cart;
+      default:
+        return AppRoutes.home;
+    }
+  }
+
   void _navigateToLearnerTab(int tabIndex, {int subTab = 0}) {
-    final shellState = LearnerShellPage.of(context);
-    if (shellState != null) {
-      shellState.selectTab(tabIndex, subTab: subTab);
-    } else {
+    final learnerShell = LearnerShellPage.of(context);
+    if (learnerShell != null) {
+      learnerShell.selectTab(tabIndex, subTab: subTab);
+      return;
+    }
+    final trainerShell = TrainerShellPage.of(context);
+    if (trainerShell != null) {
+      // Only "Home"/logo maps onto the Trainer shell's own tab 0 -- the
+      // Learner-only nav links (Courses/Exams/Pathway) have no Trainer
+      // equivalent, so just pop back to wherever the trainer came from.
+      if (tabIndex == 0) {
+        trainerShell.selectTab(0);
+      } else if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      return;
+    }
+    final courseManagerShell = CourseManagerShellPage.of(context);
+    if (courseManagerShell != null) {
+      if (tabIndex == 0) {
+        courseManagerShell.selectTab(0);
+      } else if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      return;
+    }
+    // When outside any shell (e.g. on CourseDetailPage, LessonDetailPage, TakeExamPage),
+    // navigate via GoRouter so the active route and browser address bar update cleanly.
+    final targetRoute = _getLearnerRoute(tabIndex, subTab: subTab);
+    try {
+      context.go(targetRoute);
+    } catch (_) {
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(
@@ -772,8 +812,12 @@ class _SharedHeaderState extends State<SharedHeader> {
             IconButton(
               icon: const Icon(Icons.arrow_back, color: Color(0xFF1F2937)),
               onPressed: () {
-                if (Navigator.canPop(context)) {
+                if (context.canPop()) {
+                  context.pop();
+                } else if (Navigator.canPop(context)) {
                   Navigator.pop(context);
+                } else {
+                  context.go(AppRoutes.courses);
                 }
               },
             ),
@@ -1027,26 +1071,11 @@ class _SharedHeaderState extends State<SharedHeader> {
                     final isTrainer = _userRoles.any((r) => r.toUpperCase().contains('TRAINER'));
                     final isAdmin = _userRoles.any((r) => r.toUpperCase().contains('ADMIN'));
                     if (isAdmin) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const AdminDashboardPage(),
-                        ),
-                      );
+                      context.go(AppRoutes.admin);
                     } else if (isTrainer) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const TrainerShellPage(),
-                        ),
-                      );
+                      context.go(AppRoutes.trainer);
                     } else {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const CourseManagerShellPage(),
-                        ),
-                      );
+                      context.go(AppRoutes.courseManager);
                     }
                   } else if (val == 'logout') {
                     _handleLogout();
@@ -1375,12 +1404,7 @@ class _SharedHeaderState extends State<SharedHeader> {
               ],
               TextButton(
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const LoginPage(),
-                    ),
-                  );
+                  context.go(AppRoutes.login);
                 },
                 child: const Text(
                   'Login',
@@ -1407,12 +1431,7 @@ class _SharedHeaderState extends State<SharedHeader> {
                 ),
                 child: ElevatedButton(
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const RegisterPage(),
-                      ),
-                    );
+                    context.go(AppRoutes.register);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,

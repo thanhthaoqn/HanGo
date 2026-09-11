@@ -1,8 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../routes/app_routes.dart';
+import 'package:hango/presentation/widgets/image_cropper_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
+import '../../../utils/language_manager.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/file_picker_helper.dart';
 import '../../../utils/toast_helper.dart';
@@ -14,10 +18,12 @@ class CourseManagerMyInformationPage extends StatefulWidget {
   const CourseManagerMyInformationPage({super.key});
 
   @override
-  State<CourseManagerMyInformationPage> createState() => _CourseManagerMyInformationPageState();
+  State<CourseManagerMyInformationPage> createState() =>
+      _CourseManagerMyInformationPageState();
 }
 
-class _CourseManagerMyInformationPageState extends State<CourseManagerMyInformationPage> {
+class _CourseManagerMyInformationPageState
+    extends State<CourseManagerMyInformationPage> {
   final _authService = AuthService();
   bool _isLoading = true;
   int _activeTab = 0; // 0: Information & Contact, 1: Change Password
@@ -62,7 +68,7 @@ class _CourseManagerMyInformationPageState extends State<CourseManagerMyInformat
           }
           _address = data['address'] ?? '';
           _avatarUrl = data['avatarUrl'] ?? '';
-          
+
           if (_fullName.trim().isNotEmpty) {
             final parts = _fullName.trim().split(' ');
             if (parts.isNotEmpty) {
@@ -86,7 +92,8 @@ class _CourseManagerMyInformationPageState extends State<CourseManagerMyInformat
           }
         });
       } else {
-        if (res['message'] != null && res['message'] != 'No auth token found.') {
+        if (res['message'] != null &&
+            res['message'] != 'No auth token found.') {
           _showErrorSnackBar('Failed to load profile: ${res['message']}');
         }
       }
@@ -114,11 +121,17 @@ class _CourseManagerMyInformationPageState extends State<CourseManagerMyInformat
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: InternalAppHeader(isMobile: !(isDesktop), activeTab: '',),
-      drawer: !isDesktop ? const Drawer(child: CourseManagerSidebar(currentRoute: 'profile')) : null,
+      appBar: InternalAppHeader(isMobile: !(isDesktop), activeTab: ''),
+      drawer: !isDesktop
+          ? const Drawer(child: CourseManagerSidebar(currentRoute: 'profile'))
+          : null,
       body: Row(
         children: [
-          if (isDesktop) const SizedBox(width: 240, child: CourseManagerSidebar(currentRoute: 'profile')),
+          if (isDesktop)
+            const SizedBox(
+              width: 240,
+              child: CourseManagerSidebar(currentRoute: 'profile'),
+            ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -128,7 +141,9 @@ class _CourseManagerMyInformationPageState extends State<CourseManagerMyInformat
                   child: _isLoading
                       ? const Center(
                           child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF28B79B)),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Color(0xFF28B79B),
+                            ),
                           ),
                         )
                       : SingleChildScrollView(
@@ -138,7 +153,8 @@ class _CourseManagerMyInformationPageState extends State<CourseManagerMyInformat
                               constraints: const BoxConstraints(maxWidth: 1440),
                               child: isDesktop
                                   ? Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         // Sidebar Left
                                         _buildSidebar(isDesktop),
@@ -147,18 +163,23 @@ class _CourseManagerMyInformationPageState extends State<CourseManagerMyInformat
                                         Expanded(
                                           child: _activeTab == 0
                                               ? _buildInformationTab(isDesktop)
-                                              : _buildChangePasswordTab(isDesktop),
+                                              : _buildChangePasswordTab(
+                                                  isDesktop,
+                                                ),
                                         ),
                                       ],
                                     )
                                   : Column(
-                                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
                                       children: [
                                         _buildSidebar(isDesktop),
                                         const SizedBox(height: 20),
                                         _activeTab == 0
                                             ? _buildInformationTab(isDesktop)
-                                            : _buildChangePasswordTab(isDesktop),
+                                            : _buildChangePasswordTab(
+                                                isDesktop,
+                                              ),
                                       ],
                                     ),
                             ),
@@ -281,7 +302,9 @@ class _CourseManagerMyInformationPageState extends State<CourseManagerMyInformat
             Icon(
               icon,
               size: 20,
-              color: isActive ? const Color(0xFF28B79B) : const Color(0xFF64748B),
+              color: isActive
+                  ? const Color(0xFF28B79B)
+                  : const Color(0xFF64748B),
             ),
             const SizedBox(width: 12),
             Text(
@@ -289,7 +312,9 @@ class _CourseManagerMyInformationPageState extends State<CourseManagerMyInformat
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                color: isActive ? const Color(0xFF28B79B) : const Color(0xFF334155),
+                color: isActive
+                    ? const Color(0xFF28B79B)
+                    : const Color(0xFF334155),
                 fontFamily: 'Outfit',
               ),
             ),
@@ -340,7 +365,10 @@ class _CourseManagerMyInformationPageState extends State<CourseManagerMyInformat
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFF28B79B),
                   side: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -455,7 +483,10 @@ class _CourseManagerMyInformationPageState extends State<CourseManagerMyInformat
         _buildTwoFieldRow(
           isWide,
           _buildReadOnlyField('Full name*', _fullName),
-          _buildReadOnlyField('date of birth*', _dateOfBirth.isNotEmpty ? _dateOfBirth : '--/--/----'),
+          _buildReadOnlyField(
+            'date of birth*',
+            _dateOfBirth.isNotEmpty ? _dateOfBirth : '--/--/----',
+          ),
         ),
         const SizedBox(height: 20),
         _buildTwoFieldRow(
@@ -466,8 +497,14 @@ class _CourseManagerMyInformationPageState extends State<CourseManagerMyInformat
         const SizedBox(height: 20),
         _buildTwoFieldRow(
           isWide,
-          _buildReadOnlyField('Phone number*', _phoneNumber.isNotEmpty ? _phoneNumber : 'Not provided'),
-          _buildReadOnlyField('Address', _address.isNotEmpty ? _address : 'Not provided'),
+          _buildReadOnlyField(
+            'Phone number*',
+            _phoneNumber.isNotEmpty ? _phoneNumber : 'Not provided',
+          ),
+          _buildReadOnlyField(
+            'Address',
+            _address.isNotEmpty ? _address : 'Not provided',
+          ),
         ),
       ],
     );
@@ -483,13 +520,7 @@ class _CourseManagerMyInformationPageState extends State<CourseManagerMyInformat
         ],
       );
     }
-    return Column(
-      children: [
-        left,
-        const SizedBox(height: 20),
-        right,
-      ],
-    );
+    return Column(children: [left, const SizedBox(height: 20), right]);
   }
 
   Widget _buildReadOnlyField(String label, String value) {
@@ -579,18 +610,18 @@ class _CourseManagerMyInformationPageState extends State<CourseManagerMyInformat
           _isLoading = true;
         });
         try {
-          final res = await _authService.changePassword(currentPassword, newPassword);
+          final res = await _authService.changePassword(
+            currentPassword,
+            newPassword,
+          );
           if (res['success'] == true) {
             _showSuccessSnackBar('Password updated successfully!');
-            // The prompt says "After the change, you will need to log back in on all devices."
-            // We can prompt them or auto log out
-            Future.delayed(const Duration(seconds: 2), () {
-              _authService.logout();
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const LoginPage()),
-                (route) => false,
-              );
+
+            Future.delayed(const Duration(seconds: 2), () async {
+              await _authService.logout();
+              if (mounted) {
+                context.go(AppRoutes.login);
+              }
             });
           } else {
             _showErrorSnackBar('Failed to update password: ${res['message']}');
@@ -675,20 +706,33 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
   Future<void> _pickAndUploadAvatar() async {
     try {
       final pickedFile = await pickImage();
-      if (pickedFile == null) return;
+      if (pickedFile == null || pickedFile.bytes.isEmpty) return;
+
+      final croppedBytes = await ImageCropperDialog.show(
+        context,
+        imageBytes: Uint8List.fromList(pickedFile.bytes),
+        title: LanguageManager.isVi
+            ? 'Chỉnh sửa ảnh đại diện'
+            : 'Adjust Avatar Photo',
+      );
+      if (croppedBytes == null) return;
 
       setState(() {
         _isUploading = true;
       });
 
-      final url = Uri.parse('https://api.cloudinary.com/v1_1/diqekap4o/image/upload');
+      final url = Uri.parse(
+        'https://api.cloudinary.com/v1_1/diqekap4o/image/upload',
+      );
       final request = http.MultipartRequest('POST', url)
         ..fields['upload_preset'] = 'hango_preset'
-        ..files.add(http.MultipartFile.fromBytes(
-          'file',
-          pickedFile.bytes,
-          filename: pickedFile.name,
-        ));
+        ..files.add(
+          http.MultipartFile.fromBytes(
+            'file',
+            croppedBytes,
+            filename: 'avatar_${DateTime.now().millisecondsSinceEpoch}.png',
+          ),
+        );
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
@@ -701,7 +745,10 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
         });
         ToastHelper.showSuccess(context, 'Avatar uploaded successfully!');
       } else {
-        ToastHelper.showError(context, 'Avatar upload failed: Cloudinary returned status ${response.statusCode}');
+        ToastHelper.showError(
+          context,
+          'Avatar upload failed: Cloudinary returned status ${response.statusCode}',
+        );
       }
     } catch (e) {
       ToastHelper.showError(context, 'Error uploading avatar: $e');
@@ -727,7 +774,10 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
             children: [
               // Header
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 20,
+                ),
                 decoration: const BoxDecoration(
                   border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
                 ),
@@ -745,7 +795,10 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                     ),
                     IconButton(
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Color(0xFF64748B),
+                      ),
                     ),
                   ],
                 ),
@@ -767,7 +820,10 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                               height: 100,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                border: Border.all(color: const Color(0xFFCBD5E1), width: 2),
+                                border: Border.all(
+                                  color: const Color(0xFFCBD5E1),
+                                  width: 2,
+                                ),
                               ),
                               child: ClipOval(
                                 child: _avatarUrl.isNotEmpty
@@ -800,7 +856,9 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                                   ),
                                   child: const Center(
                                     child: CircularProgressIndicator(
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -809,7 +867,9 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                               bottom: 0,
                               right: 0,
                               child: InkWell(
-                                onTap: _isUploading ? null : _pickAndUploadAvatar,
+                                onTap: _isUploading
+                                    ? null
+                                    : _pickAndUploadAvatar,
                                 customBorder: const CircleBorder(),
                                 child: Container(
                                   padding: const EdgeInsets.all(6),
@@ -835,12 +895,16 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                         _buildInputField(
                           label: 'Full name*',
                           controller: _nameController,
-                          validator: (v) => v == null || v.isEmpty ? 'Please enter your full name' : null,
+                          validator: (v) => v == null || v.isEmpty
+                              ? 'Please enter your full name'
+                              : null,
                         ),
                         _buildInputField(
                           label: 'Name account*',
                           controller: _usernameController,
-                          validator: (v) => v == null || v.isEmpty ? 'Please enter a username' : null,
+                          validator: (v) => v == null || v.isEmpty
+                              ? 'Please enter a username'
+                              : null,
                         ),
                       ]),
                       const SizedBox(height: 20),
@@ -851,8 +915,11 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                           label: 'Phone number*',
                           controller: _phoneController,
                           validator: (v) {
-                            if (v == null || v.isEmpty) return 'Please enter your phone number';
-                            if (!RegExp(r'^(0[3|5|7|8|9])+([0-9]{8})$').hasMatch(v)) {
+                            if (v == null || v.isEmpty)
+                              return 'Please enter your phone number';
+                            if (!RegExp(
+                              r'^(0[3|5|7|8|9])+([0-9]{8})$',
+                            ).hasMatch(v)) {
                               return 'Please enter a valid 10-digit Vietnamese phone number (e.g. 0912345678)';
                             }
                             return null;
@@ -863,13 +930,21 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                           controller: _dobController,
                           hint: 'DD/MM/YYYY',
                           readOnly: true,
-                          suffixIcon: const Icon(Icons.calendar_today_rounded, size: 18, color: Color(0xFF64748B)),
+                          suffixIcon: const Icon(
+                            Icons.calendar_today_rounded,
+                            size: 18,
+                            color: Color(0xFF64748B),
+                          ),
                           onTap: () async {
-                            DateTime initialDate = DateTime.now().subtract(const Duration(days: 365 * 18));
+                            DateTime initialDate = DateTime.now().subtract(
+                              const Duration(days: 365 * 18),
+                            );
                             if (_dobController.text.isNotEmpty) {
                               final parts = _dobController.text.split('/');
                               if (parts.length == 3) {
-                                final parsed = DateTime.tryParse('${parts[2]}-${parts[1]}-${parts[0]}');
+                                final parsed = DateTime.tryParse(
+                                  '${parts[2]}-${parts[1]}-${parts[0]}',
+                                );
                                 if (parsed != null) {
                                   initialDate = parsed;
                                 }
@@ -895,15 +970,20 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                             );
                             if (picked != null) {
                               final day = picked.day.toString().padLeft(2, '0');
-                              final month = picked.month.toString().padLeft(2, '0');
+                              final month = picked.month.toString().padLeft(
+                                2,
+                                '0',
+                              );
                               final year = picked.year.toString();
                               _dobController.text = '$day/$month/$year';
                             }
                           },
                           validator: (v) {
-                            if (v == null || v.isEmpty) return 'Please select your date of birth';
+                            if (v == null || v.isEmpty)
+                              return 'Please select your date of birth';
                             final parts = v.split('/');
-                            if (parts.length != 3) return 'Please enter date in DD/MM/YYYY format';
+                            if (parts.length != 3)
+                              return 'Please enter date in DD/MM/YYYY format';
                             return null;
                           },
                         ),
@@ -917,7 +997,9 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                           controller: _addressController,
                         ),
                         _buildGenderToggle(
-                          value: ['Male', 'Female'].contains(_gender) ? _gender : 'Male',
+                          value: ['Male', 'Female'].contains(_gender)
+                              ? _gender
+                              : 'Male',
                           onChanged: (newVal) {
                             setState(() {
                               _gender = newVal;
@@ -938,10 +1020,11 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                               if (_dobController.text.isNotEmpty) {
                                 final parts = _dobController.text.split('/');
                                 if (parts.length == 3) {
-                                  formattedDob = '${parts[2]}-${parts[1]}-${parts[0]}';
+                                  formattedDob =
+                                      '${parts[2]}-${parts[1]}-${parts[0]}';
                                 }
                               }
-                              
+
                               final data = {
                                 'fullName': _nameController.text.trim(),
                                 'username': _usernameController.text.trim(),
@@ -949,7 +1032,8 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                                 'avatarUrl': _avatarUrl,
                                 'gender': _gender,
                                 'address': _addressController.text.trim(),
-                                if (formattedDob != null) 'dateOfBirth': formattedDob,
+                                if (formattedDob != null)
+                                  'dateOfBirth': formattedDob,
                               };
                               widget.onSave(data);
                               Navigator.pop(context);
@@ -998,11 +1082,7 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
           );
         }
         return Column(
-          children: [
-            children[0],
-            const SizedBox(height: 20),
-            children[1],
-          ],
+          children: [children[0], const SizedBox(height: 20), children[1]],
         );
       },
     );
@@ -1041,7 +1121,10 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
             hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
             suffixIcon: suffixIcon,
             errorMaxLines: 3,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
@@ -1052,7 +1135,10 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+              borderSide: const BorderSide(
+                color: Color(0xFF28B79B),
+                width: 1.5,
+              ),
             ),
             filled: true,
             fillColor: readOnly ? const Color(0xFFF8FAFC) : Colors.white,
@@ -1089,7 +1175,12 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
           child: Row(
             children: [
               _buildGenderOption('Male', Icons.male_rounded, value, onChanged),
-              _buildGenderOption('Female', Icons.female_rounded, value, onChanged),
+              _buildGenderOption(
+                'Female',
+                Icons.female_rounded,
+                value,
+                onChanged,
+              ),
             ],
           ),
         ),
@@ -1119,7 +1210,7 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                       color: const Color(0xFF28B79B).withOpacity(0.15),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
-                    )
+                    ),
                   ]
                 : [],
           ),
@@ -1129,7 +1220,9 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
               Icon(
                 icon,
                 size: 18,
-                color: isSelected ? const Color(0xFF28B79B) : const Color(0xFF94A3B8),
+                color: isSelected
+                    ? const Color(0xFF28B79B)
+                    : const Color(0xFF94A3B8),
               ),
               const SizedBox(width: 6),
               Text(
@@ -1137,7 +1230,9 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                  color: isSelected ? const Color(0xFF28B79B) : const Color(0xFF64748B),
+                  color: isSelected
+                      ? const Color(0xFF28B79B)
+                      : const Color(0xFF64748B),
                   fontFamily: 'Outfit',
                 ),
               ),
@@ -1228,8 +1323,10 @@ class _ChangePasswordPanelState extends State<_ChangePasswordPanel> {
               label: 'Password *',
               controller: _currPasswordController,
               obscure: _obscureCurr,
-              onToggleObscure: () => setState(() => _obscureCurr = !_obscureCurr),
-              validator: (v) => v == null || v.isEmpty ? 'Current password required' : null,
+              onToggleObscure: () =>
+                  setState(() => _obscureCurr = !_obscureCurr),
+              validator: (v) =>
+                  v == null || v.isEmpty ? 'Current password required' : null,
             ),
             const SizedBox(height: 20),
 
@@ -1242,7 +1339,8 @@ class _ChangePasswordPanelState extends State<_ChangePasswordPanel> {
               showForgetPass: true,
               validator: (v) {
                 if (v == null || v.isEmpty) return 'New password required';
-                if (v.length < 8) return 'Password must be at least 8 characters';
+                if (v.length < 8)
+                  return 'Password must be at least 8 characters';
                 return null;
               },
             ),
@@ -1253,10 +1351,13 @@ class _ChangePasswordPanelState extends State<_ChangePasswordPanel> {
               label: 'Confirm Password *',
               controller: _confirmPasswordController,
               obscure: _obscureConfirm,
-              onToggleObscure: () => setState(() => _obscureConfirm = !_obscureConfirm),
+              onToggleObscure: () =>
+                  setState(() => _obscureConfirm = !_obscureConfirm),
               validator: (v) {
-                if (v == null || v.isEmpty) return 'Confirmation password required';
-                if (v != _newPasswordController.text) return 'Passwords do not match';
+                if (v == null || v.isEmpty)
+                  return 'Confirmation password required';
+                if (v != _newPasswordController.text)
+                  return 'Passwords do not match';
                 return null;
               },
             ),
@@ -1305,21 +1406,27 @@ class _ChangePasswordPanelState extends State<_ChangePasswordPanel> {
                 return isWide
                     ? Row(
                         children: [
-                          Expanded(child: _buildInfoCard(
-                            icon: Icons.shield_outlined,
-                            iconColor: const Color(0xFF3B82F6),
-                            bgColor: const Color(0xFFEFF6FF),
-                            title: 'Strong security',
-                            desc: 'Use at least 8 characters, including letters, numbers, and special characters.',
-                          )),
+                          Expanded(
+                            child: _buildInfoCard(
+                              icon: Icons.shield_outlined,
+                              iconColor: const Color(0xFF3B82F6),
+                              bgColor: const Color(0xFFEFF6FF),
+                              title: 'Strong security',
+                              desc:
+                                  'Use at least 8 characters, including letters, numbers, and special characters.',
+                            ),
+                          ),
                           const SizedBox(width: 16),
-                          Expanded(child: _buildInfoCard(
-                            icon: Icons.info_outline_rounded,
-                            iconColor: const Color(0xFFF97316),
-                            bgColor: const Color(0xFFFFF7ED),
-                            title: 'Note',
-                            desc: 'After the change, you will need to log back in on all devices.',
-                          )),
+                          Expanded(
+                            child: _buildInfoCard(
+                              icon: Icons.info_outline_rounded,
+                              iconColor: const Color(0xFFF97316),
+                              bgColor: const Color(0xFFFFF7ED),
+                              title: 'Note',
+                              desc:
+                                  'After the change, you will need to log back in on all devices.',
+                            ),
+                          ),
                         ],
                       )
                     : Column(
@@ -1329,7 +1436,8 @@ class _ChangePasswordPanelState extends State<_ChangePasswordPanel> {
                             iconColor: const Color(0xFF3B82F6),
                             bgColor: const Color(0xFFEFF6FF),
                             title: 'Strong security',
-                            desc: 'Use at least 8 characters, including letters, numbers, and special characters.',
+                            desc:
+                                'Use at least 8 characters, including letters, numbers, and special characters.',
                           ),
                           const SizedBox(height: 16),
                           _buildInfoCard(
@@ -1337,7 +1445,8 @@ class _ChangePasswordPanelState extends State<_ChangePasswordPanel> {
                             iconColor: const Color(0xFFF97316),
                             bgColor: const Color(0xFFFFF7ED),
                             title: 'Note',
-                            desc: 'After the change, you will need to log back in on all devices.',
+                            desc:
+                                'After the change, you will need to log back in on all devices.',
                           ),
                         ],
                       );
@@ -1375,7 +1484,10 @@ class _ChangePasswordPanelState extends State<_ChangePasswordPanel> {
             if (showForgetPass)
               TextButton(
                 onPressed: () {
-                  ToastHelper.showSuccess(context, 'Please use OTP verification to recover password.');
+                  ToastHelper.showSuccess(
+                    context,
+                    'Please use OTP verification to recover password.',
+                  );
                 },
                 style: TextButton.styleFrom(
                   minimumSize: Size.zero,
@@ -1401,10 +1513,15 @@ class _ChangePasswordPanelState extends State<_ChangePasswordPanel> {
           validator: validator,
           style: const TextStyle(fontFamily: 'Outfit', fontSize: 14),
           decoration: InputDecoration(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
             suffixIcon: IconButton(
               icon: Icon(
-                obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                obscure
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
                 size: 20,
                 color: const Color(0xFF64748B),
               ),
@@ -1420,7 +1537,10 @@ class _ChangePasswordPanelState extends State<_ChangePasswordPanel> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFF28B79B), width: 1.5),
+              borderSide: const BorderSide(
+                color: Color(0xFF28B79B),
+                width: 1.5,
+              ),
             ),
             filled: true,
             fillColor: Colors.white,

@@ -75,7 +75,8 @@ public class ExamResultAnalyzerService {
                     .build();
         }
 
-        // Merge yếu theo skill/topic (placeholder schema hiện tại).
+        // Gom diem yeu theo tan suat xuat hien trong N attempts:
+        // skill sai o nhieu attempt se co diem cao hon -> xep truoc
         Map<String, Integer> weakSkillCount = new HashMap<>();
         Map<String, Integer> criticalTopicCount = new HashMap<>();
 
@@ -251,8 +252,8 @@ public class ExamResultAnalyzerService {
 
 
     private String extractKnowledgeGapsPlaceholder(String answersJson) {
-        // Parse answersJson -> thống kê câu sai theo topic/skill.
-        // Sau đó serialize thành JSON ngắn để đưa vào prompt.
+        // Day la "tool" phan tich diem yeu: doc answersJson (danh sach cau tra loi
+        // co skill/isCorrect/topic), chi giu lai cac CAU SAI de rut ra weak skills
         if (answersJson == null || answersJson.isBlank()) {
             return "{}";
         }

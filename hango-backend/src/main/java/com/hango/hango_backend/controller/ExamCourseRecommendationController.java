@@ -41,9 +41,9 @@ public class ExamCourseRecommendationController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        // (MVP) Không validate ownership ở đây vì aiService mới lấy attempt theo id.
-        // Có thể bổ sung kiểm tra attempt.student.id == userId trong aiService sau.
-        ExamCourseRecommendationAIResponseDTO resp = aiService.recommendCoursesAI(request.getExamAttemptId(), request.getWeakestSkill());
+        // Spec 20 - E6: kiem tra attempt co thuoc ve user dang login (service tu throw 403)
+        ExamCourseRecommendationAIResponseDTO resp = aiService.recommendCoursesAI(
+                request.getExamAttemptId(), request.getWeakestSkill(), userId);
         return ResponseEntity.ok(resp);
     }
 }

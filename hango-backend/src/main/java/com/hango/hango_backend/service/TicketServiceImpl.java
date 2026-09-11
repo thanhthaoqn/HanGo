@@ -33,17 +33,8 @@ public class TicketServiceImpl implements TicketService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        String userRole = "ROLE_LEARNER";
-        if (user.getRoles() != null && !user.getRoles().isEmpty()) {
-            for (com.hango.hango_backend.entity.Role r : user.getRoles()) {
-                if (r != null && r.getRoleName() != null && !r.getRoleName().isBlank()) {
-                    userRole = r.getRoleName();
-                    break;
-                }
-            }
-        }
-        if (userRole.length() > 30) {
-            userRole = userRole.substring(0, 30);
+        if (!hasRole(user, "TRAINER")) {
+            throw new RuntimeException("Only trainers can create tickets");
         }
 
         String ticketCode = "#" + Long.toHexString(System.currentTimeMillis()).toUpperCase();
@@ -57,7 +48,7 @@ public class TicketServiceImpl implements TicketService {
         Ticket ticket = Ticket.builder()
                 .ticketCode(ticketCode)
                 .user(user)
-                .userRole(userRole)
+                .userRole("TRAINER")
                 .category(dto.getCategory() != null ? dto.getCategory() : "GENERAL_ENQUIRY")
                 .priority(dto.getPriority() != null ? dto.getPriority() : "MEDIUM")
                 .status("PENDING")
@@ -105,13 +96,10 @@ public class TicketServiceImpl implements TicketService {
                 .orElseThrow(() -> new RuntimeException("Ticket not found"));
 
         User user = userRepository.findById(userId).orElse(null);
-        boolean isStaff = user != null && user.getRoles() != null &&
-                user.getRoles().stream().anyMatch(r -> 
-                    "ADMINISTRATOR".equalsIgnoreCase(r.getRoleName()) ||
-                    (r.getRoleName() != null && r.getRoleName().contains("ADMIN"))
-                );
+        boolean isAdmin = hasRole(user, "ADMINISTRATOR");
+        boolean isOwnerTrainer = hasRole(user, "TRAINER") && ticket.getUser().getId().equals(userId);
 
-        if (!isStaff && !ticket.getUser().getId().equals(userId)) {
+        if (!isAdmin && !isOwnerTrainer) {
             throw new RuntimeException("Access denied");
         }
 
@@ -136,18 +124,15 @@ public class TicketServiceImpl implements TicketService {
 
     @Override
     @Transactional
-    public TicketMessageDTO addMessage(Long userId, Long ticketId, String message, String attachmentUrls) {
+    public TicketMessageDTO addMessage(Long userId, Long ticketId, String message) {
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new RuntimeException("Ticket not found"));
 
         User sender = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        boolean isStaff = sender.getRoles() != null &&
-                sender.getRoles().stream().anyMatch(r ->
-                        "ADMINISTRATOR".equalsIgnoreCase(r.getRoleName()) ||
-                        (r.getRoleName() != null && r.getRoleName().contains("ADMIN"))
-                );
+        boolean isAdmin = hasRole(sender, "ADMINISTRATOR");
+        boolean isOwnerTrainer = hasRole(sender, "TRAINER") && ticket.getUser().getId().equals(userId);
 
         if (message == null || message.trim().isEmpty()) {
             throw new RuntimeException("Message content cannot be empty");
@@ -157,33 +142,29 @@ public class TicketServiceImpl implements TicketService {
             throw new RuntimeException("Cannot reply to a closed ticket");
         }
 
-        if (!isStaff && !ticket.getUser().getId().equals(userId)) {
+        if (!isAdmin && !isOwnerTrainer) {
             throw new RuntimeException("Access denied: You do not have permission to reply to this ticket");
         }
 
-        String senderRole = "LEARNER";
-        if (sender.getRoles() != null && !sender.getRoles().isEmpty()) {
-            senderRole = sender.getRoles().iterator().next().getRoleName();
-        }
+        String senderRole = isAdmin ? "ADMINISTRATOR" : "TRAINER";
 
         TicketMessage msg = TicketMessage.builder()
                 .ticket(ticket)
                 .sender(sender)
                 .senderRole(senderRole)
                 .message(message)
-                .attachmentUrls(attachmentUrls)
                 .build();
 
         msg = ticketMessageRepository.save(msg);
 
         ticket.setUpdatedAt(LocalDateTime.now());
-        if ("PENDING".equals(ticket.getStatus()) && !"LEARNER".equals(senderRole) && !"TRAINER".equals(senderRole)) {
+        if ("PENDING".equals(ticket.getStatus()) && isAdmin) {
             ticket.setStatus("PROCESSING");
         }
         ticketRepository.save(ticket);
 
         try {
-            if (isStaff) {
+            if (isAdmin) {
                 notificationService.notifyUser(
                         ticket.getUser(),
                         "TicketResponse",
@@ -227,7 +208,9 @@ public class TicketServiceImpl implements TicketService {
         User manager = userRepository.findById(managerUserId)
                 .orElseThrow(() -> new RuntimeException("Manager not found"));
 
-
+        if (!hasRole(manager, "ADMINISTRATOR")) {
+            throw new RuntimeException("Only administrators can process tickets");
+        }
 
         ticket.setProcessedBy(manager);
         ticket.setProcessedAt(LocalDateTime.now());
@@ -325,8 +308,18 @@ public class TicketServiceImpl implements TicketService {
                 .senderEmail(msg.getSender().getEmail())
                 .senderRole(msg.getSenderRole())
                 .message(msg.getMessage())
-                .attachmentUrls(msg.getAttachmentUrls())
                 .createdAt(msg.getCreatedAt())
                 .build();
+    }
+
+    private boolean hasRole(User user, String roleName) {
+        if (user == null || user.getRoles() == null) {
+            return false;
+        }
+        return user.getRoles().stream()
+                .filter(role -> role != null && role.getRoleName() != null)
+                .map(role -> role.getRoleName().trim())
+                .anyMatch(value -> roleName.equalsIgnoreCase(value)
+                        || ("ROLE_" + roleName).equalsIgnoreCase(value));
     }
 }

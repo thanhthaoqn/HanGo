@@ -25,4 +25,5 @@ public class TrainerExamResponseDTO {
     private String thumbnailUrl;
     private Long creatorId;
     private String creatorName;
+    private String rejectionReason;
 }

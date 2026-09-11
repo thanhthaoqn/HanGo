@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/model/course.dart';
 import '../../domain/model/course_detail.dart';
 import '../../domain/model/course_review_summary.dart';
+import '../../domain/model/paginated_response.dart';
 import '../../utils/config.dart';
 
 class CourseRepository {
@@ -34,13 +35,50 @@ class CourseRepository {
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(utf8.decode(response.bodyBytes));
+        final Map<String, dynamic> responseData = json.decode(utf8.decode(response.bodyBytes));
+        final List<dynamic> data = responseData['content'] ?? [];
         return data.map((json) => Course.fromJson(json)).toList();
       } else {
         throw Exception('Failed to load courses: ${response.statusCode}');
       }
     } catch (e) {
       throw Exception('Error fetching courses: $e');
+    }
+  }
+
+  Future<PaginatedResponse<Course>> fetchCoursesPaginated({
+    String search = '',
+    String filterType = 'ALL',
+    String difficulty = 'ALL',
+    int page = 0,
+    int size = 8,
+  }) async {
+    try {
+      final queryParams = <String, String>{};
+      if (search.isNotEmpty) queryParams['search'] = search;
+      if (filterType != 'ALL') queryParams['filterType'] = filterType;
+      if (difficulty != 'ALL') queryParams['difficulty'] = difficulty;
+      queryParams['page'] = page.toString();
+      queryParams['size'] = size.toString();
+
+      final uri = Uri.parse('$baseUrl/courses').replace(queryParameters: queryParams);
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      final response = await http.get(
+        uri,
+        headers: {if (token != null) 'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData = json.decode(utf8.decode(response.bodyBytes));
+        return PaginatedResponse<Course>.fromJson(responseData, (json) => Course.fromJson(json));
+      } else {
+        throw Exception('Failed to load paginated courses: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching paginated courses: $e');
     }
   }
 

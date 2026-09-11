@@ -31,9 +31,6 @@ public class TrainerProfile {
     @Column(columnDefinition = "TEXT")
     private String bio;
 
-    @Column(name = "workplace", length = 255)
-    private String workplace;
-
     // certifications (Cloudinary urls & JSON arrays)
     @Column(name = "score_report_url", columnDefinition = "LONGTEXT")
     private String scoreReportUrl;
@@ -54,15 +51,15 @@ public class TrainerProfile {
     @Column(name = "bank_account_name", length = 100)
     private String bankAccountName;
 
-    @Column(name = "tax_code", length = 50)
-    private String taxCode;
-
-    @Column(name = "citizen_id", length = 50)
-    private String citizenId;
-
     @Column(name = "agreement_signed")
     @Builder.Default
     private Boolean agreementSigned = false;
+
+    @Column(name = "agreement_version", length = 50)
+    private String agreementVersion;
+
+    @Column(name = "agreement_accepted_at")
+    private LocalDateTime agreementAcceptedAt;
 
     @Column(length = 50)
     @Builder.Default

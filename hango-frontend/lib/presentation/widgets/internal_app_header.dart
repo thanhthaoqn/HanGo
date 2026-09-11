@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../routes/app_routes.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../domain/model/notification_item.dart';
 import '../../../data/repositories/notification_repository.dart';
 import '../pages/login_page.dart';
-import '../pages/learner/learner_home_page.dart';
+import '../pages/learner/learner_shell_page.dart';
 import '../pages/trainer/trainer_profile_page.dart';
+import '../pages/trainer/trainer_shell_page.dart';
 import '../pages/course_manager/course_manager_my_information_page.dart';
 import '../pages/trainer/onboarding/trainer_onboarding_shell_page.dart';
 import '../pages/trainer/onboarding/trainer_onboarding_details_page.dart';
@@ -188,11 +191,7 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
   void _handleLogout() async {
     await _authService.logout();
     if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-        (route) => false,
-      );
+      context.go(AppRoutes.login);
     }
   }
 
@@ -263,10 +262,15 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
       }
 
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const TrainerProfilePage()),
-        );
+        final shell = TrainerShellPage.of(context);
+        if (shell != null) {
+          shell.selectTab(5);
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const TrainerProfilePage()),
+          );
+        }
       }
     }
   }
@@ -292,11 +296,7 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
           if (widget.showLogo)
             InkWell(
               onTap: () {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LearnerHomePage()),
-                  (route) => false,
-                );
+                context.go(AppRoutes.home);
               },
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -428,41 +428,44 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
                                     itemCount: _notifications.length,
                                     itemBuilder: (context, index) {
                                       final notif = _notifications[index];
-                                      return ListTile(
-                                        contentPadding: const EdgeInsets.symmetric(
-                                            horizontal: 8),
-                                        leading: CircleAvatar(
-                                          backgroundColor: notif.read
-                                              ? const Color(0xFFF1F5F9)
-                                              : const Color(0xFFE6F7F2),
-                                          child: Icon(
-                                            Icons.notifications_active_outlined,
-                                            color: notif.read
-                                                ? const Color(0xFF94A3B8)
-                                                : const Color(0xFF20B486),
-                                            size: 20,
+                                      return Material(
+                                        color: Colors.transparent,
+                                        child: ListTile(
+                                          contentPadding: const EdgeInsets.symmetric(
+                                              horizontal: 8),
+                                          leading: CircleAvatar(
+                                            backgroundColor: notif.read
+                                                ? const Color(0xFFF1F5F9)
+                                                : const Color(0xFFE6F7F2),
+                                            child: Icon(
+                                              Icons.notifications_active_outlined,
+                                              color: notif.read
+                                                  ? const Color(0xFF94A3B8)
+                                                  : const Color(0xFF20B486),
+                                              size: 20,
+                                            ),
                                           ),
-                                        ),
-                                        title: Text(
-                                          notif.title,
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: notif.read
-                                                ? FontWeight.normal
-                                                : FontWeight.w600,
-                                            color: const Color(0xFF0F172A),
+                                          title: Text(
+                                            notif.title,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: notif.read
+                                                  ? FontWeight.normal
+                                                  : FontWeight.w600,
+                                              color: const Color(0xFF0F172A),
+                                            ),
                                           ),
+                                          subtitle: Text(
+                                            '${notif.message}\n${_formatNotificationTime(notif.createdAt)}',
+                                            style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Color(0xFF64748B)),
+                                          ),
+                                          onTap: () {
+                                            _markNotificationAsRead(notif);
+                                            Navigator.pop(context);
+                                          },
                                         ),
-                                        subtitle: Text(
-                                          '${notif.message}\n${_formatNotificationTime(notif.createdAt)}',
-                                          style: const TextStyle(
-                                              fontSize: 12,
-                                              color: Color(0xFF64748B)),
-                                        ),
-                                        onTap: () {
-                                          _markNotificationAsRead(notif);
-                                          Navigator.pop(context);
-                                        },
                                       );
                                     },
                                   ),
@@ -558,7 +561,12 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
                     radius: 16,
                     backgroundColor: const Color(0xFF20B486),
                     backgroundImage: _userAvatarUrl.isNotEmpty
-                        ? NetworkImage(_userAvatarUrl)
+                        ? NetworkImage(_userAvatarUrl.contains('dicebear.com') && _userAvatarUrl.contains('/svg')
+                            ? _userAvatarUrl.replaceAll('/svg', '/png')
+                            : _userAvatarUrl)
+                        : null,
+                    onBackgroundImageError: _userAvatarUrl.isNotEmpty
+                        ? (exception, stackTrace) {}
                         : null,
                     child: _userAvatarUrl.isEmpty
                         ? Text(

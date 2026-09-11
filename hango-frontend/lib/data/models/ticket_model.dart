@@ -50,7 +50,7 @@ class TicketModel {
       userId: json['userId'],
       userName: json['userName'],
       userEmail: json['userEmail'],
-      userRole: json['userRole'] ?? 'LEARNER',
+      userRole: json['userRole'] ?? 'TRAINER',
       category: json['category'] ?? 'GENERAL_ENQUIRY',
       priority: json['priority'] ?? 'MEDIUM',
       status: json['status'] ?? 'PENDING',
@@ -75,7 +75,6 @@ class TicketMessageModel {
   final String senderEmail;
   final String senderRole;
   final String message;
-  final String? attachmentUrls;
   final String createdAt;
 
   TicketMessageModel({
@@ -86,7 +85,6 @@ class TicketMessageModel {
     required this.senderEmail,
     required this.senderRole,
     required this.message,
-    this.attachmentUrls,
     required this.createdAt,
   });
 
@@ -99,7 +97,6 @@ class TicketMessageModel {
       senderEmail: json['senderEmail'] ?? '',
       senderRole: json['senderRole'] ?? '',
       message: json['message'] ?? '',
-      attachmentUrls: json['attachmentUrls'],
       createdAt: json['createdAt'] ?? '',
     );
   }

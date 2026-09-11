@@ -100,29 +100,48 @@ public class AdminCommentController {
     private Map<String, Object> toSummaryMap(Comment c, DateTimeFormatter formatter) {
         Map<String, Object> map = new HashMap<>();
         map.put("id", c.getId());
-        String commentType = "lesson";
-        if (c.getLesson() != null && "PRACTICE".equalsIgnoreCase(c.getLesson().getLessonType())) {
-            commentType = "quiz";
+        
+        try {
+            String commentType = "lesson";
+            if (c.getLesson() != null && "PRACTICE".equalsIgnoreCase(c.getLesson().getLessonType())) {
+                commentType = "quiz";
+            }
+            map.put("type", commentType);
+        } catch (jakarta.persistence.EntityNotFoundException | org.hibernate.ObjectNotFoundException e) {
+            map.put("type", "lesson");
         }
-        map.put("type", commentType);
-        map.put("userId", c.getUser() != null ? c.getUser().getId() : 0);
-        map.put("commenter", c.getUser() != null ? c.getUser().getFullName() : "Anonymous");
-        map.put("email", c.getUser() != null ? c.getUser().getEmail() : "");
+        
+        try {
+            map.put("userId", c.getUser() != null ? c.getUser().getId() : 0);
+            map.put("commenter", c.getUser() != null ? c.getUser().getFullName() : "Anonymous");
+            map.put("email", c.getUser() != null ? c.getUser().getEmail() : "");
+        } catch (jakarta.persistence.EntityNotFoundException | org.hibernate.ObjectNotFoundException e) {
+            map.put("userId", 0);
+            map.put("commenter", "Anonymous");
+            map.put("email", "");
+        }
+        
         map.put("comment", c.getContent());
 
         // Format status nicely (Approved, Rejected, Pending)
-        String rawStatus = c.getStatus() != null ? c.getStatus() : "PENDING";
-        String formattedStatus = rawStatus.substring(0, 1).toUpperCase() + rawStatus.substring(1).toLowerCase();
+        String rawStatus = (c.getStatus() != null && !c.getStatus().isEmpty()) ? c.getStatus() : "PENDING";
+        String formattedStatus = rawStatus;
+        if (rawStatus.length() > 0) {
+            formattedStatus = rawStatus.substring(0, 1).toUpperCase() + rawStatus.substring(1).toLowerCase();
+        }
         map.put("status", formattedStatus);
 
-        String contextTitle = "General";
-        if (c.getLesson() != null) {
-            contextTitle = c.getLesson().getTitle();
-        } else if (c.getCourse() != null) {
-            contextTitle = c.getCourse().getTitle();
+        try {
+            String contextTitle = "General";
+            if (c.getLesson() != null) {
+                contextTitle = c.getLesson().getTitle();
+            }
+            map.put("quizOrLesson", contextTitle);
+            map.put("course", resolveCourseTitle(c));
+        } catch (jakarta.persistence.EntityNotFoundException | org.hibernate.ObjectNotFoundException e) {
+            map.put("quizOrLesson", "Deleted Lesson");
+            map.put("course", "N/A");
         }
-        map.put("quizOrLesson", contextTitle);
-        map.put("course", resolveCourseTitle(c));
 
         String dateStr = c.getCreatedAt() != null ? c.getCreatedAt().format(formatter) : "";
         map.put("createdAt", dateStr);
@@ -131,9 +150,6 @@ public class AdminCommentController {
     }
 
     private String resolveCourseTitle(Comment c) {
-        if (c.getCourse() != null) {
-            return c.getCourse().getTitle();
-        }
         if (c.getLesson() != null && c.getLesson().getSection() != null
                 && c.getLesson().getSection().getCourse() != null) {
             return c.getLesson().getSection().getCourse().getTitle();

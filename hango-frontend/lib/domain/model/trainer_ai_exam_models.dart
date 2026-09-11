@@ -47,6 +47,7 @@ class TrainerAiExamGenerateResponse {
 class TrainerAiExamBlock {
   final bool isQuestionGroup;
   final String passageText;
+  final String? sourceCitation;
   final int categoryId;
   final int? skillParamId;
   final int difficultyId;
@@ -55,6 +56,7 @@ class TrainerAiExamBlock {
   TrainerAiExamBlock({
     required this.isQuestionGroup,
     required this.passageText,
+    this.sourceCitation,
     required this.categoryId,
     this.skillParamId,
     required this.difficultyId,
@@ -65,6 +67,7 @@ class TrainerAiExamBlock {
     return TrainerAiExamBlock(
       isQuestionGroup: (json['isQuestionGroup'] as bool?) ?? false,
       passageText: json['passageText'] as String? ?? '',
+      sourceCitation: json['sourceCitation'] as String?,
       categoryId: (json['categoryId'] as num?)?.toInt() ?? 1,
       skillParamId: (json['skillParamId'] as num?)?.toInt(),
       difficultyId: (json['difficultyId'] as num?)?.toInt() ?? 14, // Easy default

@@ -25,6 +25,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import com.hango.hango_backend.dto.CourseDetailDTO;
+import com.hango.hango_backend.dto.CourseLessonDTO;
 import com.hango.hango_backend.dto.CourseSummaryDTO;
 import com.hango.hango_backend.entity.Course;
 import com.hango.hango_backend.entity.Enrollment;
@@ -104,72 +105,73 @@ class CourseServiceTest {
 
     @Test
     void getCoursesShouldTreatDifficultyAllCaseInsensitiveAsNoFilter() {
-        when(courseRepository.findCoursesWithFilters(eq("kw"), isNull(), isNull(), isNull()))
-                .thenReturn(List.of());
+        when(courseRepository.findCoursesWithFilters(eq("kw"), isNull(), isNull(), isNull(), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
 
-        courseService.getCourses("kw", null, "all");
+        courseService.getCourses("kw", null, "all", org.springframework.data.domain.Pageable.unpaged());
 
-        verify(courseRepository).findCoursesWithFilters(eq("kw"), isNull(), isNull(), isNull());
+        verify(courseRepository).findCoursesWithFilters(eq("kw"), isNull(), isNull(), isNull(), any());
     }
 
     @Test
     void getCoursesShouldUppercaseNonAllDifficultyFilter() {
-        when(courseRepository.findCoursesWithFilters(any(), eq("EASY"), any(), any())).thenReturn(List.of());
+        when(courseRepository.findCoursesWithFilters(any(), eq("EASY"), any(), any(), any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
 
-        courseService.getCourses(null, null, "easy");
+        courseService.getCourses(null, null, "easy", org.springframework.data.domain.Pageable.unpaged());
 
-        verify(courseRepository).findCoursesWithFilters(any(), eq("EASY"), any(), any());
+        verify(courseRepository).findCoursesWithFilters(any(), eq("EASY"), any(), any(), any());
     }
 
     @Test
     void getCoursesShouldNotResolveUserWhenNoAuthenticationPresent() {
-        when(courseRepository.findCoursesWithFilters(any(), any(), isNull(), any())).thenReturn(List.of());
+        when(courseRepository.findCoursesWithFilters(any(), any(), isNull(), any(), any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
 
-        courseService.getCourses(null, "ENROLLED", null);
+        courseService.getCourses(null, "ENROLLED", null, org.springframework.data.domain.Pageable.unpaged());
 
-        verify(courseRepository).findCoursesWithFilters(any(), any(), isNull(), any());
+        verify(courseRepository).findCoursesWithFilters(any(), any(), isNull(), any(), any());
     }
 
     @Test
     void getCoursesShouldResolveEnrolledUserIdFromSecurityContextWhenFilterTypeEnrolled() {
         authenticateAs(7L);
-        when(courseRepository.findCoursesWithFilters(any(), any(), eq(7L), isNull())).thenReturn(List.of());
+        when(courseRepository.findCoursesWithFilters(any(), any(), eq(7L), isNull(), any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
 
-        courseService.getCourses(null, "ENROLLED", null);
+        courseService.getCourses(null, "ENROLLED", null, org.springframework.data.domain.Pageable.unpaged());
 
-        verify(courseRepository).findCoursesWithFilters(any(), any(), eq(7L), isNull());
+        verify(courseRepository).findCoursesWithFilters(any(), any(), eq(7L), isNull(), any());
     }
 
     @Test
     void getCoursesShouldSetEnrollmentStatusInProgressWhenFilterTypeInProgress() {
         authenticateAs(7L);
-        when(courseRepository.findCoursesWithFilters(any(), any(), eq(7L), eq("ENROLLED"))).thenReturn(List.of());
+        when(courseRepository.findCoursesWithFilters(any(), any(), eq(7L), eq("ENROLLED"), any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
 
-        courseService.getCourses(null, "IN_PROGRESS", null);
+        courseService.getCourses(null, "IN_PROGRESS", null, org.springframework.data.domain.Pageable.unpaged());
 
-        verify(courseRepository).findCoursesWithFilters(any(), any(), eq(7L), eq("ENROLLED"));
+        verify(courseRepository).findCoursesWithFilters(any(), any(), eq(7L), eq("ENROLLED"), any());
     }
 
     @Test
     void getCoursesShouldSetEnrollmentStatusCompletedWhenFilterTypeCompleted() {
         authenticateAs(7L);
-        when(courseRepository.findCoursesWithFilters(any(), any(), eq(7L), eq("COMPLETED"))).thenReturn(List.of());
+        when(courseRepository.findCoursesWithFilters(any(), any(), eq(7L), eq("COMPLETED"), any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
 
-        courseService.getCourses(null, "COMPLETED", null);
+        courseService.getCourses(null, "COMPLETED", null, org.springframework.data.domain.Pageable.unpaged());
 
-        verify(courseRepository).findCoursesWithFilters(any(), any(), eq(7L), eq("COMPLETED"));
+        verify(courseRepository).findCoursesWithFilters(any(), any(), eq(7L), eq("COMPLETED"), any());
     }
 
     @Test
     void getCoursesShouldEnrichDtoCategoriesFromCourseCategoriesSet() {
         CourseSummaryDTO dto = CourseSummaryDTO.builder().id(1L).build();
-        when(courseRepository.findCoursesWithFilters(any(), any(), any(), any())).thenReturn(List.of(dto));
+        when(courseRepository.findCoursesWithFilters(any(), any(), any(), any(), any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(dto)));
         
         List<Object[]> categoryList = new java.util.ArrayList<>();
         categoryList.add(new Object[]{1L, "Grammar"});
         when(courseRepository.findCategoriesByCourseIds(any())).thenReturn(categoryList);
 
-        List<CourseSummaryDTO> result = courseService.getCourses(null, null, null);
+        org.springframework.data.domain.Page<CourseSummaryDTO> resultPage = courseService.getCourses(null, null, null, org.springframework.data.domain.Pageable.unpaged());
+        List<CourseSummaryDTO> result = resultPage.getContent();
 
         assertEquals(List.of("Grammar"), result.get(0).getCategories());
         assertEquals("Grammar", result.get(0).getCategoryName());
@@ -178,12 +180,58 @@ class CourseServiceTest {
     @Test
     void getCoursesShouldFallBackToSingleCategoryWhenCategoriesSetEmpty() {
         CourseSummaryDTO dto = CourseSummaryDTO.builder().id(1L).categoryName("Reading").build();
-        when(courseRepository.findCoursesWithFilters(any(), any(), any(), any())).thenReturn(List.of(dto));
+        when(courseRepository.findCoursesWithFilters(any(), any(), any(), any(), any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(dto)));
         when(courseRepository.findCategoriesByCourseIds(any())).thenReturn(new java.util.ArrayList<>());
 
-        List<CourseSummaryDTO> result = courseService.getCourses(null, null, null);
+        org.springframework.data.domain.Page<CourseSummaryDTO> resultPage = courseService.getCourses(null, null, null, org.springframework.data.domain.Pageable.unpaged());
+        List<CourseSummaryDTO> result = resultPage.getContent();
 
         assertEquals(List.of("Reading"), result.get(0).getCategories());
+    }
+
+    @Test
+    void getCoursesShouldReturnEmptyListWithoutFurtherLookupsWhenNoCoursesMatch() {
+        when(courseRepository.findCoursesWithFilters(any(), any(), any(), any(), any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
+
+        org.springframework.data.domain.Page<CourseSummaryDTO> resultPage = courseService.getCourses(null, null, null, org.springframework.data.domain.Pageable.unpaged());
+        List<CourseSummaryDTO> result = resultPage.getContent();
+
+        assertTrue(result.isEmpty());
+        verify(courseRepository, never()).findCategoriesByCourseIds(any());
+    }
+
+    @Test
+    void getCoursesShouldEnrichLearnersCountAndRatingByBaseCodeWhenCourseHasCode() {
+        CourseSummaryDTO dto = CourseSummaryDTO.builder().id(1L).code("ENG-101-V2").build();
+        when(courseRepository.findCoursesWithFilters(any(), any(), any(), any(), any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(dto)));
+        when(courseRepository.findCategoriesByCourseIds(any())).thenReturn(List.of());
+        when(enrollmentRepository.countDistinctUsersByCourseBaseCodes(List.of("ENG-101")))
+                .thenReturn(List.<Object[]>of(new Object[]{"ENG-101", 5L}));
+        when(courseRatingRepository.getRatingStatsByCourseBaseCodes(List.of("ENG-101")))
+                .thenReturn(List.<Object[]>of(new Object[]{"ENG-101", 4.5}));
+
+        org.springframework.data.domain.Page<CourseSummaryDTO> resultPage = courseService.getCourses(null, null, null, org.springframework.data.domain.Pageable.unpaged());
+        List<CourseSummaryDTO> result = resultPage.getContent();
+
+        assertEquals(5L, result.get(0).getLearnersCount());
+        assertEquals(4.5, result.get(0).getRating());
+    }
+
+    @Test
+    void getCoursesShouldEnrichLearnersCountAndRatingByCourseIdWhenCourseHasNoCode() {
+        CourseSummaryDTO dto = CourseSummaryDTO.builder().id(1L).build();
+        when(courseRepository.findCoursesWithFilters(any(), any(), any(), any(), any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(dto)));
+        when(courseRepository.findCategoriesByCourseIds(any())).thenReturn(List.of());
+        when(enrollmentRepository.countDistinctUsersByCourseIdsGrouped(List.of(1L)))
+                .thenReturn(List.<Object[]>of(new Object[]{1L, 3L}));
+        when(courseRatingRepository.getRatingStatsByCourseIds(List.of(1L)))
+                .thenReturn(List.<Object[]>of(new Object[]{1L, 2.5}));
+
+        org.springframework.data.domain.Page<CourseSummaryDTO> resultPage = courseService.getCourses(null, null, null, org.springframework.data.domain.Pageable.unpaged());
+        List<CourseSummaryDTO> result = resultPage.getContent();
+
+        assertEquals(3L, result.get(0).getLearnersCount());
+        assertEquals(2.5, result.get(0).getRating());
     }
 
     // =================================================================
@@ -321,6 +369,90 @@ class CourseServiceTest {
         assertTrue(result.getHasNewVersionAvailable());
         assertEquals(2L, result.getLatestPublishedCourseId());
         assertEquals("v2", result.getLatestPublishedVersion());
+    }
+
+    @Test
+    void getCourseDetailShouldFallBackToPublishedVersionByCodeWhenLatestVersionIdNull() {
+        Course c = course(1L, trainer(2L));
+        c.setCode("ENG-101");
+        when(courseRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(c));
+        when(sectionRepository.findByCourseIdOrderByDisplayOrderAsc(1L)).thenReturn(List.of());
+        when(enrollmentRepository.findByUserIdAndCourseId(5L, 1L))
+                .thenReturn(Optional.of(Enrollment.builder().enrolledVersionId(1L).build()));
+        Course latest = course(2L, trainer(2L));
+        latest.setVersion("v2");
+        when(courseRepository.findPublishedByCodeOrderByPublishedAtDesc("ENG-101")).thenReturn(List.of(latest));
+
+        CourseDetailDTO result = courseService.getCourseDetail(1L, 5L);
+
+        assertTrue(result.getHasNewVersionAvailable());
+        assertEquals(2L, result.getLatestPublishedCourseId());
+    }
+
+    @Test
+    void getCourseDetailShouldRedirectToFamilyEnrolledCourseWhenUserEnrolledInDifferentVersion() {
+        Course requested = course(1L, trainer(2L));
+        Course familyCourse = course(2L, trainer(2L));
+        when(courseRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(requested));
+        when(enrollmentRepository.findByUserIdAndCourseId(5L, 1L)).thenReturn(Optional.empty());
+        Enrollment familyEnrollment = Enrollment.builder().course(familyCourse).build();
+        when(enrollmentRepository.findFamilyEnrollments(5L, 1L)).thenReturn(List.of(familyEnrollment));
+        when(courseRepository.findByIdWithDetails(2L)).thenReturn(Optional.of(familyCourse));
+        when(sectionRepository.findByCourseIdOrderByDisplayOrderAsc(2L)).thenReturn(List.of());
+        when(enrollmentRepository.findByUserIdAndCourseId(5L, 2L)).thenReturn(Optional.of(familyEnrollment));
+
+        CourseDetailDTO result = courseService.getCourseDetail(1L, 5L);
+
+        assertEquals(2L, result.getId());
+        assertTrue(result.getIsEnrolled());
+    }
+
+    @Test
+    void getCourseDetailShouldAllowEnrolledUserToViewHiddenCourse() {
+        Course c = course(1L, trainer(2L));
+        c.setStatus("HIDDEN");
+        when(courseRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(c));
+        when(enrollmentRepository.findByUserIdAndCourseId(5L, 1L))
+                .thenReturn(Optional.of(Enrollment.builder().build()));
+        when(sectionRepository.findByCourseIdOrderByDisplayOrderAsc(1L)).thenReturn(List.of());
+
+        CourseDetailDTO result = courseService.getCourseDetail(1L, 5L);
+
+        assertEquals("Course", result.getTitle());
+    }
+
+    @Test
+    void getCourseDetailShouldMapMultipleCategoriesFromCourseCategoriesSet() {
+        Course c = course(1L, trainer(2L));
+        SystemParameter cat1 = SystemParameter.builder().paramKey("GRAMMAR").paramValue("Grammar").build();
+        SystemParameter cat2 = SystemParameter.builder().paramKey("READING").paramValue("Reading").build();
+        c.setCategories(new java.util.LinkedHashSet<>(List.of(cat1, cat2)));
+        when(courseRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(c));
+        when(sectionRepository.findByCourseIdOrderByDisplayOrderAsc(1L)).thenReturn(List.of());
+
+        CourseDetailDTO result = courseService.getCourseDetail(1L, null);
+
+        assertEquals(2, result.getCategoryKeys().size());
+        assertTrue(result.getCategoryName().contains("Grammar"));
+        assertTrue(result.getCategoryName().contains("Reading"));
+    }
+
+    @Test
+    void getCourseDetailShouldComputeQuizEstimatedTimeFromQuestionCountWhenEstimatedTimeNull() {
+        Course c = course(1L, trainer(2L));
+        when(courseRepository.findByIdWithDetails(1L)).thenReturn(Optional.of(c));
+        Section section = Section.builder().id(10L).title("Section A").displayOrder(1).build();
+        when(sectionRepository.findByCourseIdOrderByDisplayOrderAsc(1L)).thenReturn(List.of(section));
+        Lesson quizLesson = Lesson.builder().id(20L).title("Quiz A").section(section).lessonType("quiz").displayOrder(1).build();
+        when(lessonRepository.findByCourseIdOrdered(1L)).thenReturn(List.of(quizLesson));
+        when(lessonRepository.countQuestionsByLessonIds(List.of(20L)))
+                .thenReturn(List.<Object[]>of(new Object[]{20L, 5L}));
+
+        CourseDetailDTO result = courseService.getCourseDetail(1L, null);
+
+        CourseLessonDTO lessonDto = result.getSessions().get(0).getLessons().get(0);
+        assertEquals(5, lessonDto.getQuestionCount());
+        assertEquals(20, lessonDto.getEstimatedTime());
     }
 
     // =================================================================
@@ -495,6 +627,84 @@ class CourseServiceTest {
         assertEquals("COMPLETED", captor.getValue().getStatus());
         assertEquals(0, captor.getValue().getProgressPercentage().compareTo(java.math.BigDecimal.valueOf(100)));
         verify(lessonProgressRepository).save(any(LessonProgress.class));
+    }
+
+    @Test
+    void switchCourseVersionShouldCarryProgressByTitleMatchWhenLessonCodeMissing() {
+        Course current = course(10L, trainer(2L));
+        current.setLatestVersionId(11L);
+        Course latest = course(11L, trainer(2L));
+        User learner = User.builder().id(1L).build();
+        Enrollment enrollment = Enrollment.builder().id(5L).user(learner).course(current).build();
+        when(enrollmentRepository.findByUserIdAndCourseId(1L, 10L)).thenReturn(Optional.of(enrollment));
+        when(courseRepository.findById(11L)).thenReturn(Optional.of(latest));
+
+        Lesson oldLesson = Lesson.builder().id(100L).title("Intro Lesson").build();
+        LessonProgress progress = LessonProgress.builder().lesson(oldLesson).isCompleted(true).completedAt(LocalDateTime.now()).build();
+        when(lessonProgressRepository.findCompletedProgressByUserIdAndCourseId(1L, 10L)).thenReturn(List.of(progress));
+
+        Section newSection = Section.builder().id(20L).build();
+        when(sectionRepository.findByCourseIdOrderByDisplayOrderAsc(11L)).thenReturn(List.of(newSection));
+        Lesson newLesson = Lesson.builder().id(200L).title("Intro Lesson").section(newSection).build();
+        when(lessonRepository.findByCourseIdOrdered(11L)).thenReturn(List.of(newLesson));
+        when(lessonProgressRepository.existsByUserIdAndLessonIdAndIsCompletedTrue(1L, 200L)).thenReturn(false);
+
+        courseService.switchCourseVersion(10L, 1L);
+
+        verify(lessonProgressRepository).save(any(LessonProgress.class));
+    }
+
+    @Test
+    void switchCourseVersionShouldNotResaveProgressWhenAlreadyCarried() {
+        Course current = course(10L, trainer(2L));
+        current.setLatestVersionId(11L);
+        Course latest = course(11L, trainer(2L));
+        User learner = User.builder().id(1L).build();
+        Enrollment enrollment = Enrollment.builder().id(5L).user(learner).course(current).build();
+        when(enrollmentRepository.findByUserIdAndCourseId(1L, 10L)).thenReturn(Optional.of(enrollment));
+        when(courseRepository.findById(11L)).thenReturn(Optional.of(latest));
+
+        Lesson oldLesson = Lesson.builder().id(100L).code("L1").build();
+        LessonProgress progress = LessonProgress.builder().lesson(oldLesson).isCompleted(true).completedAt(LocalDateTime.now()).build();
+        when(lessonProgressRepository.findCompletedProgressByUserIdAndCourseId(1L, 10L)).thenReturn(List.of(progress));
+
+        Section newSection = Section.builder().id(20L).build();
+        when(sectionRepository.findByCourseIdOrderByDisplayOrderAsc(11L)).thenReturn(List.of(newSection));
+        Lesson newLesson = Lesson.builder().id(200L).code("L1").section(newSection).build();
+        when(lessonRepository.findByCourseIdOrdered(11L)).thenReturn(List.of(newLesson));
+        when(lessonProgressRepository.existsByUserIdAndLessonIdAndIsCompletedTrue(1L, 200L)).thenReturn(true);
+
+        courseService.switchCourseVersion(10L, 1L);
+
+        verify(lessonProgressRepository, never()).save(any(LessonProgress.class));
+        ArgumentCaptor<Enrollment> captor = ArgumentCaptor.forClass(Enrollment.class);
+        verify(enrollmentRepository).save(captor.capture());
+        assertEquals("COMPLETED", captor.getValue().getStatus());
+    }
+
+    @Test
+    void switchCourseVersionShouldComputePartialProgressPercentageWhenNotAllLessonsCompleted() {
+        Course current = course(10L, trainer(2L));
+        current.setLatestVersionId(11L);
+        Course latest = course(11L, trainer(2L));
+        User learner = User.builder().id(1L).build();
+        Enrollment enrollment = Enrollment.builder().id(5L).user(learner).course(current).build();
+        when(enrollmentRepository.findByUserIdAndCourseId(1L, 10L)).thenReturn(Optional.of(enrollment));
+        when(courseRepository.findById(11L)).thenReturn(Optional.of(latest));
+        when(lessonProgressRepository.findCompletedProgressByUserIdAndCourseId(1L, 10L)).thenReturn(List.of());
+
+        Section newSection = Section.builder().id(20L).build();
+        when(sectionRepository.findByCourseIdOrderByDisplayOrderAsc(11L)).thenReturn(List.of(newSection));
+        Lesson lessonOne = Lesson.builder().id(200L).code("L1").section(newSection).build();
+        Lesson lessonTwo = Lesson.builder().id(201L).code("L2").section(newSection).build();
+        when(lessonRepository.findByCourseIdOrdered(11L)).thenReturn(List.of(lessonOne, lessonTwo));
+
+        courseService.switchCourseVersion(10L, 1L);
+
+        ArgumentCaptor<Enrollment> captor = ArgumentCaptor.forClass(Enrollment.class);
+        verify(enrollmentRepository).save(captor.capture());
+        assertEquals(0, captor.getValue().getProgressPercentage().compareTo(java.math.BigDecimal.ZERO));
+        assertEquals("ENROLLED", captor.getValue().getStatus());
     }
 
     // =================================================================

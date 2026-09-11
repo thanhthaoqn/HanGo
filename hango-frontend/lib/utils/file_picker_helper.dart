@@ -19,6 +19,11 @@ Future<PickedFile?> pickPdf() async {
   return impl.pickPdfFile();
 }
 
+Future<PickedFile?> pickImageOrPdf() async {
+  return impl.pickImageOrPdfFile();
+}
+
+
 void registerDragDrop(Function(double clientX, double clientY, PickedFile file) onFileDropped) {
   impl.setupDragDrop(onFileDropped);
 }

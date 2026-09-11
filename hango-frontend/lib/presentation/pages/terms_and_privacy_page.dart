@@ -215,7 +215,7 @@ class _TermsAndPrivacyPageState extends State<TermsAndPrivacyPage> with SingleTi
         '2.2 User Roles:\n'
         '• Learner: Access learning materials, purchase courses, complete quizzes/exams, and receive AI-driven weakness analysis & personalized learning pathways.\n'
         '• Trainer (Professional Teacher / Peer Tutor): Create and publish courses, quizzes, and exams. Trainer accounts feature an integrated Dual-Mode, allowing Trainers to switch between Trainer Mode and Learner Mode to enroll in courses created by peers.\n'
-        '• Course Manager: Quality assurance, content reviewing (Course & Exam approval/rejection), management of Exam Matrices, support ticket handling, and financial revenue settlements.\n'
+        '• Course Manager: Quality assurance, content reviewing (Course & Exam approval/rejection), management of Exam Matrices, and financial revenue settlements.\n'
         '• Administrator: System governance, account lifecycle management, RBAC permission matrix configuration, AI usage tracking, and audit log monitoring.',
       ),
 

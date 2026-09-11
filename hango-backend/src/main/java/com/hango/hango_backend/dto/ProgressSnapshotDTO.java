@@ -54,5 +54,8 @@ public class ProgressSnapshotDTO {
 
         @JsonProperty("has_weak_skill_overlap")
         private Boolean hasWeakSkillOverlap;
+
+        @JsonProperty("already_detoured")
+        private Boolean alreadyDetoured;
     }
 }

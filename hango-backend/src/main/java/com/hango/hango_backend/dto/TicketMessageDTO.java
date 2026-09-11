@@ -19,6 +19,5 @@ public class TicketMessageDTO {
     private String senderEmail;
     private String senderRole;
     private String message;
-    private String attachmentUrls;
     private LocalDateTime createdAt;
 }

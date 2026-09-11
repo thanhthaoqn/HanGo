@@ -45,32 +45,14 @@ public class ScopeGuardrailService {
         }
 
         try {
-            // Guardrail embedding bây giờ dựa trên: (lý thuyết + 1 phần bài tập)
-            StringBuilder scopeText = new StringBuilder();
-            scopeText.append(lesson.getContentText() != null ? lesson.getContentText() : "");
-
-            if (practiceQuestions != null && !practiceQuestions.isEmpty()) {
-                int idx = 1;
-                for (var q : practiceQuestions) {
-                    scopeText.append("\n\n[Practice ").append(idx).append("]\n");
-                    if (q.getPassage() != null && !q.getPassage().isBlank()) {
-                        scopeText.append("Passage: ").append(q.getPassage()).append("\n");
-                    }
-                    scopeText.append("Question: ").append(q.getQuestionText()).append("\n");
-                    if (q.getOptions() != null && !q.getOptions().isEmpty()) {
-                        scopeText.append("Options: ").append(String.join(" | ", q.getOptions())).append("\n");
-                    }
-                    // Có hết luôn theo yêu cầu: đưa cả explanation
-                    if (q.getExplanation() != null && !q.getExplanation().isBlank()) {
-                        scopeText.append("Explanation: ").append(q.getExplanation()).append("\n");
-                    }
-                    idx++;
-                }
-            }
-
-            List<Double> scopeVector = geminiClientService.generateEmbedding(scopeText.toString());
+            // TỐI ƯU: Sử dụng embedding đã cache sẵn trong DB (tính 1 lần khi bài học được tạo/sửa)
+            // thay vì gọi API tính lại mỗi lần learner chat — tiết kiệm ~50% lượt gọi Gemini Embedding.
+            // Bài tập luyện tập vẫn được bao phủ đầy đủ bởi Guardrail Lớp 1 (prompt engineering
+            // trong AIPromptBuilder đã nhúng toàn bộ practice questions vào system prompt).
+            List<Double> scopeVector = lessonEmbeddingService.getOrComputeEmbedding(lesson);
             List<Double> messageVector = geminiClientService.generateEmbedding(userMessage);
 
+            // Buoc 3+4: tinh cosine similarity va so sanh voi nguong cau hinh
             double similarity = VectorUtil.cosineSimilarity(scopeVector, messageVector);
             boolean inScope = similarity >= aiAssistantProperties.getScopeSimilarityThreshold();
 

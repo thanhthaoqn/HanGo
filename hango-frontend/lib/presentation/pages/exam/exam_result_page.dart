@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../routes/app_routes.dart';
 import '../../../domain/entities/exam.dart';
 import '../../../data/repositories/course_repository.dart';
 import '../../../data/repositories/exam_repository.dart';
@@ -20,8 +22,8 @@ class ExamResultPage extends StatefulWidget {
   final Exam exam;
   final double score;
   final int correctCount;
-  final Map<int, int> userAnswers;
-  final List<Map<String, dynamic>> examQuestions;
+  final Map<int, int>? userAnswers;
+  final List<Map<String, dynamic>>? examQuestions;
   final Map<String, dynamic> attempt;
 
   const ExamResultPage({
@@ -29,8 +31,8 @@ class ExamResultPage extends StatefulWidget {
     required this.exam,
     required this.score,
     required this.correctCount,
-    required this.userAnswers,
-    required this.examQuestions,
+    this.userAnswers,
+    this.examQuestions,
     required this.attempt,
   }) : super(key: key);
 
@@ -48,19 +50,93 @@ class _ExamResultPageState extends State<ExamResultPage> {
   List<Map<String, dynamic>> _attempts = [];
   bool _isLoadingAttempts = true;
 
+  // Pagination
+  int _historyCurrentPage = 1;
+  final int _historyPageSize = 5;
+
+  List<Map<String, dynamic>> get _paginatedAttempts {
+    if (_attempts.isEmpty) return [];
+    final startIndex = (_historyCurrentPage - 1) * _historyPageSize;
+    if (startIndex >= _attempts.length) {
+      return _attempts.take(_historyPageSize).toList();
+    }
+    return _attempts.skip(startIndex).take(_historyPageSize).toList();
+  }
+
+  int get _totalHistoryPages {
+    final total = _attempts.length;
+    if (total == 0) return 1;
+    return (total / _historyPageSize).ceil();
+  }
+
   // AI recommendation
   String _aiWeaknessSummary = "";
   bool _isLoadingAi = true;
   List<Map<String, dynamic>> _aiRecommendedCourses = [];
 
+  // Lazy-loaded data (when opened from My Learning without pre-fetched questions)
+  late Map<int, int> _resolvedUserAnswers;
+  late List<Map<String, dynamic>> _resolvedExamQuestions;
+  bool _isLoadingQuestions = false;
+
   @override
   void initState() {
     super.initState();
-    _analyzeSkills();
+
+    // If examQuestions were provided (fresh from TakeExamPage), use them directly
+    if (widget.examQuestions != null && widget.userAnswers != null) {
+      _resolvedExamQuestions = widget.examQuestions!;
+      _resolvedUserAnswers = widget.userAnswers!;
+      _analyzeSkills();
+    } else {
+      // Lazy-load: fetch questions from API & parse answers from attempt map
+      _resolvedExamQuestions = [];
+      _resolvedUserAnswers = _parseUserAnswersFromAttempt(widget.attempt);
+      _isLoadingQuestions = true;
+      _fetchQuestionsAndAnalyze();
+    }
+
     _loadRecommendations();
     _loadAttempts();
     _loadAiRecommendations();
   }
+
+  Map<int, int> _parseUserAnswersFromAttempt(Map<String, dynamic> attempt) {
+    final Map<int, int> parsed = {};
+    final rawAnswers = attempt['answers'];
+    if (rawAnswers is Map) {
+      rawAnswers.forEach((key, value) {
+        if (key != null && value != null) {
+          final k = int.tryParse(key.toString());
+          final v = int.tryParse(value.toString());
+          if (k != null && v != null) {
+            parsed[k - 1] = v; // Convert 1-based to 0-based
+          }
+        }
+      });
+    }
+    return parsed;
+  }
+
+  Future<void> _fetchQuestionsAndAnalyze() async {
+    try {
+      final repository = ExamRepository();
+      final questions = await repository.fetchExamQuestions(widget.exam.id);
+      if (!mounted) return;
+      setState(() {
+        _resolvedExamQuestions = questions;
+        _isLoadingQuestions = false;
+      });
+      _analyzeSkills();
+    } catch (e) {
+      debugPrint("Error fetching exam questions for result page: $e");
+      if (!mounted) return;
+      setState(() {
+        _isLoadingQuestions = false;
+      });
+    }
+  }
+
 
   Future<void> _loadAttempts() async {
     try {
@@ -81,13 +157,15 @@ class _ExamResultPageState extends State<ExamResultPage> {
   }
 
   void _analyzeSkills() {
+    // Phan tich diem yeu NGAY TREN CLIENT: dem ti le dung/sai theo tung skill
+    // tu correctnessMap do TakeExamPage truyen sang; skill co accuracy thap nhat = weakest
     Map<String, int> totalPerSkill = {};
     Map<String, int> correctPerSkill = {};
 
     final correctnessMap = widget.attempt['correctness'] ?? {};
 
-    for (int i = 0; i < widget.examQuestions.length; i++) {
-      final q = widget.examQuestions[i];
+    for (int i = 0; i < _resolvedExamQuestions.length; i++) {
+      final q = _resolvedExamQuestions[i];
       final skill = q['skill'] ?? 'General';
       
       totalPerSkill[skill] = (totalPerSkill[skill] ?? 0) + 1;
@@ -126,8 +204,8 @@ class _ExamResultPageState extends State<ExamResultPage> {
   }
 
   Future<void> _loadAiRecommendations() async {
-    // Tạo “bong bóng phân tích AI + khóa học gợi ý”
-    // Dựa trên examAttemptId lấy từ attempt history gần nhất.
+    // Goi API AI recommend: gui examAttemptId (lay tu attempt vua nop) + weakestSkill (client tinh)
+    // Neu AI that bai thi fallback ve rule-based recommendations ben duoi
     try {
       final latestAttemptId = (() {
         if (widget.attempt['id'] != null)
@@ -223,31 +301,38 @@ class _ExamResultPageState extends State<ExamResultPage> {
     final isDesktop = size.width > 900;
     final isPassed = widget.score >= 5.0;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
-      appBar: SharedHeader(isDesktop: isDesktop, activeTab: 'Exams'),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            Center(
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 1440),
-                padding: EdgeInsets.symmetric(
-                  horizontal: isDesktop ? 24 : 20,
-                  vertical: 32,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Result title & Back Button
-                    Row(
-                      children: [
-                        if (Navigator.canPop(context))
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        context.go(AppRoutes.myLearning);
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF9FAFB),
+        appBar: SharedHeader(isDesktop: isDesktop, activeTab: 'Exams'),
+        body: SingleChildScrollView(
+          child: Column(
+            children: [
+              Center(
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 1440),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isDesktop ? 24 : 20,
+                    vertical: 32,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Result title & Back Button
+                      Row(
+                        children: [
                           Padding(
                             padding: const EdgeInsets.only(right: 16.0),
                             child: IconButton(
                               icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF1F2937)),
-                              onPressed: () => Navigator.pop(context),
+                              onPressed: () {
+                                context.go(AppRoutes.myLearning);
+                              },
                               tooltip: 'Go back',
                             ),
                           ),
@@ -305,8 +390,9 @@ class _ExamResultPageState extends State<ExamResultPage> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildResultDetails(bool isPassed) {
     return Container(
@@ -366,7 +452,7 @@ class _ExamResultPageState extends State<ExamResultPage> {
               _buildStatBox(
                 Icons.quiz_outlined,
                 'Total',
-                '${widget.examQuestions.length}',
+                '${_resolvedExamQuestions.isNotEmpty ? _resolvedExamQuestions.length : widget.exam.questionCount}',
                 Colors.grey.shade700,
               ),
               _buildStatBox(
@@ -378,7 +464,7 @@ class _ExamResultPageState extends State<ExamResultPage> {
               _buildStatBox(
                 Icons.cancel_outlined,
                 'Incorrect',
-                '${widget.examQuestions.length - widget.correctCount}',
+                '${(_resolvedExamQuestions.isNotEmpty ? _resolvedExamQuestions.length : widget.exam.questionCount) - widget.correctCount}',
                 const Color(0xFFEF4444),
               ),
             ],
@@ -515,12 +601,7 @@ class _ExamResultPageState extends State<ExamResultPage> {
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ListExamsPage(),
-                      ),
-                    );
+                    context.go(AppRoutes.exams);
                   },
                   icon: const Icon(Icons.arrow_back, size: 18),
                   label: const Text('Back to Exams List'),
@@ -736,26 +817,51 @@ class _ExamResultPageState extends State<ExamResultPage> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFE0F2FE),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      (category.isNotEmpty
-                                              ? category
-                                              : 'AI Recommended')
-                                          .toUpperCase(),
-                                      style: const TextStyle(
-                                        color: Color(0xFF0369A1),
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.bold,
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFE0F2FE),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          (category.isNotEmpty
+                                                  ? category
+                                                  : 'AI Recommended')
+                                              .toUpperCase(),
+                                          style: const TextStyle(
+                                            color: Color(0xFF0369A1),
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                      if (difficulty.isNotEmpty) ...[
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFF3F4F6),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            difficulty.toUpperCase(),
+                                            style: const TextStyle(
+                                              color: Color(0xFF4B5563),
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
@@ -782,15 +888,18 @@ class _ExamResultPageState extends State<ExamResultPage> {
                                   ElevatedButton(
                                     onPressed: () {
                                       if (courseId > 0) {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                CourseDetailPage(
-                                                  courseId: courseId,
-                                                ),
-                                          ),
-                                        );
+                                        try {
+                                          context.push('/courses/$courseId');
+                                        } catch (_) {
+                                          Navigator.of(context, rootNavigator: true).push(
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  CourseDetailPage(
+                                                    courseId: courseId,
+                                                  ),
+                                            ),
+                                          );
+                                        }
                                       }
                                     },
                                     style: ElevatedButton.styleFrom(
@@ -952,15 +1061,18 @@ class _ExamResultPageState extends State<ExamResultPage> {
                                 ElevatedButton(
                                   onPressed: () {
                                     if (courseId > 0) {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              CourseDetailPage(
-                                                courseId: courseId,
-                                              ),
-                                        ),
-                                      );
+                                      try {
+                                        context.push('/courses/$courseId');
+                                      } catch (_) {
+                                        Navigator.of(context, rootNavigator: true).push(
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                CourseDetailPage(
+                                                  courseId: courseId,
+                                                ),
+                                          ),
+                                        );
+                                      }
                                     }
                                   },
                                   style: ElevatedButton.styleFrom(
@@ -1106,14 +1218,17 @@ class _ExamResultPageState extends State<ExamResultPage> {
                                 const SizedBox(height: 12),
                                 ElevatedButton(
                                   onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => CourseDetailPage(
-                                          courseId: course.id,
+                                    try {
+                                      context.push('/courses/${course.id}');
+                                    } catch (_) {
+                                      Navigator.of(context, rootNavigator: true).push(
+                                        MaterialPageRoute(
+                                          builder: (context) => CourseDetailPage(
+                                            courseId: course.id,
+                                          ),
                                         ),
-                                      ),
-                                    );
+                                      );
+                                    }
                                   },
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFF28B79B),
@@ -1219,11 +1334,11 @@ class _ExamResultPageState extends State<ExamResultPage> {
               : ListView.separated(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _attempts.length,
+                  itemCount: _paginatedAttempts.length,
                   separatorBuilder: (context, index) =>
                       const Divider(height: 24),
                   itemBuilder: (context, index) {
-                    final attempt = _attempts[index];
+                    final attempt = _paginatedAttempts[index];
                     final attemptNum = attempt['attemptNumber'] ?? (index + 1);
                     final date = attempt['date'] ?? '';
                     final score = (attempt['score'] as num?)?.toDouble() ?? 0.0;
@@ -1325,8 +1440,52 @@ class _ExamResultPageState extends State<ExamResultPage> {
                     );
                   },
                 ),
+                  if (_totalHistoryPages > 1) ...[
+                    const SizedBox(height: 24),
+                    _buildHistoryPagination(),
+                  ],
         ],
       ),
+    );
+  }
+
+  Widget _buildHistoryPagination() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.chevron_left_rounded),
+          onPressed: _historyCurrentPage > 1
+              ? () {
+                  setState(() {
+                    _historyCurrentPage--;
+                  });
+                }
+              : null,
+          color: const Color(0xFF28B79B),
+        ),
+        const SizedBox(width: 16),
+        Text(
+          'Page $_historyCurrentPage of $_totalHistoryPages',
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1F2937),
+          ),
+        ),
+        const SizedBox(width: 16),
+        IconButton(
+          icon: const Icon(Icons.chevron_right_rounded),
+          onPressed: _historyCurrentPage < _totalHistoryPages
+              ? () {
+                  setState(() {
+                    _historyCurrentPage++;
+                  });
+                }
+              : null,
+          color: const Color(0xFF28B79B),
+        ),
+      ],
     );
   }
 }

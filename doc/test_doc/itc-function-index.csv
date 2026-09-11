@@ -10,24 +10,34 @@ No,Function Name,Sheet Name,Description,Pre-Condition
 9,Verify Account (email link),Authentication,Marks an account verified via the emailed token link,Unverified account
 10,Check Verification Status,Authentication,Polls whether an account is verified,none
 11,Resend Verification Email,Authentication,Re-sends the verification email with a 60s cooldown,Unverified account
+
+
 12,View Permission List,Roles & Permissions Management,Lists the full seeded permission catalog,ADMINISTRATOR
 13,View Role List,Roles & Permissions Management,Lists the 4 fixed roles with their assigned permissions,ADMINISTRATOR
 14,Update Role Permissions,Roles & Permissions Management,Assigns/revokes permissions for a fixed role (core-forced, restricted-filtered),ADMINISTRATOR
+
+
 15,View Account List,Account Management,Paged/filtered/searchable user list,ADMINISTRATOR
 16,View Account Detail,Account Management,Single user's full detail,ADMINISTRATOR
 17,Create Account,Account Management,Admin creates a user directly (pre-verified),ADMINISTRATOR
 18,Update Account,Account Management,Edits a user including role/status,ADMINISTRATOR
 19,Toggle Status (direct),Account Management,Direct ACTIVE/INACTIVE status toggle,ADMINISTRATOR
+
+
 20,View Own Profile,Profile Management,Self-service profile view,Logged in
 21,Update Own Profile,Profile Management,Self-service profile edit,Logged in
 22,Change Password (logged-in),Profile Management,Self-service password change (revokes sessions),Logged in, knows current password
 23,Upload Avatar,Profile Management,Cloudinary avatar upload (2MB/jpg-png limit),Logged in, eligible role
+
+
 24,Become Trainer,Trainer Onboarding,Grants TRAINER role immediately + JIT profile,Logged in (any role)
 25,View Own Trainer Profile,Trainer Onboarding,JIT-creates profile if missing,TRAINER/ADMIN/TRAINER_LEAD
 26,Save Trainer Profile Draft,Trainer Onboarding,Save without submitting,TRAINER/ADMIN/TRAINER_LEAD
 27,Submit Trainer Profile for Review,Trainer Onboarding,Validates mandatory fields, moves to AWAITING_APPROVAL,TRAINER/ADMIN/TRAINER_LEAD
 28,View Trainer Profiles List (Admin),Trainer Onboarding,Search/filter applications by status,ADMINISTRATOR
 29,Review Trainer Profile (Admin),Trainer Onboarding,Approve (VERIFIED)/Suspend/Reject with revenue-share validation,ADMINISTRATOR
+
+
 30,Browse/Search Course Catalog,Course Management,Public course listing with search/filter/difficulty,none (public)
 31,View Course Detail,Course Management,Public detail + own progress if logged in,none (public)
 32,Enroll Course,Course Management,Free enroll / after purchase, gated on trainer VERIFIED status,Logged in
@@ -40,6 +50,8 @@ No,Function Name,Sheet Name,Description,Pre-Condition
 39,Submit / Publish / Approve / Reject Trainer Course,Course Management,Trainer submit/self-publish workflow + ungated legacy direct-publish,owner Trainer / ADMIN / TRAINER_LEAD / COURSE_MANAGER per-endpoint
 40,View Courses for Review / Review Detail,Course Management,Course-Manager review queue + publish/reject/hide/unhide,TRAINER_LEAD/COURSE_MANAGER/ADMIN
 41,Lookup System Parameters / Metadata,Course Management,Category/difficulty dropdown data (authoring + public),eligible role for authoring lookup; none for public metadata
+
+
 42,View Lesson Detail,Course Content Management,Lesson content + quiz questions (answer key always included),none (public)
 43,Mark Lesson Complete,Course Content Management,Progress tracking (no enrollment check),Logged in
 44,Get / Submit Quiz Attempt (Lesson),Course Content Management,Lesson-quiz attempts, unlimited retakes,Logged in
@@ -49,6 +61,8 @@ No,Function Name,Sheet Name,Description,Pre-Condition
 48,Save Questions to Lesson Quiz,Course Content Management,Attach questions to a lesson quiz (delete+recreate),any authenticated (no role gate)
 49,Create / Update Question (single),Course Content Management,Question CRUD, auto-approved, no ownership check on edit,any authenticated (no role gate)
 50,Create Group Question (passage),Course Content Management,Passage + sub-questions,any authenticated (no role gate)
+
+
 51,View Trainer Question List,Question Bank Management,List/search/sort own authored questions,TRAINER/COURSE_MANAGER/ADMIN
 52,Create Question Bank Group,Question Bank Management,Create single/group question,TRAINER/COURSE_MANAGER/ADMIN
 53,View Question Detail,Question Bank Management,Fetch for edit (with answer key),TRAINER/COURSE_MANAGER/ADMIN
@@ -57,6 +71,7 @@ No,Function Name,Sheet Name,Description,Pre-Condition
 56,Download Question-Bank Import Template,Question Bank Management,Excel template download,TRAINER/COURSE_MANAGER/ADMIN
 57,Generate Question via AI,Question Bank Management,LLM-generated question(s),any authenticated (no role gate)
 58,Multi-turn AI Exam-Building Chat,Question Bank Management,Chat-driven exam JSON generation,any authenticated (no role gate)
+
 59,Browse Exam List (Learner),Exam Management,Public list, status filter (non-public statuses leak metadata),none (public)
 60,View Exam Questions (take exam),Exam Management,Answer-safe question list,none (public)
 61,View My / Exam Attempts,Exam Management,Attempt history,logged in
@@ -66,9 +81,13 @@ No,Function Name,Sheet Name,Description,Pre-Condition
 65,Import Exam from Excel + Template,Exam Management,Bulk exam+question import (partial-commit-on-error),TRAINER/ADMIN/TRAINER_LEAD
 66,Exam Matrix CRUD + Generate,Exam Management,Criteria-based auto-exam build from own question bank,role varies by endpoint (see sheet)
 67,View Exams for Review / Publish / Reject (Course Manager),Exam Management,Exam review queue,TRAINER_LEAD/COURSE_MANAGER/ADMIN
+
+
 68,Send Message to AI Assistant,AI Assistant,Scope-guarded lesson Q&A,logged in (AI_LEARNING_ASSISTANT)
 69,View Conversation History,AI Assistant,Past AI chats,logged in (AI_LEARNING_ASSISTANT)
 70,Check AI Service Status,AI Assistant,Health check,none
+
+
 71,Generate Learning Pathway,Learning Pathway,AI-built roadmap from exam weakness,LEARNER (ENROLL_AND_LEARN_COURSES)
 72,View Pathway Detail / My Pathway,Learning Pathway,Own roadmap with live progress sync,LEARNER
 73,Reroute Pathway (legacy simple form),Learning Pathway,Unconditional downstream re-lock based on latest score,LEARNER
@@ -78,25 +97,37 @@ No,Function Name,Sheet Name,Description,Pre-Condition
 77,Mentor Action,Learning Pathway,Scripted mentor actions (fast-track/adjust-schedule/quiz/overview),LEARNER
 78,Chat with Pathway Mentor,Learning Pathway,Free-form AI chat on the pathway,LEARNER
 79,Multi-Course Merge (Feature C),Learning Pathway,Documented but unmapped (no live HTTP route),LEARNER
+
+
 80,Recommend Courses via AI,Recommendation,Weakness-based course suggestion (no ownership check),logged in (any role)
+
+
 81,Cart CRUD + Sync,Payment & Revenue,Get/add/remove/clear/sync,logged in
 82,Create Payment (Checkout),Payment & Revenue,PayOS checkout-link creation / free auto-enroll,logged in, non-empty cart/course
 83,Handle PayOS Webhook,Payment & Revenue,Server-to-server payment confirmation,valid PENDING Payment + correct HMAC
 84,View/Search Payments (Manager),Payment & Revenue,Learner payment history + manager transaction list/export,logged in / privileged role
 85,Trainer Revenue Summary / Statements,Payment & Revenue,Trainer-side earnings + confirm/reject,TRAINER/TRAINER_LEAD/TEACHER
 86,Course-Manager Statement Generation & Settlement,Payment & Revenue,Cutoff generation, settle/cancel/regenerate,TRAINER_LEAD/COURSE_MANAGER/ADMIN
+
+
 87,View Lesson Comments,Comment Management,Public approved comment thread,none (public)
 88,Add / Update / Delete Comment,Comment Management,Auto-moderated create/edit/delete,logged in (any role)
 89,Like / Unlike Comment,Comment Management,Comment like toggle,logged in (any role)
 90,View / Manage Comments (Admin),Comment Management,Moderation queue, status override, hard delete,ADMINISTRATOR
+
+
 91,View Notifications / Unread Count,Notification Management,Personal inbox (poll-based),logged in
 92,Mark (All) Notifications as Read,Notification Management,Ownership/role-membership enforced,logged in
 93,Role-Broadcast Read State,Notification Management,Per-user broadcast copy semantics,logged in
 94,Course-Manager Notification Inbox Variant,Notification Management,TRAINER_LEAD-only shared inbox,TRAINER_LEAD
+
+
 95,Create Ticket,Ticket Management,Learner support ticket creation (no category whitelist),logged in (any role)
 96,Update / View Ticket,Ticket Management,Own-ticket edit, owner-or-staff detail view,logged in
 97,Ticket Messages,Ticket Management,Thread messaging (no ownership check on add),logged in
 98,Staff Queue / Process Ticket,Ticket Management,Approve/reject with category-based RBAC rule,ADMINISTRATOR/TRAINER_LEAD/COURSE_MANAGER
+
+
 99,View Report (Admin Dashboard),Dashboard & Reports,Platform-wide stats + registration trend,ADMINISTRATOR
 100,View Audit Log,Dashboard & Reports,Admin action log,ADMINISTRATOR
 101,View AI Usage Stats,Dashboard & Reports,Gemini call usage/cost stats,ADMINISTRATOR

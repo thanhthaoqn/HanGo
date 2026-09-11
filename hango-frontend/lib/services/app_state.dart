@@ -25,6 +25,9 @@ class AppState extends ChangeNotifier {
     AuthService.onLoginSuccess = (result) {
       _handleExternalLoginSuccess(result);
     };
+    AuthService.onLogout = () {
+      logout();
+    };
 
     // Tự động nạp lại session cũ khi mở app
     restoreSession();
@@ -198,6 +201,7 @@ class AppState extends ChangeNotifier {
       final String finalChatUrl = _buildAiUrl('/ai-assistant/messages');
       debugPrint('[AppState] Sending message to: $finalChatUrl');
 
+      // Gui POST kem JWT tu session; body chua lessonId + conversationId + message
       final response = await http
           .post(
             Uri.parse(finalChatUrl), // Đường dẫn: /api/v1/ai-assistant/messages

@@ -33,9 +33,6 @@ public class TicketMessage {
     @Column(columnDefinition = "TEXT", nullable = false)
     private String message;
 
-    @Column(name = "attachment_urls", columnDefinition = "TEXT")
-    private String attachmentUrls;
-
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

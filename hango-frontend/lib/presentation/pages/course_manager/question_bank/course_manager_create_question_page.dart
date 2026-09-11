@@ -14,6 +14,7 @@ class OptionState {
   int? id;
   TextEditingController textController = TextEditingController();
   bool isCorrect;
+  String? errorText;
   OptionState({this.id, String text = '', this.isCorrect = false}) {
     textController.text = text;
   }
@@ -60,6 +61,7 @@ class CourseManagerCreateQuestionPage extends StatefulWidget {
   final bool isCourseManager;
   final Map<String, dynamic>? initialData;
   final bool isEmbedded;
+  final int initialUsageType; // 1=QUIZ, 2=EXAM, 3=BOTH
   final VoidCallback? onBack;
 
   const CourseManagerCreateQuestionPage({
@@ -70,6 +72,7 @@ class CourseManagerCreateQuestionPage extends StatefulWidget {
     this.isCourseManager = false,
     this.initialData,
     this.isEmbedded = false,
+    this.initialUsageType = 1,
     this.onBack,
   }) : super(key: key);
 
@@ -91,12 +94,17 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
   List<Map<String, dynamic>> _difficulties = [];
 
   String _status = 'PRIVATE';
+  int _usageType = 1;
 
   List<QuestionGroupState> _groups = [];
 
   @override
   void initState() {
     super.initState();
+    _usageType = widget.initialUsageType;
+    if (widget.question != null && widget.question!.usageType != null) {
+      _usageType = widget.question!.usageType!;
+    }
     _loadMetadata();
   }
 
@@ -213,7 +221,7 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
           
           if (isGroup) {
             gState.passageController.text = detail['passageText'] ?? '';
-            gState.selectedGroupTypeId = detail['categoryId'] as int?;
+            gState.selectedGroupTypeId = detail['groupTypeParamId'] as int?;
           }
 
           final subQList = detail['subQuestions'] as List? ?? [];
@@ -418,6 +426,13 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
             q.questionTextError = 'Question text cannot be empty';
             isValid = false;
           }
+          for (var opt in q.options) {
+            opt.errorText = null;
+            if (opt.textController.text.trim().isEmpty) {
+              opt.errorText = 'Option text cannot be empty';
+              isValid = false;
+            }
+          }
           if (!q.options.any((opt) => opt.isCorrect)) {
             q.optionsError = 'Must have at least one correct option';
             isValid = false;
@@ -438,8 +453,9 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
       for (var group in _groups) {
         final payload = {
           if (widget.question != null) 'id': widget.question!.id,
-          'categoryId': group.selectedGroupTypeId,
+          'groupTypeParamId': group.selectedGroupTypeId,
           'status': _status,
+          'usageType': _usageType,
           'passageText': group.isGroup ? group.passageController.text : null,
           'subQuestions': group.questions.map((q) => {
             if (q.id != null) 'id': q.id,
@@ -539,6 +555,10 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (!widget.isReadOnly) ...[
+                _buildUsageTypeDropdown(),
+                const SizedBox(height: 16),
+              ],
               for (int i = 0; i < _groups.length; i++) ...[
                 _buildGroupBlock(i),
                 const SizedBox(height: 32),
@@ -1219,6 +1239,7 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
             readOnly: widget.isReadOnly,
             decoration: InputDecoration(
               hintText: 'Option $letter',
+              errorText: option.errorText,
               isDense: true,
               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               border: OutlineInputBorder(
@@ -1249,6 +1270,54 @@ class _CourseManagerCreateQuestionPageState extends State<CourseManagerCreateQue
           fontFamily: 'Outfit',
         ),
       ),
+    );
+  }
+  Widget _buildUsageTypeDropdown() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        const Text(
+          'Usage Type: ',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF1E293B),
+            fontFamily: 'Outfit',
+          ),
+        ),
+        const SizedBox(width: 12),
+        Container(
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<int>(
+              value: _usageType,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF1E293B),
+                fontFamily: 'Outfit',
+                fontWeight: FontWeight.w500,
+              ),
+              icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF64748B), size: 18),
+              items: const [
+                DropdownMenuItem(value: 1, child: Text('Quiz Only')),
+                DropdownMenuItem(value: 2, child: Text('Exam Only')),
+                DropdownMenuItem(value: 3, child: Text('Both (Quiz & Exam)')),
+              ],
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() => _usageType = val);
+                }
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

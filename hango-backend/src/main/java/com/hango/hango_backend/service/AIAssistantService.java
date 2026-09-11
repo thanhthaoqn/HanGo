@@ -83,6 +83,8 @@ public class AIAssistantService {
                                                 ? lessonDetail.getQuestions()
                                                 : java.util.List.of();
 
+                // LOP 3: Goi guardrail embedding de so sanh do tuong dong gi cau hoi va noi dung bai hoc
+                // practiceQuestions duoc nap them de mo rong pham vi scope (AI doc duoc ca de bai tap)
                 ScopeGuardrailService.ScopeCheckResult scopeCheck = scopeGuardrailService.checkScope(
                                 lesson,
                                 request.getMessage(),
@@ -92,7 +94,7 @@ public class AIAssistantService {
                 boolean outOfScope = !scopeCheck.inScope();
 
                 if (outOfScope) {
-                        // Bị chặn ở lớp 3 -> KHÔNG gọi Gemini, dùng câu trả lời từ chối có sẵn
+                        // Bị chặn ở lớp 3 -> KHÔNG gọi Gemini, dùng câu trả lời từ chối có sẵn de tiet kiem chi phi LLM
                         replyText = promptBuilder.buildOutOfScopeFallback(lesson);
                         log.info("AI guardrail chặn câu hỏi ngoài phạm vi - learnerId={}, lessonId={}, similarity={}",
                                         learnerId, lesson.getId(), scopeCheck.similarityScore());
@@ -125,6 +127,7 @@ public class AIAssistantService {
                         }
 
                         // 2. Thêm chính câu hỏi HIỆN TẠI của người dùng vào cuối mảng lịch sử
+                        // Day la cau hoi moi nhat, dua vao de AI biet phai tra loi gi
                         geminiHistory.add(com.hango.hango_backend.dto.GeminiGenerateRequest.Content.builder()
                                         .role("user")
                                         .parts(List.of(com.hango.hango_backend.dto.GeminiGenerateRequest.Part
@@ -133,9 +136,10 @@ public class AIAssistantService {
                                                         .build()))
                                         .build());
 
-                        // 3. Gọi Gemini với System Prompt và Toàn bộ Lịch sử cuộc trò chuyện
-                        // Nhúng luôn practiceQuestions để AI "đọc được đề bài".
+                        // 3. Goi Gemini voi System Prompt va toan bo lich su cuoc tro chuyen
+                        // Nhung luon practiceQuestions de AI "doc duoc de bai".
                         String systemPrompt = promptBuilder.buildSystemPrompt(lesson, practiceQuestions);
+                        // Day la diem duy nhat ton chi phi goi LLM trong flow chatbox
                         replyText = geminiClientService.generateChatResponse(systemPrompt, geminiHistory);
                 }
 
@@ -239,6 +243,8 @@ public class AIAssistantService {
                                 .wasOutOfScope(false)
                                 .build();
 
+                // Luu 2 tin nhan (user + assistant) vao DB trong cung 1 transaction
+                // de lich su chat khong bi mat khi server loi giua chung
                 conversation.getMessages().add(userMessage);
                 conversation.getMessages().add(assistantMessage);
                 conversationRepository.save(conversation);
