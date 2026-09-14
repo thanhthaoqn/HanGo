@@ -19,6 +19,7 @@ import '../course/list_courses_page.dart';
 import '../course/course_detail_page.dart';
 import '../course/lesson_detail_page.dart';
 import '../../widgets/shared_header.dart';
+import '../../widgets/shared_drawer.dart';
 import '../../../utils/language_manager.dart';
 import '../../widgets/shared_footer.dart';
 import 'learning_pathway_page.dart';
@@ -759,7 +760,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
               : SharedHeader(isDesktop: isDesktop, activeTab: ''),
           drawer: (widget.isEmbedded || isDesktop)
               ? null
-              : _buildDrawer(context),
+              : SharedDrawer(activeTab: isVi ? 'Trang chủ' : 'Home'),
           body: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -815,80 +816,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
     );
   }
 
-  // Adaptive drawer for mobile layouts
-  Widget _buildDrawer(BuildContext context) {
-    return Drawer(
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          UserAccountsDrawerHeader(
-            decoration: const BoxDecoration(color: Color(0xFF28B79B)),
-            accountName: Text(
-              _userFullName,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            accountEmail: Text(_userEmail),
-            currentAccountPicture: CircleAvatar(
-              backgroundColor: Colors.white,
-              child: Text(
-                _userInitials,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF28B79B),
-                ),
-              ),
-            ),
-          ),
-          if (_canAttemptExam)
-            ListTile(
-              leading: const Icon(Icons.description_outlined),
-              title: const Text('Exams'),
-              onTap: () {
-                Navigator.pop(context); // close drawer
-                context.go(AppRoutes.exams);
-              },
-            ),
-          ListTile(
-            leading: const Icon(Icons.school_outlined),
-            title: const Text('Courses'),
-            onTap: () {
-              Navigator.pop(context);
-              context.go(AppRoutes.courses);
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.route_outlined),
-            title: const Text('Learning Pathway'),
-            onTap: () {
-              Navigator.pop(context);
-              context.go(AppRoutes.pathway);
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.history_rounded),
-            title: const Text('Purchase History'),
-            onTap: () {
-              Navigator.pop(context);
-              context.go('${AppRoutes.profile}?tab=2');
-            },
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.logout, color: Colors.redAccent),
-            title: const Text(
-              'Log Out',
-              style: TextStyle(color: Colors.redAccent),
-            ),
-            onTap: () {
-              Navigator.pop(context);
-              _handleLogout();
-            },
-          ),
-        ],
-      ),
-    );
-  }
+
 
   Widget _buildHeroBanner(bool isDesktop) {
     final isVi = LanguageManager.isVi;
