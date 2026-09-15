@@ -5,6 +5,7 @@ import '../../../services/hango_api.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/download_helper.dart';
 import '../../../utils/config.dart';
+import 'exam_import_error_dialog.dart';
 
 class CourseManagerExamImportExcelPage extends StatefulWidget {
   final VoidCallback onBack;
@@ -117,6 +118,13 @@ class _CourseManagerExamImportExcelPageState
         } else {
           (widget.onImportSuccess ?? widget.onBack)();
         }
+      }
+    } on ExamImportValidationFailure catch (e) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (_) => ExamImportErrorDialog(errors: e.errors),
+        );
       }
     } catch (e) {
       if (mounted)

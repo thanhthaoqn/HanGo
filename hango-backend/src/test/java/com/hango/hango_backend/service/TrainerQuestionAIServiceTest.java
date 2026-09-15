@@ -17,12 +17,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 
+import com.hango.hango_backend.dto.GeminiGenerateResponse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,11 +39,13 @@ class TrainerQuestionAIServiceTest {
     @Mock
     private SystemParameterRepository systemParameterRepository;
 
+    @Mock
+    private SystemConfigService systemConfigService;
+
     private TrainerQuestionAIService service;
 
     @BeforeEach
     void setUp() {
-        SystemConfigService systemConfigService = org.mockito.Mockito.mock(SystemConfigService.class);
         org.mockito.Mockito.lenient().when(systemConfigService.getConfigValue(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString()))
                 .thenAnswer(invocation -> invocation.getArgument(2));
         service = new TrainerQuestionAIService(geminiClientService, new ObjectMapper(), systemParameterRepository, systemConfigService);
@@ -290,6 +297,116 @@ class TrainerQuestionAIServiceTest {
                 .findByParamTypeAndIsActiveTrue(anyString());
     }
 
+    @Test
+    void generatePayloadShouldUseSearchGroundingAndPopulateCitationForMultipleMode() {
+        when(systemParameterRepository.findByParamTypeAndIsActiveTrue("SKILL_TYPE"))
+                .thenReturn(List.of(param(101, "Main idea")));
+        when(systemParameterRepository.findByParamTypeAndIsActiveTrue("DIFFICULTY"))
+                .thenReturn(List.of(param(14, "Easy")));
+
+        String json = "{\"mode\":\"MULTIPLE\",\"questions\":[],\"group\":{\"passageText\":\"Recent archaeological findings suggest...\",\"subQuestions\":[]}}";
+        GeminiClientService.GeminiChatResult chatResult = new GeminiClientService.GeminiChatResult(
+                json,
+                List.of(GeminiGenerateResponse.WebSource.builder().title("BBC History").uri("https://www.bbc.com/news/archaeology-123").build())
+        );
+        when(geminiClientService.generateChatResponseDetailed(anyString(), any(), eq(true))).thenReturn(chatResult);
+
+        CreateTrainerQuestionAIRequestDTO req = request("MULTIPLE", "Archaeological discoveries", 1);
+        req.setUseSearchGrounding(true);
+
+        CreateTrainerQuestionAIResponseDTO result = service.generatePayload(req);
+
+        verify(geminiClientService).generateChatResponseDetailed(anyString(), any(), eq(true));
+        verify(geminiClientService, never()).generateChatResponse(anyString(), any());
+
+        assertEquals("(Adapted from: BBC History (https://www.bbc.com/news/archaeology-123))", result.getGroup().getSourceCitation());
+        assertTrue(result.getGroup().getPassageText().contains("Recent archaeological findings suggest..."));
+        assertTrue(result.getGroup().getPassageText().contains("(Adapted from: BBC History (https://www.bbc.com/news/archaeology-123))"));
+    }
+
+    @Test
+    void generatePayloadShouldUseSearchGroundingAndPopulateCitationForSingleMode() {
+        String json = "{\"mode\":\"SINGLE\",\"questions\":[{\"questionText\":\"What was discovered in 2024?\",\"options\":[]}]}";
+        GeminiClientService.GeminiChatResult chatResult = new GeminiClientService.GeminiChatResult(
+                json,
+                List.of(GeminiGenerateResponse.WebSource.builder().title("Nature Journal").uri("https://www.nature.com/articles/d41586-024").build())
+        );
+        when(geminiClientService.generateChatResponseDetailed(anyString(), any(), eq(true))).thenReturn(chatResult);
+
+        CreateTrainerQuestionAIRequestDTO req = request("SINGLE", "Recent scientific breakthroughs", 1);
+        req.setUseSearchGrounding(true);
+
+        CreateTrainerQuestionAIResponseDTO result = service.generatePayload(req);
+
+        verify(geminiClientService).generateChatResponseDetailed(anyString(), any(), eq(true));
+        verify(geminiClientService, never()).generateChatResponse(anyString(), any());
+
+        assertEquals(1, result.getQuestions().size());
+        assertEquals("(Source: Nature Journal (https://www.nature.com/articles/d41586-024))", result.getQuestions().get(0).getSourceCitation());
+    }
+
+    @Test
+    void generatePayloadShouldIncludeSearchGroundingRulesInPromptWhenEnabled() {
+        String json = "{\"mode\":\"SINGLE\",\"questions\":[]}";
+        GeminiClientService.GeminiChatResult chatResult = new GeminiClientService.GeminiChatResult(json, List.of());
+        when(geminiClientService.generateChatResponseDetailed(anyString(), any(), eq(true))).thenReturn(chatResult);
+
+        CreateTrainerQuestionAIRequestDTO req = request("SINGLE", "Current events", 1);
+        req.setUseSearchGrounding(true);
+
+        service.generatePayload(req);
+
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<List> historyCaptor = ArgumentCaptor.forClass(List.class);
+        verify(geminiClientService).generateChatResponseDetailed(promptCaptor.capture(), historyCaptor.capture(), eq(true));
+
+        assertTrue(promptCaptor.getValue().contains("Google Search"));
+        assertTrue(promptCaptor.getValue().contains("sourceCitation"));
+        String userInput = ((com.hango.hango_backend.dto.GeminiGenerateRequest.Content) historyCaptor.getValue().get(0))
+                .getParts().get(0).getText();
+        assertTrue(userInput.contains("USE_SEARCH_GROUNDING: true"));
+    }
+
+    @Test
+    void generatePayloadShouldKeepTextualCitationAndStripFakeUrlsForMultipleMode() {
+        when(systemParameterRepository.findByParamTypeAndIsActiveTrue("SKILL_TYPE"))
+                .thenReturn(List.of(param(101, "Main idea")));
+        when(systemParameterRepository.findByParamTypeAndIsActiveTrue("DIFFICULTY"))
+                .thenReturn(List.of(param(14, "Easy")));
+
+        String json = "{\"mode\":\"MULTIPLE\",\"questions\":[],\"group\":{\"passageText\":\"Understanding human behavior with money.\","
+                + "\"sourceCitation\":\"Adapted from The Psychology of Money (https://fake-link-404.org/book)\",\"subQuestions\":[]}}";
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn(json);
+
+        CreateTrainerQuestionAIRequestDTO req = request("MULTIPLE", "Financial behavior", 1);
+        req.setUseSearchGrounding(false);
+
+        CreateTrainerQuestionAIResponseDTO result = service.generatePayload(req);
+
+        assertEquals("(Adapted from The Psychology of Money)", result.getGroup().getSourceCitation());
+        assertTrue(result.getGroup().getPassageText().contains("(Adapted from The Psychology of Money)"));
+        assertFalse(result.getGroup().getPassageText().contains("fake-link-404.org"));
+    }
+
+    @Test
+    void generatePayloadShouldStripPureFakeUrlToNull() {
+        when(systemParameterRepository.findByParamTypeAndIsActiveTrue("SKILL_TYPE"))
+                .thenReturn(List.of(param(101, "Main idea")));
+        when(systemParameterRepository.findByParamTypeAndIsActiveTrue("DIFFICULTY"))
+                .thenReturn(List.of(param(14, "Easy")));
+
+        String json = "{\"mode\":\"MULTIPLE\",\"questions\":[],\"group\":{\"passageText\":\"Some passage.\","
+                + "\"sourceCitation\":\"https://pure-fake-url.com/something\",\"subQuestions\":[]}}";
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn(json);
+
+        CreateTrainerQuestionAIRequestDTO req = request("MULTIPLE", "Random topic", 1);
+        req.setUseSearchGrounding(false);
+
+        CreateTrainerQuestionAIResponseDTO result = service.generatePayload(req);
+
+        assertNull(result.getGroup().getSourceCitation());
+    }
+
     private TrainerExamChatRequestDTO.Message message(String role, String text) {
         return TrainerExamChatRequestDTO.Message.builder().role(role).text(text).build();
     }
@@ -317,6 +434,20 @@ class TrainerQuestionAIServiceTest {
                 .history(List.of(message("user", "I want to create a grammar exam"))).build());
 
         assertEquals("What's the exam title?", reply);
+    }
+
+    @Test
+    void handleExamChatShouldUseSystemPromptFromConfigServiceWhenOverridden() {
+        when(systemConfigService.getConfigValue("AI", "AI_TRAINER_EXAM_CHAT_PROMPT", TrainerQuestionAIService.DEFAULT_CHAT_PROMPT))
+                .thenReturn("CUSTOM CHAT PROMPT");
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn("ok");
+
+        service.handleExamChat(TrainerExamChatRequestDTO.builder()
+                .history(List.of(message("user", "hi"))).build());
+
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(geminiClientService).generateChatResponse(promptCaptor.capture(), any());
+        assertEquals("CUSTOM CHAT PROMPT", promptCaptor.getValue());
     }
 
     @Test
@@ -381,11 +512,66 @@ class TrainerQuestionAIServiceTest {
     }
 
     @Test
+    void generateExamFromChatShouldUseCustomBaseSystemPromptFromConfigService() {
+        when(systemConfigService.getConfigValue("AI", "AI_TRAINER_EXAM_GENERATE_PROMPT", TrainerQuestionAIService.DEFAULT_GENERATE_PROMPT))
+                .thenReturn("CUSTOM GENERATE PROMPT BASE");
+        String json = "{\"title\":\"t\",\"description\":\"d\",\"durationMinutes\":30,"
+                + "\"passingScore\":50.0,\"expectedQuestionCount\":1,\"blocks\":[]}";
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn(json);
+
+        service.generateExamFromChat(TrainerExamChatRequestDTO.builder()
+                .history(List.of(message("user", "go"))).build());
+
+        ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(geminiClientService).generateChatResponse(promptCaptor.capture(), any());
+        assertTrue(promptCaptor.getValue().startsWith("CUSTOM GENERATE PROMPT BASE"));
+    }
+
+    @Test
     void generateExamFromChatShouldThrowBadGatewayWhenAiReturnsInvalidJson() {
         when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn("not json");
 
         ApiException ex = assertThrows(ApiException.class, () -> service.generateExamFromChat(
                 TrainerExamChatRequestDTO.builder().history(List.of(message("user", "go"))).build()));
         assertEquals(502, ex.getStatus().value());
+    }
+
+    @Test
+    void generateExamFromChatShouldPopulateAndFormatPassageCitationForReadingGroupBlocks() {
+        String json = "{\"title\":\"Reading Test\",\"description\":\"desc\",\"durationMinutes\":45,"
+                + "\"passingScore\":60.0,\"expectedQuestionCount\":2,\"blocks\":["
+                + "{\"isQuestionGroup\":true,\"passageText\":\"Coffee is one of the most popular drinks in the world.\","
+                + "\"sourceCitation\":\"Adapted from National Geographic (https://fake-link-404.com/coffee)\","
+                + "\"categoryId\":1,\"difficultyId\":14,\"questions\":[]}]}";
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn(json);
+
+        CreateTrainerExamAIResponseDTO result = service.generateExamFromChat(
+                TrainerExamChatRequestDTO.builder().history(List.of(message("user", "make exam"))).build());
+
+        assertEquals(1, result.getBlocks().size());
+        CreateTrainerExamAIResponseDTO.BlockDTO block = result.getBlocks().get(0);
+        assertEquals("(Adapted from National Geographic)", block.getSourceCitation());
+        assertTrue(block.getPassageText().contains("Coffee is one of the most popular drinks in the world."));
+        assertTrue(block.getPassageText().contains("(Adapted from National Geographic)"));
+        assertFalse(block.getPassageText().contains("fake-link-404.com"));
+    }
+
+    @Test
+    void generateExamFromChatShouldRelocateLeadingCitationPreambleToBottom() {
+        String json = "{\"title\":\"Sleep Test\",\"description\":\"desc\",\"durationMinutes\":45,"
+                + "\"passingScore\":60.0,\"expectedQuestionCount\":2,\"blocks\":["
+                + "{\"isQuestionGroup\":true,\"passageText\":\"Adapted from BBC Science Focus: Sleep is vital for human survival. During sleep, the brain repairs tissues.\","
+                + "\"categoryId\":1,\"difficultyId\":14,\"questions\":[]}]}";
+        when(geminiClientService.generateChatResponse(anyString(), any())).thenReturn(json);
+
+        CreateTrainerExamAIResponseDTO result = service.generateExamFromChat(
+                TrainerExamChatRequestDTO.builder().history(List.of(message("user", "make sleep exam"))).build());
+
+        assertEquals(1, result.getBlocks().size());
+        CreateTrainerExamAIResponseDTO.BlockDTO block = result.getBlocks().get(0);
+        assertEquals("(Adapted from: BBC Science Focus)", block.getSourceCitation());
+        assertTrue(block.getPassageText().startsWith("Sleep is vital for human survival."));
+        assertTrue(block.getPassageText().endsWith("(Adapted from: BBC Science Focus)"));
+        assertFalse(block.getPassageText().startsWith("Adapted from BBC"));
     }
 }

@@ -17,4 +17,7 @@ public class LessonQuizAttemptDTO {
     private String grade;
     private String submittedTime;
     private Map<String, Integer> answers;
+    @com.fasterxml.jackson.annotation.JsonProperty("isPassed")
+    private Boolean isPassed;
+    private Double passingScore;
 }

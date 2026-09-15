@@ -8,14 +8,18 @@ Round 3,0,0,11,0
 
 Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
 View Report (Admin Dashboard),,,,
-DASHBOARD_FT01,"An admin views platform-wide dashboard statistics, including a 7-day registration trend and the top courses by enrollment.","1. Log in as ADMINISTRATOR in an environment with existing users/courses/enrollments.
-2. Prepare GET /api/admin/dashboard/stats with the Authorization header set.
+DASHBOARD_FT01,"[Endpoint replaced] An admin views the platform's comprehensive dashboard statistics via the new GET /api/admin/dashboard/comprehensive-stats endpoint, which superseded the old GET /api/admin/dashboard/stats (that route no longer exists in AdminController — calling it now 404s).","1. Log in as ADMINISTRATOR in an environment with existing users/courses/enrollments/payments/tickets/AI usage.
+2. Prepare GET /api/admin/dashboard/comprehensive-stats (optionally ?periodDays=30, default 30).
 3. Send the request.
-4. Inspect the response's totalUsers/totalCourses/totalEnrollments, the 7-day weeklyLabels[]/weeklyValues[] trend, and topCourses[].","1. 200 OK; totalUsers, totalRoles, totalCourses, totalEnrollments, weeklyLabels[]/weeklyValues[] (7 entries, oldest-to-newest, real registration counts per day), topCourses[] (up to 5, by enrollment count).","- ADMINISTRATOR logged in; users/courses/enrollments exist."
-DASHBOARD_FT02,"A TRAINER or LEARNER account, lacking the required dashboard authority, is forbidden from viewing the admin dashboard stats.","1. Log in as a plain TRAINER or LEARNER account.
-2. Prepare GET /api/admin/dashboard/stats with that account's Authorization header.
+4. Inspect the response's top-level sections: overview, revenue, contentHealth, learningPerformance, ticketHealth, aiUsage, trends, pendingActions.","1. 200 OK. overview contains totalActiveUsers/totalLearners/totalTrainers/totalCourseManagers/totalAdmins/totalPublishedCourses/totalFreeCourses/totalPaidCourses/totalEnrollments/totalExamAttempts/totalCertificates plus today counters.
+2. revenue contains totalRevenue/platformFee/trainerEarnings/transactionCount/avgTransactionValue/revenueByMonth (12 months).
+3. contentHealth contains coursesByStatus/examsByStatus/trainerAppsByStatus maps, approvalRate, oldestPendingCourseDate/oldestPendingExamDate.
+4. learningPerformance contains completionRate/avgExamScore/examPassRate/activeLearners30d/learningFunnel.
+5. ticketHealth, aiUsage (totalCalls/chatCalls/embeddingCalls/successRate/callsByDay/topUsers), trends (userGrowthByDay/revenueByDay over periodDays), and pendingActions (coursesPendingReview/examsPendingReview/trainerAppsPending/ticketsPending/commentsPendingModeration/unsettledStatements) are all populated from real data.","- ADMINISTRATOR logged in; users/courses/enrollments/payments exist."
+DASHBOARD_FT02,"A TRAINER or LEARNER account, lacking the required dashboard authority, is forbidden from viewing the comprehensive admin dashboard stats.","1. Log in as a plain TRAINER or LEARNER account.
+2. Prepare GET /api/admin/dashboard/comprehensive-stats with that account's Authorization header.
 3. Send the request.
-4. Inspect the response status.","1. 403 Forbidden.","- TRAINER/LEARNER logged in (no VIEW_PLATFORM_DASHBOARD/MANAGE_ACCOUNTS_ROLES authority)."
+4. Inspect the response status.","1. 403 Forbidden.","- TRAINER/LEARNER logged in (no VIEW_PLATFORM_DASHBOARD/MANAGE_ACCOUNTS_ROLES authority, not ADMINISTRATOR)."
 View Audit Log,,,,
 DASHBOARD_FT03,"An admin views the most recent admin-action audit log entries, respecting the requested limit and newest-first ordering.","1. Log in as ADMINISTRATOR in an environment with several prior account/role changes logged.
 2. Prepare GET /api/admin/audit-log?limit=5.
@@ -35,25 +39,27 @@ DASHBOARD_FT06,"A trainer's dashboard correctly aggregates their own courses, le
 2. Prepare GET /api/v1/trainer/dashboard.
 3. Send the request.
 4. Inspect coursesCount, learnersCount, examsCount, totalRevenue, averageRating, courses[], and monthlyRevenues[] in the response.","1. 200 OK; coursesCount, learnersCount (distinct across all the trainer's courses), examsCount, totalRevenue (defaults to 0, never null), averageRating, courses[] (one row per course family, most-recent version, with versionsCount), monthlyRevenues[] (12 fixed Jan-Dec entries for the current year, zero-filled where no revenue).","- Logged in as an eligible authoring role; owns ≥1 course with some learners/payments."
-DASHBOARD_FT07,"The trainer dashboard's ""recent activities"" feed correctly merges three different event types by recency and caps the combined list at 5 entries.","1. Ensure the trainer has more than 5 combined recent payment, enrollment, and rating events across their courses.
+DASHBOARD_FT07,"The trainer dashboard's ""recent activities"" feed correctly merges three different event types by recency and caps the combined list at 20 entries.","1. Ensure the trainer has more than 20 combined recent payment, enrollment, and rating events across their courses.
 2. Prepare GET /api/v1/trainer/dashboard.
 3. Send the request.
-4. Inspect recentActivities[] — count the entries and check the relative-time strings.","1. recentActivities[] contains at most 5 entries total, drawn from the union of the last 5 payments + last 5 enrollments + last 5 ratings, re-sorted and capped to the 5 most recent overall, each with a human-readable relative ""time"" string (""X mins/hours/days ago"").","- ≥6 combined recent payment/enrollment/rating events exist for the trainer's courses."
+4. Inspect recentActivities[] — count the entries and check the relative-time strings.","1. recentActivities[] contains at most 20 entries total, drawn from the union of the most recent 20 payments + 20 enrollments + 20 ratings (findTop20By...), re-sorted and capped to the 20 most recent overall, each with a human-readable relative ""time"" string (""X mins/hours/days ago"").","- ≥21 combined recent payment/enrollment/rating events exist for the trainer's courses."
 View Course-Manager Dashboard,,,,
 DASHBOARD_FT08,"A Course Manager views platform-wide learner and course counts.","1. Log in as COURSE_MANAGER or ADMINISTRATOR in an environment with learners and courses of various statuses.
 2. Prepare GET /api/v1/course-manager/dashboard.
 3. Send the request.
-4. Inspect registeredUsersCount, activeCoursesCount, and inactiveCoursesCount in the response.","1. 200 OK; registeredUsersCount (role=LEARNER), activeCoursesCount (status=PUBLISHED), inactiveCoursesCount.","- COURSE_MANAGER/ADMINISTRATOR logged in; learners and courses of various statuses exist."
-DASHBOARD_FT09,"The inactiveCoursesCount figure silently undercounts submitted-for-review courses, because it queries the literal status string ""PENDING"" instead of the real ""PENDING_APPROVAL"" value that submission actually sets (confirmed likely bug, worth verifying against live data).","1. Log in as COURSE_MANAGER and note the current inactiveCoursesCount via GET /api/v1/course-manager/dashboard.
+4. Inspect registeredUsersCount, activeCoursesCount, and inactiveCoursesCount in the response.","1. 200 OK; registeredUsersCount (role=LEARNER), activeCoursesCount (status=PUBLISHED), inactiveCoursesCount (DRAFT + ARCHIVED + HIDDEN + literal ""PENDING"" statuses).","- COURSE_MANAGER/ADMINISTRATOR logged in; learners and courses of various statuses exist."
+DASHBOARD_FT09,"The inactiveCoursesCount figure silently undercounts submitted-for-review courses, because it queries the literal status string ""PENDING"" instead of the real ""PENDING_APPROVAL"" value that submission actually sets (confirmed bug — verified directly against CourseManagerDashboardServiceImpl.getDashboardSummary and the course-submission status-normalization logic, which always writes ""PENDING_APPROVAL"", never ""PENDING"").","1. Log in as COURSE_MANAGER and note the current inactiveCoursesCount via GET /api/v1/course-manager/dashboard.
 2. As a trainer, submit a DRAFT course for review so its status becomes PENDING_APPROVAL.
 3. As COURSE_MANAGER, call GET /api/v1/course-manager/dashboard again.
 4. Compare the before/after inactiveCoursesCount values.","1. inactiveCoursesCount does NOT increase after the submission — the course sitting in PENDING_APPROVAL is silently excluded from the count, since no course is ever persisted with the literal status ""PENDING"" that the query actually filters on.","- COURSE_MANAGER logged in; a DRAFT course ready to submit."
 DASHBOARD_FT10,"A plain TRAINER account is forbidden from viewing the Course-Manager dashboard, even though the URL itself is public at the filter level.","1. Log in as a plain TRAINER account (no COURSE_MANAGER/ADMINISTRATOR role).
 2. Prepare GET /api/v1/course-manager/dashboard with that account's Authorization header.
 3. Send the request.
-4. Inspect the response status, confirming the request does reach the controller before being denied by method security.","1. 403 Forbidden — confirm this is actually enforced given the URL-level permitAll (i.e. the request does reach the controller before being denied by method security).","- Plain TRAINER logged in (not COURSE_MANAGER/ADMINISTRATOR)."
+4. Inspect the response status, confirming the request does reach the controller before being denied by method security.","1. 403 Forbidden — confirmed: SecurityConfig.java maps /api/v1/course-manager/** to permitAll() at the filter-chain level (""delegate to controller security""), so the 403 comes purely from the endpoint's own @PreAuthorize, not from the global filter chain.","- Plain TRAINER logged in (not COURSE_MANAGER/ADMINISTRATOR)."
 Trainer Course List (bundled counts),,,,
 DASHBOARD_FT11,"A trainer's own course-list view bundles status-count badges computed from their FULL course set, independent of whatever narrow status/search filter is currently applied to the visible list.","1. Log in as a trainer with courses across at least 3 different statuses.
 2. Prepare GET /api/v1/trainer/courses?status=DRAFT&search=xyz (a narrow filter expected to match few or zero courses).
 3. Send the request.
 4. Compare the returned courses[] (should be narrowly filtered) against the count badges (allCount/draftCount/publishedCount/hiddenCount/pendingCount/rejectedCount) in the same response.","1. The count badges reflect the trainer's FULL, unfiltered course set — they do not shrink to match the narrow status=DRAFT&search=xyz filter, while courses[] itself IS correctly filtered.","- Trainer with courses across ≥3 different statuses."
+
+[Doc note] GET /api/admin/dashboard/stats (the endpoint DASHBOARD_FT01/FT02 previously tested) no longer exists in AdminController — it was replaced by GET /api/admin/dashboard/comprehensive-stats (added ~2026-08-13, backed by the new AdminDashboardService), a much richer response covering overview/revenue/contentHealth/learningPerformance/ticketHealth/aiUsage/trends/pendingActions. FT01/FT02 have been rewritten in place to target the new endpoint rather than adding new IDs, since the old route is dead and testing it would just produce a 404.

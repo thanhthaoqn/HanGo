@@ -42,6 +42,12 @@ public class Exam {
 
     private String visibility = "PRIVATE";
 
+    // When true, this exam is a candidate for the learner-facing Entry Exam
+    // (placement test) - if more than one exam has this flag, one is picked
+    // at random each time a learner is offered the entry exam.
+    @Column(name = "is_entry_exam")
+    private Boolean isEntryExam = false;
+
     @Column(name = "rejection_reason", columnDefinition = "TEXT")
     private String rejectionReason;
 

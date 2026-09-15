@@ -3,6 +3,7 @@ package com.hango.hango_backend.controller;
 import com.hango.hango_backend.dto.CourseManagerDashboardSummaryDTO;
 import com.hango.hango_backend.dto.CourseReviewDetailDTO;
 import com.hango.hango_backend.entity.Notification;
+import com.hango.hango_backend.exception.ApiException;
 import com.hango.hango_backend.repository.NotificationRepository;
 import com.hango.hango_backend.service.CourseManagerDashboardService;
 import com.hango.hango_backend.service.NotificationService;
@@ -114,6 +115,8 @@ public class CourseManagerDashboardController {
         try {
             courseManagerDashboardService.publishCourse(id);
             return ResponseEntity.ok("{\"message\": \"Course published successfully\"}");
+        } catch (ApiException e) {
+            return ResponseEntity.status(e.getStatus()).body("{\"error\": \"" + e.getMessage() + "\"}");
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
@@ -130,6 +133,8 @@ public class CourseManagerDashboardController {
             }
             courseManagerDashboardService.rejectCourse(id, reason);
             return ResponseEntity.ok("{\"message\": \"Course rejected successfully\"}");
+        } catch (ApiException e) {
+            return ResponseEntity.status(e.getStatus()).body("{\"error\": \"" + e.getMessage() + "\"}");
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
@@ -142,6 +147,8 @@ public class CourseManagerDashboardController {
         try {
             courseManagerDashboardService.hideCourse(id);
             return ResponseEntity.ok("{\"message\": \"Course hidden successfully\"}");
+        } catch (ApiException e) {
+            return ResponseEntity.status(e.getStatus()).body("{\"error\": \"" + e.getMessage() + "\"}");
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
@@ -154,6 +161,8 @@ public class CourseManagerDashboardController {
         try {
             courseManagerDashboardService.unhideCourse(id);
             return ResponseEntity.ok("{\"message\": \"Course unhidden successfully\"}");
+        } catch (ApiException e) {
+            return ResponseEntity.status(e.getStatus()).body("{\"error\": \"" + e.getMessage() + "\"}");
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
@@ -178,6 +187,24 @@ public class CourseManagerDashboardController {
         try {
             courseManagerDashboardService.publishExam(id);
             return ResponseEntity.ok("{\"message\": \"Exam published successfully\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");
+        }
+    }
+
+    @org.springframework.web.bind.annotation.PatchMapping("/exams/{id}/entry-exam-status")
+    @PreAuthorize("hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    public ResponseEntity<?> setEntryExamStatus(
+            @PathVariable Long id,
+            @org.springframework.web.bind.annotation.RequestBody java.util.Map<String, Object> body) {
+        try {
+            Object flag = body.get("isEntryExam");
+            if (!(flag instanceof Boolean)) {
+                return ResponseEntity.badRequest().body("{\"error\": \"isEntryExam (boolean) is required\"}");
+            }
+            courseManagerDashboardService.setEntryExamStatus(id, (Boolean) flag);
+            return ResponseEntity.ok("{\"message\": \"Entry Exam status updated\"}");
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("{\"error\": \"" + e.getMessage() + "\"}");

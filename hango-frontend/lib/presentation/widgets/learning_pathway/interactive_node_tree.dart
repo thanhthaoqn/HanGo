@@ -1,31 +1,41 @@
 import 'package:flutter/material.dart';
 import '../../../domain/entities/learning_pathway.dart';
-import '../../pages/course/course_detail_page.dart';
 
 class InteractiveNodeTree extends StatelessWidget {
   final List<PathwayNode> nodes;
   final Function(PathwayNode) onNodeTap;
+  final Function(PathwayNode)? onStartLearningTap;
   final Function(PathwayNode)? onFastTrackTap;
+  final Function(PathwayNode)?
+  onMasteryTap; // B4 (spec 20): mo Mastery Quiz that
+  final Function(PathwayNode)? onSkipTap;
+  final VoidCallback? onRegenerateFreeTap;
   final PathwayNode? selectedNode;
   final bool isDarkMode;
   final EdgeInsetsGeometry? contentPadding;
   final Widget? header;
+  final List<String> suggestedActions;
 
   const InteractiveNodeTree({
     super.key,
     required this.nodes,
     required this.onNodeTap,
+    this.onStartLearningTap,
     this.onFastTrackTap,
+    this.onMasteryTap,
+    this.onSkipTap,
+    this.onRegenerateFreeTap,
     this.selectedNode,
     this.isDarkMode = false,
     this.contentPadding,
     this.header,
+    this.suggestedActions = const [],
   });
 
   @override
   Widget build(BuildContext context) {
     final itemCount = nodes.length + (header != null ? 1 : 0);
-    
+
     return ListView.builder(
       padding: contentPadding ?? const EdgeInsets.fromLTRB(22, 18, 22, 28),
       itemCount: itemCount,
@@ -33,7 +43,7 @@ class InteractiveNodeTree extends StatelessWidget {
         if (header != null && index == 0) {
           return header!;
         }
-        
+
         final nodeIndex = header != null ? index - 1 : index;
         final node = nodes[nodeIndex];
         final isLast = nodeIndex == nodes.length - 1;
@@ -55,11 +65,22 @@ class InteractiveNodeTree extends StatelessWidget {
           child: _NodeRow(
             node: node,
             isLast: isLast,
+            suggestedActions: suggestedActions,
             alignLeft: alignLeft,
             isSelected: selectedNode?.step == node.step,
             isDarkMode: isDarkMode,
             onTap: () => onNodeTap(node),
-            onFastTrackTap: onFastTrackTap != null ? () => onFastTrackTap!(node) : null,
+            onStartLearningTap: onStartLearningTap != null
+                ? () => onStartLearningTap!(node)
+                : null,
+            onFastTrackTap: onFastTrackTap != null
+                ? () => onFastTrackTap!(node)
+                : null,
+            onMasteryTap: onMasteryTap != null
+                ? () => onMasteryTap!(node)
+                : null,
+            onSkipTap: onSkipTap != null ? () => onSkipTap!(node) : null,
+            onRegenerateFreeTap: onRegenerateFreeTap,
           ),
         );
       },
@@ -74,7 +95,12 @@ class _NodeRow extends StatelessWidget {
   final bool isSelected;
   final bool isDarkMode;
   final VoidCallback onTap;
+  final VoidCallback? onStartLearningTap;
   final VoidCallback? onFastTrackTap;
+  final VoidCallback? onMasteryTap;
+  final VoidCallback? onSkipTap;
+  final VoidCallback? onRegenerateFreeTap;
+  final List<String> suggestedActions;
 
   const _NodeRow({
     required this.node,
@@ -83,7 +109,12 @@ class _NodeRow extends StatelessWidget {
     required this.isSelected,
     required this.isDarkMode,
     required this.onTap,
+    this.onStartLearningTap,
     this.onFastTrackTap,
+    this.onMasteryTap,
+    this.onSkipTap,
+    this.onRegenerateFreeTap,
+    this.suggestedActions = const [],
   });
 
   @override
@@ -143,7 +174,13 @@ class _NodeRow extends StatelessWidget {
                         node: node,
                         isSelected: isSelected,
                         isDarkMode: isDarkMode,
+                        onTap: onTap,
+                        onStartLearningTap: onStartLearningTap,
                         onFastTrackTap: onFastTrackTap,
+                        onMasteryTap: onMasteryTap,
+                        onSkipTap: onSkipTap,
+                        onRegenerateFreeTap: onRegenerateFreeTap,
+                        suggestedActions: suggestedActions,
                       ),
                     ),
                   ),
@@ -162,21 +199,38 @@ class _NodeCard extends StatelessWidget {
   final PathwayNode node;
   final bool isSelected;
   final bool isDarkMode;
+  final VoidCallback? onTap;
   final VoidCallback? onFastTrackTap;
+  final VoidCallback? onMasteryTap;
+  final VoidCallback? onStartLearningTap;
+  final VoidCallback? onSkipTap;
+  final VoidCallback? onRegenerateFreeTap;
+  final List<String> suggestedActions;
 
   const _NodeCard({
     required this.node,
     required this.isSelected,
     required this.isDarkMode,
+    this.onTap,
     this.onFastTrackTap,
+    this.onMasteryTap,
+    this.onStartLearningTap,
+    this.onSkipTap,
+    this.onRegenerateFreeTap,
+    this.suggestedActions = const [],
   });
 
   @override
   Widget build(BuildContext context) {
-    final palette = _NodePalette.forStatus(node.status, isDarkMode);
-    final effectiveProgress = node.status == NodeStatus.completed
-        ? 100
-        : node.progressPercent.clamp(0, 100);
+    final isSkipped = node.nodeType == NodeType.skipped;
+    final palette = isSkipped
+        ? _NodePalette.skipped(isDarkMode)
+        : _NodePalette.forStatus(node.status, isDarkMode);
+    final effectiveProgress = isSkipped
+        ? node.progressPercent.clamp(0, 100)
+        : (node.status == NodeStatus.completed
+            ? 100
+            : node.progressPercent.clamp(0, 100));
     final lessonText = node.totalLessons > 0
         ? '${node.completedLessons}/${node.totalLessons} lessons'
         : 'Course step';
@@ -209,7 +263,11 @@ class _NodeCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              _StatusPill(status: node.status, isDarkMode: isDarkMode),
+              _StatusPill(
+                status: node.status,
+                nodeType: node.nodeType,
+                isDarkMode: isDarkMode,
+              ),
               const Spacer(),
               Text(
                 'Step ${node.step}',
@@ -222,15 +280,23 @@ class _NodeCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          Text(
-            node.courseTitle,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              height: 1.35,
-              color: palette.text,
+          InkWell(
+            onTap: (node.courseId > 0 &&
+                    node.status != NodeStatus.locked &&
+                    onStartLearningTap != null)
+                ? onStartLearningTap
+                : null,
+            borderRadius: BorderRadius.circular(6),
+            child: Text(
+              node.courseTitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                height: 1.35,
+                color: palette.text,
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -262,6 +328,14 @@ class _NodeCard extends StatelessWidget {
                   status: node.status,
                   isDarkMode: isDarkMode,
                 ),
+              if (node.difficulty != null &&
+                  node.difficulty != 'N/A' &&
+                  node.difficulty!.isNotEmpty)
+                _SkillTag(
+                  label: '#${node.difficulty}',
+                  status: node.status,
+                  isDarkMode: isDarkMode,
+                ),
             ],
           ),
           if (node.reasonWhy.isNotEmpty) ...[
@@ -269,13 +343,13 @@ class _NodeCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: isDarkMode 
-                    ? const Color(0xFF1F2937).withOpacity(0.5) 
+                color: isDarkMode
+                    ? const Color(0xFF1F2937).withOpacity(0.5)
                     : const Color(0xFF8B5CF6).withOpacity(0.06),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isDarkMode 
-                      ? const Color(0xFF374151) 
+                  color: isDarkMode
+                      ? const Color(0xFF374151)
                       : const Color(0xFF8B5CF6).withOpacity(0.15),
                 ),
               ),
@@ -285,7 +359,9 @@ class _NodeCard extends StatelessWidget {
                   Icon(
                     Icons.psychology_rounded,
                     size: 20,
-                    color: isDarkMode ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED),
+                    color: isDarkMode
+                        ? const Color(0xFFA78BFA)
+                        : const Color(0xFF7C3AED),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -294,7 +370,9 @@ class _NodeCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 13,
                         height: 1.5,
-                        color: isDarkMode ? const Color(0xFFD1D5DB) : const Color(0xFF4B5563),
+                        color: isDarkMode
+                            ? const Color(0xFFD1D5DB)
+                            : const Color(0xFF4B5563),
                         fontStyle: FontStyle.italic,
                       ),
                     ),
@@ -309,6 +387,7 @@ class _NodeCard extends StatelessWidget {
           _ProgressBar(
             percent: effectiveProgress,
             status: node.status,
+            isSkipped: isSkipped,
             isDarkMode: isDarkMode,
           ),
           if (node.isMastered) ...[
@@ -318,15 +397,23 @@ class _NodeCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: const Color(0xFFEC4899).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFEC4899).withOpacity(0.2)),
+                border: Border.all(
+                  color: const Color(0xFFEC4899).withOpacity(0.2),
+                ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.workspace_premium, color: Color(0xFFEC4899), size: 16),
+                  const Icon(
+                    Icons.workspace_premium,
+                    color: Color(0xFFEC4899),
+                    size: 16,
+                  ),
                   const SizedBox(width: 6),
                   Text(
-                    node.masteryScore != null ? 'Mastery: ${node.masteryScore}%' : 'Mastered',
+                    node.masteryScore != null
+                        ? 'Mastery: ${node.masteryScore}%'
+                        : 'Mastered',
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -339,38 +426,213 @@ class _NodeCard extends StatelessWidget {
           ],
           if (node.status != NodeStatus.locked && node.courseId > 0) ...[
             const SizedBox(height: 14),
+            if (node.status == NodeStatus.inProgress &&
+                suggestedActions.contains('ENROLL_OR_REGENERATE')) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 16,
+                ),
+                decoration: BoxDecoration(
+                  color: isDarkMode
+                      ? const Color(0xFF1E293B)
+                      : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isDarkMode
+                        ? const Color(0xFF334155)
+                        : const Color(0xFFE2E8F0),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.lock_rounded,
+                          size: 16,
+                          color: isDarkMode
+                              ? const Color(0xFF94A3B8)
+                              : const Color(0xFF64748B),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Premium Course (not paid yet)',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: isDarkMode
+                                ? const Color(0xFF94A3B8)
+                                : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: onStartLearningTap ?? onTap,
+                        icon: const Icon(Icons.shopping_cart_rounded, size: 18),
+                        label: const Text('Buy Course / View Details'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF59E0B),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          elevation: 0,
+                          textStyle: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: onRegenerateFreeTap,
+                        icon: const Icon(Icons.auto_awesome, size: 18),
+                        label: const Text('Ask AI to find free courses'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF8B5CF6),
+                          side: const BorderSide(color: Color(0xFF8B5CF6)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          textStyle: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: onSkipTap,
+                        icon: const Icon(Icons.skip_next_rounded, size: 18),
+                        label: const Text('Skip this course'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: isDarkMode
+                              ? Colors.white70
+                              : Colors.black54,
+                          side: BorderSide(
+                            color: isDarkMode ? Colors.white24 : Colors.black12,
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          textStyle: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ] else ...[
+              SizedBox(
+                width: double.infinity,
+                child: Builder(
+                  builder: (context) {
+                    final isMasteryAction = !isSkipped && (
+                        node.isReviewDue ||
+                        (node.status == NodeStatus.completed &&
+                            !node.isMastered));
+                    final handleTap = isMasteryAction && onMasteryTap != null
+                        ? onMasteryTap
+                        : (onStartLearningTap ?? onTap);
+                    return ElevatedButton.icon(
+                      onPressed: handleTap,
+                      icon: Icon(
+                        isSkipped
+                            ? Icons.replay_rounded
+                            : node.isReviewDue
+                            ? Icons.replay
+                            : (node.status == NodeStatus.completed &&
+                                  !node.isMastered)
+                            ? Icons.workspace_premium
+                            : (node.status == NodeStatus.completed &&
+                                  node.isMastered)
+                            ? Icons.done_all_rounded
+                            : Icons.play_arrow_rounded,
+                        size: 18,
+                      ),
+                      label: Text(
+                        isSkipped
+                            ? 'Review Course'
+                            : node.isReviewDue
+                            ? 'Review Now'
+                            : (node.status == NodeStatus.completed &&
+                                  !node.isMastered)
+                            ? 'Take Mastery Quiz'
+                            : (node.status == NodeStatus.completed &&
+                                  node.isMastered)
+                            ? 'Review Course'
+                            : 'Start learning',
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isSkipped
+                            ? (isDarkMode
+                                  ? const Color(0xFF334155)
+                                  : const Color(0xFF64748B))
+                            : node.isReviewDue
+                            ? const Color(0xFFF59E0B)
+                            : (node.status == NodeStatus.completed &&
+                                  !node.isMastered)
+                            ? const Color(0xFFEC4899)
+                            : (isDarkMode
+                                  ? const Color(0xFF6366F1)
+                                  : const Color(0xFF4F46E5)),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 0,
+                        textStyle: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ],
+          if (!isSkipped &&
+              (node.isReviewDue ||
+                  (node.status == NodeStatus.completed && !node.isMastered)) &&
+              node.courseId > 0 &&
+              onStartLearningTap != null) ...[
+            const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => CourseDetailPage(courseId: node.courseId),
-                    ),
-                  );
-                },
-                icon: Icon(
-                  node.isReviewDue ? Icons.replay : 
-                  (node.status == NodeStatus.completed && !node.isMastered) ? Icons.workspace_premium : 
-                  Icons.play_arrow_rounded, 
-                  size: 18
-                ),
-                label: Text(
-                  node.isReviewDue ? 'Review Now' :
-                  (node.status == NodeStatus.completed && !node.isMastered) ? 'Take Mastery Quiz' :
-                  'Start learning'
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: node.isReviewDue ? const Color(0xFFF59E0B) :
-                                  (node.status == NodeStatus.completed && !node.isMastered) ? const Color(0xFFEC4899) :
-                                  (isDarkMode ? const Color(0xFF6366F1) : const Color(0xFF4F46E5)),
-                  foregroundColor: Colors.white,
+              child: OutlinedButton.icon(
+                onPressed: onStartLearningTap,
+                icon: const Icon(Icons.menu_book_rounded, size: 18),
+                label: const Text('Review Course Content'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: isDarkMode ? Colors.white70 : Colors.black87,
+                  side: BorderSide(
+                    color: isDarkMode ? Colors.white24 : Colors.black12,
+                  ),
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  elevation: 0,
                   textStyle: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
@@ -379,14 +641,17 @@ class _NodeCard extends StatelessWidget {
               ),
             ),
           ],
-          if (node.status == NodeStatus.inProgress && node.courseId > 0 && onFastTrackTap != null) ...[
+          if (node.status == NodeStatus.inProgress &&
+              node.courseId > 0 &&
+              onFastTrackTap != null &&
+              suggestedActions.contains('FAST_TRACK')) ...[
             const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: onFastTrackTap,
                 icon: const Icon(Icons.fast_forward_rounded, size: 18),
-                label: const Text('Fast-track (Skip)'),
+                label: const Text('Fast-track (Take final exam)'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: isDarkMode ? Colors.white70 : Colors.black54,
                   side: BorderSide(
@@ -399,6 +664,28 @@ class _NodeCard extends StatelessWidget {
                   textStyle: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+          ],
+          if (node.status == NodeStatus.inProgress &&
+              node.courseId > 0 &&
+              onSkipTap != null &&
+              !suggestedActions.contains('ENROLL_OR_REGENERATE')) ...[
+            const SizedBox(height: 6),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton.icon(
+                onPressed: onSkipTap,
+                icon: const Icon(Icons.skip_next_rounded, size: 16),
+                label: const Text('Skip this course'),
+                style: TextButton.styleFrom(
+                  foregroundColor: isDarkMode ? Colors.white60 : Colors.black45,
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  textStyle: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
                   ),
                 ),
               ),
@@ -420,30 +707,36 @@ class _StepBadge extends StatelessWidget {
     switch (type) {
       case NodeType.fastTrackSkipped:
         return 'Fast-track';
+      case NodeType.skipped:
+        return 'Skipped';
       case NodeType.detourRemedial:
         return 'Detour';
       case NodeType.merged:
         return 'Merged';
       case NodeType.normal:
-      default:
         return '';
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isSkipped = node.nodeType == NodeType.skipped;
     final nodeTypeLabel = _nodeTypeLabel(node.nodeType);
-    final color = switch (node.status) {
-      NodeStatus.completed => const Color(0xFF10B981),
-      NodeStatus.inProgress => const Color(0xFF28B79B),
-      NodeStatus.locked =>
-        isDarkMode ? const Color(0xFF30363D) : const Color(0xFFCBD5E1),
-    };
-    final icon = switch (node.status) {
-      NodeStatus.completed => Icons.check_rounded,
-      NodeStatus.inProgress => Icons.play_arrow_rounded,
-      NodeStatus.locked => Icons.lock_rounded,
-    };
+    final color = isSkipped
+        ? (isDarkMode ? const Color(0xFF475569) : const Color(0xFF94A3B8))
+        : switch (node.status) {
+            NodeStatus.completed => const Color(0xFF10B981),
+            NodeStatus.inProgress => const Color(0xFF28B79B),
+            NodeStatus.locked =>
+              isDarkMode ? const Color(0xFF30363D) : const Color(0xFFCBD5E1),
+          };
+    final icon = isSkipped
+        ? Icons.skip_next_rounded
+        : switch (node.status) {
+            NodeStatus.completed => Icons.check_rounded,
+            NodeStatus.inProgress => Icons.play_arrow_rounded,
+            NodeStatus.locked => Icons.lock_rounded,
+          };
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -488,31 +781,42 @@ class _StepBadge extends StatelessWidget {
 
 class _StatusPill extends StatelessWidget {
   final NodeStatus status;
+  final NodeType nodeType;
   final bool isDarkMode;
 
-  const _StatusPill({required this.status, required this.isDarkMode});
+  const _StatusPill({
+    required this.status,
+    this.nodeType = NodeType.normal,
+    required this.isDarkMode,
+  });
 
   @override
   Widget build(BuildContext context) {
     late final String label;
     late final IconData icon;
     late final Color color;
-    switch (status) {
-      case NodeStatus.completed:
-        label = 'Completed';
-        icon = Icons.check_circle_rounded;
-        color = const Color(0xFF10B981);
-        break;
-      case NodeStatus.inProgress:
-        label = 'In Progress';
-        icon = Icons.play_circle_fill_rounded;
-        color = const Color(0xFF28B79B);
-        break;
-      case NodeStatus.locked:
-        label = 'Locked';
-        icon = Icons.lock_rounded;
-        color = const Color(0xFF94A3B8);
-        break;
+    if (nodeType == NodeType.skipped) {
+      label = 'Skipped';
+      icon = Icons.skip_next_rounded;
+      color = isDarkMode ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    } else {
+      switch (status) {
+        case NodeStatus.completed:
+          label = 'Completed';
+          icon = Icons.check_circle_rounded;
+          color = const Color(0xFF10B981);
+          break;
+        case NodeStatus.inProgress:
+          label = 'In Progress';
+          icon = Icons.play_circle_fill_rounded;
+          color = const Color(0xFF28B79B);
+          break;
+        case NodeStatus.locked:
+          label = 'Locked';
+          icon = Icons.lock_rounded;
+          color = const Color(0xFF94A3B8);
+          break;
+      }
     }
 
     return Container(
@@ -554,19 +858,29 @@ class _SkillTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final locked = status == NodeStatus.locked;
-    
+
     // Default color
     Color color = locked ? const Color(0xFF94A3B8) : const Color(0xFF6366F1);
     Color bgColor = color.withOpacity(isDarkMode ? 0.16 : 0.10);
     Color borderColor = color.withOpacity(0.22);
-    
+
     // Premium styling for special tags
-    if (label == "#FocusNow" || label == "#LỗiMới" || label == "#Mới Phát Hiện" || label == "#New Vulnerability") {
+    if (label == "#FocusNow" ||
+        label == "#LỗiMới" ||
+        label == "#Mới Phát Hiện" ||
+        label == "#New Vulnerability") {
       color = const Color(0xFFEF4444); // Red/Orange for urgency
       bgColor = color.withOpacity(isDarkMode ? 0.2 : 0.12);
       borderColor = color.withOpacity(0.4);
-    } else if (label == "#LongTerm" || label == "#KinhNiên" || label == "#Kinh Niên" || label == "#Chronic Weakness") {
+    } else if (label == "#LongTerm" ||
+        label == "#KinhNiên" ||
+        label == "#Kinh Niên" ||
+        label == "#Chronic Weakness") {
       color = const Color(0xFF8B5CF6); // Purple for long-term mastery
+      bgColor = color.withOpacity(isDarkMode ? 0.2 : 0.12);
+      borderColor = color.withOpacity(0.4);
+    } else if (label == "#Easy" || label == "#Medium" || label == "#Hard") {
+      color = const Color(0xFFEAB308); // Yellow/Orange for difficulty
       bgColor = color.withOpacity(isDarkMode ? 0.2 : 0.12);
       borderColor = color.withOpacity(0.4);
     }
@@ -596,57 +910,17 @@ class _ScheduleChip extends StatelessWidget {
 
   const _ScheduleChip({required this.node, required this.isDarkMode});
 
-  String _formatDate(DateTime d) {
-    final day = d.day.toString().padLeft(2, '0');
-    final month = d.month.toString().padLeft(2, '0');
-    return '$day/$month';
-  }
-
   @override
   Widget build(BuildContext context) {
-    final startDate = node.startDate;
-    final deadline = node.deadline;
-    if (startDate == null && deadline == null) return const SizedBox.shrink();
-
-    final status = node.scheduleStatus ?? ScheduleStatus.onTrack;
-
-    Color bg;
-    Color fg;
-    String label;
-
-    switch (status) {
-      case ScheduleStatus.behind:
-        bg = const Color(0xFFDC2626);
-        fg = Colors.white;
-        label = 'Behind';
-        break;
-      case ScheduleStatus.atRisk:
-        bg = const Color(0xFFF59E0B);
-        fg = Colors.black;
-        label = 'At risk';
-        break;
-      case ScheduleStatus.completed:
-        bg = const Color(0xFF10B981);
-        fg = Colors.white;
-        label = 'Completed';
-        break;
-      case ScheduleStatus.onTrack:
-      default:
-        bg = const Color(0xFF28B79B);
-        fg = Colors.white;
-        label = 'On track';
-        break;
-    }
-
-    if (!isDarkMode && status != ScheduleStatus.atRisk) {
-      fg = bg;
-    }
-
     final hours = node.estimatedHours;
-    final dateText = startDate != null && deadline != null
-        ? '${_formatDate(startDate)} - ${_formatDate(deadline)}'
-        : _formatDate(startDate ?? deadline!);
-    final hoursText = hours != null ? ' | ${hours}h' : '';
+    if (hours == null || hours <= 0) {
+      return const SizedBox.shrink();
+    }
+
+    String text = '⏳ Estimated: ${hours}h';
+
+    Color bg = const Color(0xFF28B79B);
+    Color fg = isDarkMode ? Colors.white : bg;
 
     return Align(
       alignment: Alignment.centerLeft,
@@ -658,7 +932,7 @@ class _ScheduleChip extends StatelessWidget {
           border: Border.all(color: bg.withOpacity(0.45)),
         ),
         child: Text(
-          '$label | $dateText$hoursText',
+          text,
           style: TextStyle(
             color: fg,
             fontSize: 12,
@@ -673,30 +947,32 @@ class _ScheduleChip extends StatelessWidget {
 class _ProgressBar extends StatelessWidget {
   final int percent;
   final NodeStatus status;
+  final bool isSkipped;
   final bool isDarkMode;
 
   const _ProgressBar({
     required this.percent,
     required this.status,
+    this.isSkipped = false,
     required this.isDarkMode,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = status == NodeStatus.completed
-        ? const Color(0xFF10B981)
-        : const Color(0xFF28B79B);
+    final color = isSkipped
+        ? (isDarkMode ? const Color(0xFF64748B) : const Color(0xFF94A3B8))
+        : status == NodeStatus.completed
+            ? const Color(0xFF10B981)
+            : const Color(0xFF28B79B);
     final track = isDarkMode
         ? const Color(0xFF30363D)
         : const Color(0xFFE2E8F0);
-
-    // Keep the progress height controlled via a parent SizedBox/ClipRRect instead.
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Text(
-          '$percent%',
+          isSkipped ? '$percent% (Skipped)' : '$percent%',
           style: TextStyle(
             color: color,
             fontSize: 12,
@@ -745,14 +1021,30 @@ class _NodePalette {
   static _NodePalette forStatus(NodeStatus status, bool dark) {
     if (status == NodeStatus.completed) {
       return _NodePalette(
-        surface: const Color(0xFF063F32),
-        border: const Color(0xFF10B981),
-        text: Colors.white,
-        muted: const Color(0xFFD1FAE5),
-        glow: const Color(0xFF10B981),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0F766E), Color(0xFF10B981)],
-        ),
+        surface: dark ? const Color(0xFF161B22) : Colors.white,
+        border: dark
+            ? const Color(0xFF10B981).withOpacity(0.6)
+            : const Color(0xFF10B981).withOpacity(0.5),
+        text: dark ? const Color(0xFFF0F6FC) : const Color(0xFF0F172A),
+        muted: dark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+        glow: const Color(0xFF10B981).withOpacity(0.3),
+        gradient: dark
+            ? LinearGradient(
+                colors: [
+                  const Color(0xFF10B981).withOpacity(0.05),
+                  const Color(0xFF161B22),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : LinearGradient(
+                colors: [
+                  const Color(0xFF10B981).withOpacity(0.05),
+                  Colors.white,
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
       );
     }
     if (status == NodeStatus.inProgress) {
@@ -775,6 +1067,16 @@ class _NodePalette {
       text: dark ? const Color(0xFF8B949E) : const Color(0xFF64748B),
       muted: const Color(0xFF94A3B8),
       glow: dark ? Colors.black : const Color(0xFFCBD5E1),
+    );
+  }
+
+  static _NodePalette skipped(bool dark) {
+    return _NodePalette(
+      surface: dark ? const Color(0xFF161B22) : Colors.white,
+      border: dark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+      text: dark ? const Color(0xFFF0F6FC) : const Color(0xFF0F172A),
+      muted: dark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+      glow: dark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
     );
   }
 }

@@ -1,6 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../routes/app_routes.dart';
+import 'package:hango/presentation/widgets/image_cropper_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../../../data/services/auth_service.dart';
@@ -12,7 +15,7 @@ import '../../../utils/toast_helper.dart';
 import '../../../utils/language_manager.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/shared_footer.dart';
-import 'learner_home_page.dart';
+import 'learner_shell_page.dart';
 import '../course/course_detail_page.dart';
 
 class MyInformationPage extends StatefulWidget {
@@ -141,15 +144,9 @@ class _MyInformationPageState extends State<MyInformationPage> {
           appBar: widget.isEmbedded
               ? null
               : SharedHeader(isDesktop: isDesktop, activeTab: ''),
-          body: _isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Color(0xFF28B79B),
-                    ),
-                  ),
-                )
-              : SingleChildScrollView(
+          body: Stack(
+            children: [
+              SingleChildScrollView(
                   child: Column(
                     children: [
                       Padding(
@@ -198,6 +195,19 @@ class _MyInformationPageState extends State<MyInformationPage> {
                     ],
                   ),
                 ),
+              if (_isLoading)
+                Container(
+                  color: Colors.white.withOpacity(0.5),
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Color(0xFF28B79B),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         );
       },
     );
@@ -606,16 +616,16 @@ class _MyInformationPageState extends State<MyInformationPage> {
             newPassword,
           );
           if (res['success'] == true) {
-            _showSuccessSnackBar('Password updated successfully!');
+            _showSuccessSnackBar(
+              'Password updated successfully! Please log in again!',
+            );
             // The prompt says "After the change, you will need to log back in on all devices."
             // We can prompt them or auto log out
-            Future.delayed(const Duration(seconds: 2), () {
-              _authService.logout();
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => LearnerHomePage()),
-                (route) => false,
-              );
+            Future.delayed(const Duration(seconds: 2), () async {
+              await _authService.logout();
+              if (mounted) {
+                context.go(AppRoutes.home);
+              }
             });
           } else {
             _showErrorSnackBar('Failed to update password: ${res['message']}');
@@ -700,7 +710,16 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
   Future<void> _pickAndUploadAvatar() async {
     try {
       final pickedFile = await pickImage();
-      if (pickedFile == null) return;
+      if (pickedFile == null || pickedFile.bytes.isEmpty) return;
+
+      final croppedBytes = await ImageCropperDialog.show(
+        context,
+        imageBytes: Uint8List.fromList(pickedFile.bytes),
+        title: LanguageManager.isVi
+            ? 'Chỉnh sửa ảnh đại diện'
+            : 'Adjust Avatar Photo',
+      );
+      if (croppedBytes == null) return;
 
       setState(() {
         _isUploading = true;
@@ -714,8 +733,8 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
         ..files.add(
           http.MultipartFile.fromBytes(
             'file',
-            pickedFile.bytes,
-            filename: pickedFile.name,
+            croppedBytes,
+            filename: 'avatar_${DateTime.now().millisecondsSinceEpoch}.png',
           ),
         );
 
@@ -900,8 +919,11 @@ class _UpdateProfileModalState extends State<_UpdateProfileModal> {
                           label: 'Phone number*',
                           controller: _phoneController,
                           validator: (v) {
-                            if (v == null || v.trim().isEmpty) return 'Please enter your phone number';
-                            if (!RegExp(r'^(0[3|5|7|8|9])+([0-9]{8})$').hasMatch(v)) {
+                            if (v == null || v.trim().isEmpty)
+                              return 'Please enter your phone number';
+                            if (!RegExp(
+                              r'^(0[3|5|7|8|9])+([0-9]{8})$',
+                            ).hasMatch(v)) {
                               return 'Please enter a valid 10-digit Vietnamese phone number (e.g. 0912345678)';
                             }
                             return null;
@@ -1318,11 +1340,11 @@ class _ChangePasswordPanelState extends State<_ChangePasswordPanel> {
               controller: _newPasswordController,
               obscure: _obscureNew,
               onToggleObscure: () => setState(() => _obscureNew = !_obscureNew),
-              showForgetPass: true,
               validator: (v) {
                 if (v == null || v.isEmpty) return 'New password required';
-                if (v.length < 8)
-                  return 'Password must be at least 8 characters';
+                if (!RegExp(r'^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$').hasMatch(v)) {
+                  return 'Use at least 8 characters, including letters, numbers, and special characters.';
+                }
                 return null;
               },
             ),
@@ -1338,8 +1360,6 @@ class _ChangePasswordPanelState extends State<_ChangePasswordPanel> {
               validator: (v) {
                 if (v == null || v.isEmpty)
                   return 'Confirmation password required';
-                if (v != _newPasswordController.text)
-                  return 'Passwords do not match';
                 return null;
               },
             ),
@@ -1354,6 +1374,15 @@ class _ChangePasswordPanelState extends State<_ChangePasswordPanel> {
                 child: ElevatedButton(
                   onPressed: () {
                     if (_formKey.currentState!.validate()) {
+                      if (_newPasswordController.text != _confirmPasswordController.text) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Passwords do not match', style: TextStyle(fontFamily: 'Outfit')),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
                       widget.onSave(
                         _currPasswordController.text,
                         _newPasswordController.text,
@@ -1724,7 +1753,10 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
     );
   }
 
-  void _showTransactionDetailsDialog(BuildContext context, Map<String, dynamic> item) {
+  void _showTransactionDetailsDialog(
+    BuildContext context,
+    Map<String, dynamic> item,
+  ) {
     final isVi = LanguageManager.isVi;
     final txnRef = item['txnRef'] ?? '${item['id']}';
     final amount = item['amount'];
@@ -1756,7 +1788,9 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
       context: context,
       builder: (context) {
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           backgroundColor: Colors.white,
           clipBehavior: Clip.antiAlias,
           child: Container(
@@ -1766,10 +1800,13 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
               builder: (context, setModalState) {
                 return FutureBuilder<List<CourseDetail>>(
                   future: Future.wait(
-                    targetCourseIds.map((id) => courseRepository.fetchCourseDetail(id)),
+                    targetCourseIds.map(
+                      (id) => courseRepository.fetchCourseDetail(id),
+                    ),
                   ),
                   builder: (context, snapshot) {
-                    final isLoadingDetails = snapshot.connectionState == ConnectionState.waiting;
+                    final isLoadingDetails =
+                        snapshot.connectionState == ConnectionState.waiting;
                     final courseList = snapshot.data ?? [];
                     final hasError = snapshot.hasError;
 
@@ -1778,10 +1815,15 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                       children: [
                         // Header
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 20,
+                          ),
                           decoration: const BoxDecoration(
                             color: Color(0xFFF8FAFC),
-                            border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                            border: Border(
+                              bottom: BorderSide(color: Color(0xFFE2E8F0)),
+                            ),
                           ),
                           child: Row(
                             children: [
@@ -1803,7 +1845,9 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      isVi ? 'Chi tiết đơn hàng #$txnRef' : 'Order Details #$txnRef',
+                                      isVi
+                                          ? 'Chi tiết đơn hàng #$txnRef'
+                                          : 'Order Details #$txnRef',
                                       style: const TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.bold,
@@ -1827,7 +1871,10 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                               const SizedBox(width: 8),
                               IconButton(
                                 onPressed: () => Navigator.pop(context),
-                                icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                                icon: const Icon(
+                                  Icons.close_rounded,
+                                  color: Color(0xFF64748B),
+                                ),
                                 tooltip: isVi ? 'Đóng' : 'Close',
                               ),
                             ],
@@ -1856,63 +1903,107 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
 
                                 if (isLoadingDetails)
                                   const Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 40.0),
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: 40.0,
+                                    ),
                                     child: Center(
-                                      child: CircularProgressIndicator(color: Color(0xFF28B79B)),
+                                      child: CircularProgressIndicator(
+                                        color: Color(0xFF28B79B),
+                                      ),
                                     ),
                                   )
                                 else if (hasError && courseList.isEmpty)
                                   Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 30.0),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 30.0,
+                                    ),
                                     child: Center(
                                       child: Text(
-                                        isVi ? 'Không thể tải thông tin khóa học.' : 'Failed to load course details.',
-                                        style: const TextStyle(color: Colors.red, fontFamily: 'Outfit'),
+                                        isVi
+                                            ? 'Không thể tải thông tin khóa học.'
+                                            : 'Failed to load course details.',
+                                        style: const TextStyle(
+                                          color: Colors.red,
+                                          fontFamily: 'Outfit',
+                                        ),
                                       ),
                                     ),
                                   )
                                 else
                                   ListView.separated(
                                     shrinkWrap: true,
-                                    physics: const NeverScrollableScrollPhysics(),
-                                    itemCount: courseList.isNotEmpty ? courseList.length : targetCourseIds.length,
-                                    separatorBuilder: (context, index) => const SizedBox(height: 12),
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    itemCount: courseList.isNotEmpty
+                                        ? courseList.length
+                                        : targetCourseIds.length,
+                                    separatorBuilder: (context, index) =>
+                                        const SizedBox(height: 12),
                                     itemBuilder: (context, index) {
-                                      final course = courseList.length > index ? courseList[index] : null;
-                                      final courseId = course?.id ?? (targetCourseIds.length > index ? targetCourseIds[index] : 0);
-                                      final title = course?.title ?? (item['courseTitle'] ?? 'Course #$courseId');
-                                      final thumbnail = course?.thumbnailUrl ?? item['courseThumbnail'] as String?;
-                                      final creator = course?.creatorName ?? 'Instructor';
+                                      final course = courseList.length > index
+                                          ? courseList[index]
+                                          : null;
+                                      final courseId =
+                                          course?.id ??
+                                          (targetCourseIds.length > index
+                                              ? targetCourseIds[index]
+                                              : 0);
+                                      final title =
+                                          course?.title ??
+                                          (item['courseTitle'] ??
+                                              'Course #$courseId');
+                                      final thumbnail =
+                                          course?.thumbnailUrl ??
+                                          item['courseThumbnail'] as String?;
+                                      final creator =
+                                          course?.creatorName ?? 'Instructor';
                                       final difficulty = course?.difficultyName;
 
                                       return Container(
                                         padding: const EdgeInsets.all(14),
                                         decoration: BoxDecoration(
                                           color: const Color(0xFFF8FAFC),
-                                          borderRadius: BorderRadius.circular(14),
-                                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
+                                          border: Border.all(
+                                            color: const Color(0xFFE2E8F0),
+                                          ),
                                         ),
                                         child: Row(
                                           children: [
                                             ClipRRect(
-                                              borderRadius: BorderRadius.circular(10),
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
                                               child: Container(
                                                 width: 54,
                                                 height: 54,
                                                 color: Colors.white,
-                                                child: (thumbnail != null && thumbnail.isNotEmpty)
+                                                child:
+                                                    (thumbnail != null &&
+                                                        thumbnail.isNotEmpty)
                                                     ? Image.network(
                                                         thumbnail,
                                                         fit: BoxFit.cover,
-                                                        errorBuilder: (context, error, stackTrace) => const Icon(
-                                                          Icons.school_rounded,
-                                                          color: Color(0xFF28B79B),
-                                                          size: 28,
-                                                        ),
+                                                        errorBuilder:
+                                                            (
+                                                              context,
+                                                              error,
+                                                              stackTrace,
+                                                            ) => const Icon(
+                                                              Icons
+                                                                  .school_rounded,
+                                                              color: Color(
+                                                                0xFF28B79B,
+                                                              ),
+                                                              size: 28,
+                                                            ),
                                                       )
                                                     : const Icon(
                                                         Icons.school_rounded,
-                                                        color: Color(0xFF28B79B),
+                                                        color: Color(
+                                                          0xFF28B79B,
+                                                        ),
                                                         size: 28,
                                                       ),
                                               ),
@@ -1920,47 +2011,69 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                                             const SizedBox(width: 14),
                                             Expanded(
                                               child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
                                                 children: [
                                                   Text(
                                                     title,
                                                     style: const TextStyle(
                                                       fontSize: 15,
-                                                      fontWeight: FontWeight.bold,
+                                                      fontWeight:
+                                                          FontWeight.bold,
                                                       color: Color(0xFF0F172A),
                                                       fontFamily: 'Outfit',
                                                     ),
                                                     maxLines: 2,
-                                                    overflow: TextOverflow.ellipsis,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
                                                   ),
                                                   Wrap(
                                                     spacing: 6,
                                                     runSpacing: 4,
-                                                    crossAxisAlignment: WrapCrossAlignment.center,
+                                                    crossAxisAlignment:
+                                                        WrapCrossAlignment
+                                                            .center,
                                                     children: [
                                                       Text(
                                                         'Giảng viên: $creator',
                                                         style: const TextStyle(
                                                           fontSize: 12,
-                                                          color: Color(0xFF64748B),
+                                                          color: Color(
+                                                            0xFF64748B,
+                                                          ),
                                                           fontFamily: 'Outfit',
                                                         ),
                                                       ),
                                                       if (difficulty != null)
                                                         Container(
-                                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                          padding:
+                                                              const EdgeInsets.symmetric(
+                                                                horizontal: 6,
+                                                                vertical: 2,
+                                                              ),
                                                           decoration: BoxDecoration(
-                                                            color: const Color(0xFFE0F2FE),
-                                                            borderRadius: BorderRadius.circular(6),
+                                                            color: const Color(
+                                                              0xFFE0F2FE,
+                                                            ),
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  6,
+                                                                ),
                                                           ),
                                                           child: Text(
                                                             difficulty,
-                                                            style: const TextStyle(
-                                                              fontSize: 10,
-                                                              fontWeight: FontWeight.bold,
-                                                              color: Color(0xFF0369A1),
-                                                              fontFamily: 'Outfit',
-                                                            ),
+                                                            style:
+                                                                const TextStyle(
+                                                                  fontSize: 10,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold,
+                                                                  color: Color(
+                                                                    0xFF0369A1,
+                                                                  ),
+                                                                  fontFamily:
+                                                                      'Outfit',
+                                                                ),
                                                           ),
                                                         ),
                                                     ],
@@ -1968,13 +2081,22 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                                                   const SizedBox(height: 6),
                                                   Text(
                                                     course != null
-                                                        ? _formatPrice(course.price)
-                                                        : (item['amount'] != null && targetCourseIds.length == 1
-                                                            ? _formatPrice(item['amount'])
-                                                            : '-- ₫'),
+                                                        ? _formatPrice(
+                                                            course.price,
+                                                          )
+                                                        : (item['amount'] !=
+                                                                      null &&
+                                                                  targetCourseIds
+                                                                          .length ==
+                                                                      1
+                                                              ? _formatPrice(
+                                                                  item['amount'],
+                                                                )
+                                                              : '-- ₫'),
                                                     style: const TextStyle(
                                                       fontSize: 13,
-                                                      fontWeight: FontWeight.w700,
+                                                      fontWeight:
+                                                          FontWeight.w700,
                                                       color: Color(0xFF28B79B),
                                                       fontFamily: 'Outfit',
                                                     ),
@@ -1986,14 +2108,29 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                                             ElevatedButton.icon(
                                               onPressed: () {
                                                 Navigator.pop(context);
-                                                Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (context) => CourseDetailPage(courseId: courseId),
-                                                  ),
-                                                );
+                                                try {
+                                                  context.push(
+                                                    '/courses/$courseId',
+                                                  );
+                                                } catch (_) {
+                                                  Navigator.of(
+                                                    context,
+                                                    rootNavigator: true,
+                                                  ).push(
+                                                    MaterialPageRoute(
+                                                      builder: (context) =>
+                                                          CourseDetailPage(
+                                                            courseId: courseId,
+                                                          ),
+                                                    ),
+                                                  );
+                                                }
                                               },
-                                              icon: const Icon(Icons.play_circle_fill_rounded, size: 16, color: Colors.white),
+                                              icon: const Icon(
+                                                Icons.play_circle_fill_rounded,
+                                                size: 16,
+                                                color: Colors.white,
+                                              ),
                                               label: Text(
                                                 isVi ? 'Vào học' : 'Learn Now',
                                                 style: const TextStyle(
@@ -2004,11 +2141,18 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                                                 ),
                                               ),
                                               style: ElevatedButton.styleFrom(
-                                                backgroundColor: const Color(0xFF28B79B),
+                                                backgroundColor: const Color(
+                                                  0xFF28B79B,
+                                                ),
                                                 elevation: 0,
-                                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 14,
+                                                      vertical: 10,
+                                                    ),
                                                 shape: RoundedRectangleBorder(
-                                                  borderRadius: BorderRadius.circular(10),
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
                                                 ),
                                               ),
                                             ),
@@ -2024,10 +2168,15 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
 
                         // Footer
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 16,
+                          ),
                           decoration: const BoxDecoration(
                             color: Color(0xFFF8FAFC),
-                            border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+                            border: Border(
+                              top: BorderSide(color: Color(0xFFE2E8F0)),
+                            ),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2036,7 +2185,9 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    isVi ? 'Tổng tiền thanh toán:' : 'Total Amount Paid:',
+                                    isVi
+                                        ? 'Tổng tiền thanh toán:'
+                                        : 'Total Amount Paid:',
                                     style: const TextStyle(
                                       fontSize: 12,
                                       color: Color(0xFF64748B),
@@ -2058,9 +2209,16 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                               OutlinedButton(
                                 onPressed: () => Navigator.pop(context),
                                 style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(color: Color(0xFFCBD5E1)),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                  side: const BorderSide(
+                                    color: Color(0xFFCBD5E1),
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 12,
+                                  ),
                                 ),
                                 child: Text(
                                   isVi ? 'Đóng' : 'Close',
@@ -2210,8 +2368,7 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                         final item =
                             _historyList[index] as Map<String, dynamic>;
                         final txnRef = item['txnRef'] ?? '${item['id']}';
-                        final courseTitle =
-                            item['courseTitle'] ?? 'Course';
+                        final courseTitle = item['courseTitle'] ?? 'Course';
                         final courseThumbnail =
                             item['courseThumbnail'] as String?;
                         final amount = item['amount'];
@@ -2222,7 +2379,8 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                         return Material(
                           color: Colors.transparent,
                           child: InkWell(
-                            onTap: () => _showTransactionDetailsDialog(context, item),
+                            onTap: () =>
+                                _showTransactionDetailsDialog(context, item),
                             borderRadius: BorderRadius.circular(12),
                             hoverColor: const Color(0xFFF1F5F9),
                             child: Container(
@@ -2230,7 +2388,9 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF8FAFC),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                                border: Border.all(
+                                  color: const Color(0xFFE2E8F0),
+                                ),
                               ),
                               child: Row(
                                 children: [
@@ -2247,22 +2407,26 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                                               courseThumbnail,
                                               fit: BoxFit.cover,
                                               errorBuilder:
-                                                  (context, error, stackTrace) =>
-                                                      const Icon(
-                                                        Icons.receipt_outlined,
-                                                        color: Color(0xFF28B79B),
-                                                        size: 24,
-                                                      ),
+                                                  (
+                                                    context,
+                                                    error,
+                                                    stackTrace,
+                                                  ) => const Icon(
+                                                    Icons.receipt_outlined,
+                                                    color: Color(0xFF28B79B),
+                                                    size: 24,
+                                                  ),
                                             )
                                           : Container(
                                               padding: const EdgeInsets.all(10),
                                               decoration: BoxDecoration(
                                                 color: Colors.white,
-                                                borderRadius: BorderRadius.circular(
-                                                  10,
-                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
                                                 border: Border.all(
-                                                  color: const Color(0xFFCBD5E1),
+                                                  color: const Color(
+                                                    0xFFCBD5E1,
+                                                  ),
                                                 ),
                                               ),
                                               child: const Icon(
@@ -2276,7 +2440,8 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                                   const SizedBox(width: 16),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           courseTitle,

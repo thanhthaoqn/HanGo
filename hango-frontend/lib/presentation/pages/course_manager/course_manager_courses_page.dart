@@ -13,7 +13,9 @@ import '../../../utils/download_helper.dart';
 import '../trainer/create_course_page.dart';
 import '../trainer/edit_course_page.dart';
 import 'course_review_dashboard_dialog.dart';
+import 'exam_import_error_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../domain/model/exam_import_error.dart';
 
 class CourseManagerCoursesPage extends StatefulWidget {
   final bool isEmbedded;
@@ -512,6 +514,16 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
           }
         }
       } else {
+        final errors = _extractImportErrors(responseBody);
+        if (errors != null && errors.isNotEmpty) {
+          if (mounted) {
+            await showDialog(
+              context: context,
+              builder: (_) => ExamImportErrorDialog(errors: errors),
+            );
+          }
+          return;
+        }
         throw Exception(_extractErrorMessage(responseBody));
       }
     } catch (e) {
@@ -536,6 +548,24 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
       }
     } catch (_) {}
     return responseBody.isEmpty ? 'Import failed' : responseBody;
+  }
+
+  // Same "errors" list shape as the Exam Excel import
+  // (CourseImportValidationException on the backend), so the row/field-level
+  // popup can be reused as-is instead of just a flat toast message.
+  List<ExamImportError>? _extractImportErrors(String responseBody) {
+    try {
+      final data = jsonDecode(responseBody);
+      if (data is Map && data['errors'] is List) {
+        return (data['errors'] as List)
+            .whereType<Map<String, dynamic>>()
+            .map(ExamImportError.fromJson)
+            .toList();
+      }
+    } catch (_) {
+      // Not a structured-error response; fall back to the plain message.
+    }
+    return null;
   }
 
   Future<bool> _confirmAction({
@@ -1423,7 +1453,7 @@ String _formatPrice(num price) {
   if (price <= 0) return 'Free';
   return '${price.toStringAsFixed(0)} VND';
 }
-
+
 
 final List<CourseReviewCourse> _mockCourses = [
   CourseReviewCourse(

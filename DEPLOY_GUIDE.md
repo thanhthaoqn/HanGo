@@ -103,10 +103,28 @@ mkdir -p ~/hango/hango-frontend/build
 ---
 
 ## 🔑 PHẦN 4: Thiết Lập Cấu Hình File `.env` Trên EC2
-Để cấu hình bảo mật thông tin nhạy cảm của cổng thanh toán PayOS, hãy chạy lệnh sau trên EC2 để tạo file `.env`:
+`docker-compose.yml` hiện tại đọc biến môi trường từ `~/hango/.env`, nên file này phải chứa toàn bộ secret vận hành cho backend, không chỉ PayOS. Bạn có thể copy từ `.env.example` rồi thay bằng giá trị thật, hoặc tạo trực tiếp trên EC2 như sau:
 
 ```bash
 cat << 'EOF' > ~/hango/.env
+SPRING_PROFILES_ACTIVE=local
+SPRING_DATASOURCE_URL=jdbc:mysql://YOUR_DB_HOST:3306/YOUR_DB_NAME?sslMode=REQUIRED
+SPRING_DATASOURCE_USERNAME=YOUR_DB_USERNAME
+SPRING_DATASOURCE_PASSWORD=YOUR_DB_PASSWORD
+SPRING_JPA_HIBERNATE_DDL_AUTO=validate
+
+HANGO_JWT_SECRET=REPLACE_WITH_A_LONG_RANDOM_SECRET
+
+CLOUDINARY_CLOUD_NAME=YOUR_CLOUDINARY_CLOUD_NAME
+CLOUDINARY_API_KEY=YOUR_CLOUDINARY_API_KEY
+CLOUDINARY_API_SECRET=YOUR_CLOUDINARY_API_SECRET
+
+GOOGLE_CLIENT_ID=YOUR_GOOGLE_CLIENT_ID
+HANGO_GEMINI_API_KEY=YOUR_GEMINI_API_KEY
+
+SPRING_MAIL_USERNAME=YOUR_SMTP_USERNAME
+SPRING_MAIL_PASSWORD=YOUR_SMTP_APP_PASSWORD
+
 PAYOS_CLIENT_ID=YOUR_PAYOS_CLIENT_ID
 PAYOS_API_KEY=YOUR_PAYOS_API_KEY
 PAYOS_CHECKSUM_KEY=YOUR_PAYOS_CHECKSUM_KEY
@@ -116,13 +134,19 @@ EOF
 chmod 600 ~/hango/.env
 ```
 
-> ⚠️ **Không bao giờ commit giá trị thật của các biến trên vào Git** (kể cả trong tài liệu). Lấy giá trị thật từ PayOS Merchant Dashboard và dán trực tiếp trên server khi chạy lệnh này, không lưu lại trong bất kỳ file nào được track bởi git. Nếu bạn tìm thấy giá trị thật đã từng bị commit (kể cả trong lịch sử git cũ), hãy coi như đã bị lộ và rotate lại key ngay trên PayOS Dashboard.
+> ⚠️ **Không bao giờ commit giá trị thật của các biến trên vào Git** (kể cả trong tài liệu). Lấy giá trị thật từ dashboard tương ứng rồi dán trực tiếp trên server khi chạy lệnh này, không lưu lại trong bất kỳ file nào được track bởi git.
+>
+> Nếu GitGuardian hoặc GitHub Secret Scanning đã báo lộ secret, đừng chỉ sửa file hiện tại. Hãy xử lý đủ 4 bước:
+> 1. Rotate secret ở nhà cung cấp trước.
+> 2. Cập nhật lại `~/hango/.env` trên EC2 và mọi GitHub Actions Secret liên quan.
+> 3. Xóa secret khỏi lịch sử git của branch/repo đã push.
+> 4. Force-push lịch sử đã làm sạch, rồi kiểm tra lại bằng secret scan.
 
 ---
 
 ## 🤖 PHẦN 5: Triển Khai Tự Động Với CI/CD GitHub Actions
 
-Với cấu hình CI/CD đã thiết lập, bạn chỉ cần cấu hình khóa SSH trên GitHub một lần duy nhất. Sau đó, mỗi khi có bất kỳ thành viên nào `git push` code lên nhánh `dev`, hệ thống sẽ tự động build và deploy lên EC2.
+Với cấu hình CI/CD đã thiết lập, bạn chỉ cần cấu hình khóa SSH trên GitHub một lần duy nhất. Sau đó, mỗi khi có bất kỳ thành viên nào `git push` code lên nhánh `dev`, hệ thống sẽ tự động build và deploy lên EC2. Backend và Flutter Web được build trên GitHub-hosted runner rồi đẩy lên GitHub Container Registry (GHCR); EC2 chỉ pull image đã build, không chạy Maven/Flutter/Docker build nên tránh đỉnh RAM trên máy 1 GB.
 
 ### Bước 1: Thêm khóa SSH vào GitHub Secrets
 1. Đăng nhập vào GitHub -> Đi tới Repository dự án của bạn.
@@ -132,11 +156,30 @@ Với cấu hình CI/CD đã thiết lập, bạn chỉ cần cấu hình khóa 
 
 ### Bước 2: Đẩy cấu hình lên GitHub
 Khi bạn đẩy code có chứa thư mục cấu hình `.github/workflows/deploy.yml` lên nhánh `dev`, GitHub Actions sẽ tự động:
-1. Tạo môi trường ảo JDK 21 để build dự án Spring Boot thành file JAR.
-2. Tạo môi trường Flutter để build dự án Web thành thư mục tĩnh.
-3. Nén tất cả bản build và cấu hình Docker thành file `deploy.zip`.
-4. Dùng SCP để đẩy file lên EC2 và giải nén.
-5. Khởi chạy cập nhật dự án trên Docker mà không gây gián đoạn dịch vụ.
+1. Build image backend và frontend trên GitHub Actions, sử dụng cache để rút ngắn thời gian build.
+2. Push hai image gắn tag theo commit SHA lên GHCR bằng `GITHUB_TOKEN` tự cấp của workflow.
+3. Chỉ nén `docker-compose.yml` và cấu hình Nginx thành `deploy.zip`, rồi SCP lên EC2.
+4. Đăng nhập GHCR tạm thời trên EC2, pull đúng hai image của commit và chạy `docker-compose up --no-build --wait`.
+5. Chỉ hoàn tất khi backend/frontend healthy; nếu health check thất bại, tự khôi phục image của lần deploy trước.
+
+> Không chạy `docker-compose up -d --build` trên EC2 1 GB. Lệnh đó chạy Maven và Flutter build cùng các container production, là nguyên nhân tạo đỉnh RAM và có thể khiến Linux OOM-kill tiến trình Java.
+
+### Bước 3: Tạo swap dự phòng một lần trên EC2
+
+Swap không thay thế RAM và có thể chậm khi bị dùng nhiều, nhưng giúp máy không kill Java ngay khi có đỉnh bộ nhớ ngắn. Trước tiên kiểm tra phân vùng gốc còn ít nhất khoảng 3 GB trống bằng `df -h /`, sau đó chạy:
+
+```bash
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+echo 'vm.swappiness=10' | sudo tee /etc/sysctl.d/99-hango-memory.conf
+sudo sysctl --system
+free -h
+```
+
+Kết quả mong đợi: dòng `Swap` trong `free -h` hiển thị xấp xỉ `2.0Gi`. Docker Compose đồng thời giới hạn backend ở 600 MiB, heap Java ở 256 MiB và xoay log JSON tối đa 3 file × 10 MiB cho mỗi container.
 
 ---
 

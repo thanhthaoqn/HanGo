@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import '../pages/course_manager/course_manager_courses_page.dart';
 import '../pages/course_manager/course_manager_dashboard_page.dart';
 import '../pages/course_manager/course_manager_exams_page.dart';
-import '../pages/course_manager/course_manager_matrix_management_page.dart';
-import '../pages/course_manager/course_manager_question_bank_page.dart';
+import '../pages/course_manager/exam_matrix/course_manager_matrix_management_page.dart';
+import '../pages/course_manager/question_bank/course_manager_question_bank_page.dart';
 import '../pages/course_manager/course_manager_settlement_page.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';

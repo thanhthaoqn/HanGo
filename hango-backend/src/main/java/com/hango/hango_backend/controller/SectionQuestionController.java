@@ -170,8 +170,8 @@ public class SectionQuestionController {
            .append("sk.id as skill_param_id, gt.id as group_type_param_id, sp.id as difficulty_param_id ")
            .append("FROM questions q ")
            .append("JOIN lesson_quizzes lq ON q.id = lq.question_id ")
-           .append("JOIN question_categories qc ON q.category_id = qc.id ")
-           .append("JOIN system_parameters sp ON q.difficulty_param_id = sp.id ")
+           .append("LEFT JOIN question_categories qc ON q.category_id = qc.id ")
+           .append("LEFT JOIN system_parameters sp ON q.difficulty_param_id = sp.id ")
            .append("LEFT JOIN question_groups qg ON q.group_id = qg.id ")
            .append("LEFT JOIN system_parameters sk ON q.skill_param_id = sk.id ")
            .append("LEFT JOIN system_parameters gt ON qg.group_type_param_id = gt.id ")
@@ -274,7 +274,7 @@ public class SectionQuestionController {
             @RequestParam String mode) { // START or RANDOM
 
         StringBuilder sql = new StringBuilder();
-        sql.append("SELECT id FROM questions WHERE section_id = ? ");
+        sql.append("SELECT id FROM questions WHERE section_id = ? AND (usage_type = '1' OR usage_type = 'QUIZ_ONLY') ");
         
         List<Object> params = new ArrayList<>();
         params.add(sectionId);
@@ -304,17 +304,62 @@ public class SectionQuestionController {
             @PathVariable Long lessonId,
             @RequestBody QuizQuestionSelectionRequestDTO request) {
 
+        List<Long> questionIds = request.getQuestionIds();
+        if (questionIds == null) {
+            questionIds = new ArrayList<>();
+        } else {
+            questionIds = new ArrayList<>(questionIds); // Make mutable
+        }
+
+        List<Long> groupIds = request.getGroupIds();
+        if (groupIds != null && !groupIds.isEmpty()) {
+            for (Long gId : groupIds) {
+                List<Long> subQIds = jdbcTemplate.queryForList("SELECT id FROM questions WHERE group_id = ?", Long.class, gId);
+                questionIds.addAll(subQIds);
+            }
+        }
+        
+        // Remove duplicates to prevent DuplicateKeyException
+        List<Long> uniqueQuestionIds = new ArrayList<>();
+        for (Long id : questionIds) {
+            if (!uniqueQuestionIds.contains(id)) {
+                uniqueQuestionIds.add(id);
+            }
+        }
+        questionIds = uniqueQuestionIds;
+
+        if (!questionIds.isEmpty()) {
+            for (Long qId : questionIds) {
+                List<Integer> usageTypes = jdbcTemplate.query(
+                        "SELECT usage_type FROM questions WHERE id = ?",
+                        (rs, rowNum) -> {
+                            String usageStr = rs.getString("usage_type");
+                            if (usageStr == null) return 1;
+                            if (usageStr.equals("BOTH")) return 3;
+                            if (usageStr.equals("EXAM_ONLY")) return 2;
+                            if (usageStr.equals("QUIZ_ONLY")) return 1;
+                            try { return Integer.parseInt(usageStr); } catch(Exception e) { return 1; }
+                        },
+                        qId
+                );
+                Integer usageType = usageTypes.isEmpty() ? 1 : usageTypes.get(0);
+                if (usageType == 2) {
+                    return ResponseEntity.badRequest().body(Map.of("error", "Cannot add EXAM_ONLY questions to a Quiz."));
+                }
+            }
+        }
+
         // 1. Delete existing quiz questions
         jdbcTemplate.update("DELETE FROM lesson_quizzes WHERE lesson_id = ?", lessonId);
 
         // 2. Insert new quiz questions
-        List<Long> questionIds = request.getQuestionIds();
-        if (questionIds != null && !questionIds.isEmpty()) {
+        if (!questionIds.isEmpty()) {
             for (int i = 0; i < questionIds.size(); i++) {
+                Long qId = questionIds.get(i);
                 jdbcTemplate.update(
                         "INSERT INTO lesson_quizzes (lesson_id, question_id, display_order) VALUES (?, ?, ?)",
                         lessonId,
-                        questionIds.get(i),
+                        qId,
                         i + 1
                 );
             }
@@ -359,7 +404,7 @@ public class SectionQuestionController {
             org.springframework.jdbc.support.GeneratedKeyHolder keyHolder = new org.springframework.jdbc.support.GeneratedKeyHolder();
             jdbcTemplate.update(connection -> {
                 java.sql.PreparedStatement ps = connection.prepareStatement(
-                        "INSERT INTO questions (created_by, category_id, question_text, explanation, difficulty_param_id, status, section_id, skill_param_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        "INSERT INTO questions (created_by, category_id, question_text, explanation, difficulty_param_id, status, section_id, skill_param_id, usage_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(6), NOW(6))",
                         java.sql.Statement.RETURN_GENERATED_KEYS
                 );
                 ps.setLong(1, currentUserId);
@@ -374,6 +419,7 @@ public class SectionQuestionController {
                     ps.setNull(7, java.sql.Types.BIGINT);
                 }
                 ps.setLong(8, finalSkillParamId);
+                ps.setInt(9, request.getUsageType() != null ? request.getUsageType() : 1);
                 return ps;
             }, keyHolder);
 
@@ -532,12 +578,11 @@ public class SectionQuestionController {
             org.springframework.jdbc.support.GeneratedKeyHolder keyHolder = new org.springframework.jdbc.support.GeneratedKeyHolder();
             jdbcTemplate.update(connection -> {
                 java.sql.PreparedStatement ps = connection.prepareStatement(
-                        "INSERT INTO question_groups (title, group_type_param_id, context_text) VALUES (?, ?, ?)",
+                        "INSERT INTO question_groups (group_type_param_id, context_text) VALUES (?, ?)",
                         java.sql.Statement.RETURN_GENERATED_KEYS
                 );
-                ps.setString(1, "Multiple Choice Group");
-                ps.setLong(2, finalGroupTypeParamId); 
-                ps.setString(3, request.getPassageText());
+                ps.setLong(1, finalGroupTypeParamId); 
+                ps.setString(2, request.getPassageText());
                 return ps;
             }, keyHolder);
 
@@ -569,8 +614,7 @@ public class SectionQuestionController {
                     final Long finalGroupId = questionGroupId;
                     jdbcTemplate.update(connection -> {
                         java.sql.PreparedStatement ps = connection.prepareStatement(
-                                "INSERT INTO questions (created_by, category_id, question_text, explanation, difficulty_param_id, status, section_id, group_id, skill_param_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-
+                                "INSERT INTO questions (created_by, category_id, question_text, explanation, difficulty_param_id, status, section_id, group_id, skill_param_id, usage_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(6), NOW(6))",
                                 java.sql.Statement.RETURN_GENERATED_KEYS
                         );
                         ps.setLong(1, currentUserId);
@@ -586,6 +630,7 @@ public class SectionQuestionController {
                         }
                         ps.setLong(8, finalGroupId);
                         ps.setLong(9, finalSkillParamId);
+                        ps.setInt(10, request.getUsageType() != null ? request.getUsageType() : 1);
                         return ps;
 
                     }, keyHolder);

@@ -33,6 +33,7 @@ public class CreateTrainerQuestionAIResponseDTO {
         private Long categoryId;
         private Long difficultyId;
         private List<OptionDTO> options;
+        private String sourceCitation;
     }
 
     @Data
@@ -46,6 +47,7 @@ public class CreateTrainerQuestionAIResponseDTO {
         private Long categoryId;
         private Long difficultyId;
         private List<SubQuestionDTO> subQuestions;
+        private String sourceCitation;
     }
 
     @Data

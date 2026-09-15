@@ -16,9 +16,9 @@ public interface TicketService {
 
     Page<TicketResponseDTO> getMyTickets(Long userId, String status, Pageable pageable);
 
-    TicketMessageDTO addMessage(Long userId, Long ticketId, String message, String attachmentUrls);
+    TicketMessageDTO addMessage(Long userId, Long ticketId, String message);
 
-    // Management endpoints (Course Manager & Admin)
+    // Administrator management endpoints
     Page<TicketResponseDTO> getManagementTickets(Long currentUserId, String status, String category, String keyword, Pageable pageable);
 
     TicketResponseDTO processTicket(Long managerUserId, Long ticketId, TicketProcessDTO dto);

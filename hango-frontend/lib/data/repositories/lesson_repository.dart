@@ -136,6 +136,10 @@ class LessonRepository {
     }
   }
 
+  // Gui bai quiz da lam len Backend de luu lai (LessonController.saveQuizAttempt).
+  // 'score' o day chi la diem Frontend tam tinh de hien thi ngay (UX) - Backend
+  // se TU CHAM LAI tu dap an dung trong DB truoc khi luu (xem
+  // LessonServiceImpl.computeServerSideScore), khong tin thang gia tri nay.
   Future<dynamic> postQuizAttempt(int lessonId, int userId, double score, Map<int, int> answers) async {
     try {
       final uri = Uri.parse('$baseUrl/lessons/$lessonId/quiz-attempts');
@@ -173,6 +177,9 @@ class LessonRepository {
     }
   }
 
+  // Bao Backend danh dau bai hoc da xong (LessonController.completeLesson).
+  // Backend se tinh lai % tien do ca khoa hoc va tu cap chung chi neu day la
+  // bai cuoi cung (xem LessonServiceImpl.completeLesson).
   Future<void> completeLesson(int lessonId, int userId, bool completed) async {
     try {
       final uri = Uri.parse('$baseUrl/lessons/$lessonId/complete?completed=$completed');

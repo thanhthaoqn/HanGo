@@ -93,10 +93,11 @@ class ExamServiceTest {
 
     @Test
     void getAllExamsShouldQueryPublishedOnlyWhenStatusIsNull() {
-        when(examRepository.findByDeletedAtIsNullAndStatus("PUBLISHED"))
-                .thenReturn(List.of(exam(1L, "Exam A", "PUBLISHED", 50, user(1L, "trainer@example.com", "Trainer A"))));
+        when(examRepository.findByDeletedAtIsNullAndStatus(org.mockito.ArgumentMatchers.eq("PUBLISHED"), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(exam(1L, "Exam A", "PUBLISHED", 50, user(1L, "trainer@example.com", "Trainer A")))));
 
-        List<ExamResponseDTO> result = examService.getAllExams(null);
+        org.springframework.data.domain.Page<ExamResponseDTO> resultPage = examService.getAllExams(null, org.springframework.data.domain.Pageable.unpaged());
+        List<ExamResponseDTO> result = resultPage.getContent();
 
         assertEquals(1, result.size());
         assertEquals("Exam A", result.get(0).getTitle());
@@ -104,19 +105,20 @@ class ExamServiceTest {
 
     @Test
     void getAllExamsShouldQueryPublishedOnlyWhenStatusIsAllCaseInsensitive() {
-        when(examRepository.findByDeletedAtIsNullAndStatus("PUBLISHED")).thenReturn(List.of());
+        when(examRepository.findByDeletedAtIsNullAndStatus(org.mockito.ArgumentMatchers.eq("PUBLISHED"), any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of()));
 
-        examService.getAllExams("all");
+        examService.getAllExams("all", org.springframework.data.domain.Pageable.unpaged());
 
-        org.mockito.Mockito.verify(examRepository).findByDeletedAtIsNullAndStatus("PUBLISHED");
+        org.mockito.Mockito.verify(examRepository).findByDeletedAtIsNullAndStatus(org.mockito.ArgumentMatchers.eq("PUBLISHED"), any());
     }
 
     @Test
     void getAllExamsShouldReturnExamsMatchingTheRequestedNonPublishedStatus() {
         Exam draftExam = exam(2L, "Draft Exam", "DRAFT", 40, null);
-        when(examRepository.findByDeletedAtIsNullAndStatus("DRAFT")).thenReturn(List.of(draftExam));
+        when(examRepository.findByDeletedAtIsNullAndStatus(org.mockito.ArgumentMatchers.eq("DRAFT"), any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(draftExam)));
 
-        List<ExamResponseDTO> result = examService.getAllExams("DRAFT");
+        org.springframework.data.domain.Page<ExamResponseDTO> resultPage = examService.getAllExams("DRAFT", org.springframework.data.domain.Pageable.unpaged());
+        List<ExamResponseDTO> result = resultPage.getContent();
 
         assertEquals(1, result.size());
         assertEquals("Draft Exam", result.get(0).getTitle());
@@ -124,10 +126,11 @@ class ExamServiceTest {
 
     @Test
     void getAllExamsShouldFallbackCreatorNameToUnknownWhenCreatedByNull() {
-        when(examRepository.findByDeletedAtIsNullAndStatus("PUBLISHED"))
-                .thenReturn(List.of(exam(3L, "Orphan Exam", "PUBLISHED", 30, null)));
+        when(examRepository.findByDeletedAtIsNullAndStatus(org.mockito.ArgumentMatchers.eq("PUBLISHED"), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(exam(3L, "Orphan Exam", "PUBLISHED", 30, null))));
 
-        List<ExamResponseDTO> result = examService.getAllExams(null);
+        org.springframework.data.domain.Page<ExamResponseDTO> resultPage = examService.getAllExams(null, org.springframework.data.domain.Pageable.unpaged());
+        List<ExamResponseDTO> result = resultPage.getContent();
 
         assertEquals("Unknown", result.get(0).getCreatorName());
     }
@@ -135,11 +138,12 @@ class ExamServiceTest {
     @Test
     void getAllExamsShouldReturnDistinctStudentCountAsLearnerCountFormatted() {
         Exam e = exam(4L, "Popular Exam", "PUBLISHED", 45, user(1L, "trainer@example.com", "Trainer A"));
-        when(examRepository.findByDeletedAtIsNullAndStatus("PUBLISHED")).thenReturn(List.of(e));
+        when(examRepository.findByDeletedAtIsNullAndStatus(org.mockito.ArgumentMatchers.eq("PUBLISHED"), any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(e)));
         when(examAttemptRepository.countDistinctStudentsByExamIds(List.of(4L)))
                 .thenReturn(java.util.Collections.singletonList(new Object[] { 4L, 1000L }));
 
-        List<ExamResponseDTO> result = examService.getAllExams(null);
+        org.springframework.data.domain.Page<ExamResponseDTO> resultPage = examService.getAllExams(null, org.springframework.data.domain.Pageable.unpaged());
+        List<ExamResponseDTO> result = resultPage.getContent();
 
         assertEquals("1000", result.get(0).getLearnerCountFormatted());
     }
@@ -147,11 +151,12 @@ class ExamServiceTest {
     @Test
     void getAllExamsShouldDefaultLearnerCountToZeroWhenCountIsZero() {
         Exam e = exam(5L, "New Exam", "PUBLISHED", 45, user(1L, "trainer@example.com", "Trainer A"));
-        when(examRepository.findByDeletedAtIsNullAndStatus("PUBLISHED")).thenReturn(List.of(e));
+        when(examRepository.findByDeletedAtIsNullAndStatus(org.mockito.ArgumentMatchers.eq("PUBLISHED"), any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(e)));
         when(examAttemptRepository.countDistinctStudentsByExamIds(List.of(5L)))
                 .thenReturn(java.util.Collections.singletonList(new Object[] { 5L, 0L }));
 
-        List<ExamResponseDTO> result = examService.getAllExams(null);
+        org.springframework.data.domain.Page<ExamResponseDTO> resultPage = examService.getAllExams(null, org.springframework.data.domain.Pageable.unpaged());
+        List<ExamResponseDTO> result = resultPage.getContent();
 
         assertEquals("0", result.get(0).getLearnerCountFormatted());
     }
@@ -159,12 +164,38 @@ class ExamServiceTest {
     @Test
     void getAllExamsShouldDefaultLearnerCountToZeroWhenNoAttemptRowReturned() {
         Exam e = exam(6L, "Fresh Exam", "PUBLISHED", 45, user(1L, "trainer@example.com", "Trainer A"));
-        when(examRepository.findByDeletedAtIsNullAndStatus("PUBLISHED")).thenReturn(List.of(e));
+        when(examRepository.findByDeletedAtIsNullAndStatus(org.mockito.ArgumentMatchers.eq("PUBLISHED"), any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(e)));
         when(examAttemptRepository.countDistinctStudentsByExamIds(List.of(6L))).thenReturn(List.of());
 
-        List<ExamResponseDTO> result = examService.getAllExams(null);
+        org.springframework.data.domain.Page<ExamResponseDTO> resultPage = examService.getAllExams(null, org.springframework.data.domain.Pageable.unpaged());
+        List<ExamResponseDTO> result = resultPage.getContent();
 
         assertEquals("0", result.get(0).getLearnerCountFormatted());
+    }
+
+    @Test
+    void getAllExamsShouldMapQuestionCountFromCountQuestionsByExamIds() {
+        Exam e = exam(7L, "Exam With Questions", "PUBLISHED", 45, user(1L, "trainer@example.com", "Trainer A"));
+        when(examRepository.findByDeletedAtIsNullAndStatus(org.mockito.ArgumentMatchers.eq("PUBLISHED"), any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(e)));
+        when(examQuestionRepository.countQuestionsByExamIds(List.of(7L)))
+                .thenReturn(java.util.Collections.singletonList(new Object[] { 7L, 12 }));
+
+        org.springframework.data.domain.Page<ExamResponseDTO> resultPage = examService.getAllExams(null, org.springframework.data.domain.Pageable.unpaged());
+        List<ExamResponseDTO> result = resultPage.getContent();
+
+        assertEquals(12, result.get(0).getQuestionCount());
+    }
+
+    @Test
+    void getAllExamsShouldDefaultQuestionCountToZeroWhenNoQuestionRowReturned() {
+        Exam e = exam(8L, "Empty Exam", "PUBLISHED", 45, user(1L, "trainer@example.com", "Trainer A"));
+        when(examRepository.findByDeletedAtIsNullAndStatus(org.mockito.ArgumentMatchers.eq("PUBLISHED"), any())).thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(e)));
+        when(examQuestionRepository.countQuestionsByExamIds(List.of(8L))).thenReturn(List.of());
+
+        org.springframework.data.domain.Page<ExamResponseDTO> resultPage = examService.getAllExams(null, org.springframework.data.domain.Pageable.unpaged());
+        List<ExamResponseDTO> result = resultPage.getContent();
+
+        assertEquals(0, result.get(0).getQuestionCount());
     }
 
     // =================================================================
@@ -181,8 +212,6 @@ class ExamServiceTest {
         ExamAttempt second = examAttempt(102L, e, student, new BigDecimal("8.0"), null, t2, t2);
         when(examAttemptRepository.findByExamIdAndStudentIdOrderByStartedAtDesc(1L, 1L))
                 .thenReturn(List.of(first, second));
-        when(examAttemptRepository.countByExamIdAndStudentIdAndStartedAtLessThanEqual(1L, 1L, t1)).thenReturn(1);
-        when(examAttemptRepository.countByExamIdAndStudentIdAndStartedAtLessThanEqual(1L, 1L, t2)).thenReturn(2);
 
         List<ExamAttemptResponseDTO> result = examService.getExamAttempts(1L, 1L);
 
@@ -199,7 +228,6 @@ class ExamServiceTest {
         ExamAttempt attempt = examAttempt(101L, e, student, new BigDecimal("4.9"), null, t, t);
         when(examAttemptRepository.findByExamIdAndStudentIdOrderByStartedAtDesc(1L, 1L))
                 .thenReturn(List.of(attempt));
-        when(examAttemptRepository.countByExamIdAndStudentIdAndStartedAtLessThanEqual(1L, 1L, t)).thenReturn(1);
 
         List<ExamAttemptResponseDTO> result = examService.getExamAttempts(1L, 1L);
 
@@ -214,11 +242,57 @@ class ExamServiceTest {
         ExamAttempt attempt = examAttempt(101L, e, student, null, null, t, t);
         when(examAttemptRepository.findByExamIdAndStudentIdOrderByStartedAtDesc(1L, 1L))
                 .thenReturn(List.of(attempt));
-        when(examAttemptRepository.countByExamIdAndStudentIdAndStartedAtLessThanEqual(1L, 1L, t)).thenReturn(1);
 
         List<ExamAttemptResponseDTO> result = examService.getExamAttempts(1L, 1L);
 
         assertEquals("FAILED", result.get(0).getStatus());
+    }
+
+    @Test
+    void getExamAttemptsShouldPopulateExamIdAndExamTitleFromAttempt() {
+        User student = user(1L, "learner@example.com", "Learner A");
+        Exam e = exam(1L, "Exam A", "PUBLISHED", 50, null);
+        LocalDateTime t = LocalDateTime.of(2026, 1, 1, 10, 0);
+        ExamAttempt attempt = examAttempt(101L, e, student, new BigDecimal("6.0"), null, t, t);
+        when(examAttemptRepository.findByExamIdAndStudentIdOrderByStartedAtDesc(1L, 1L))
+                .thenReturn(List.of(attempt));
+
+        List<ExamAttemptResponseDTO> result = examService.getExamAttempts(1L, 1L);
+
+        assertEquals(1L, result.get(0).getExamId());
+        assertEquals("Exam A", result.get(0).getExamTitle());
+    }
+
+    @Test
+    void getExamAttemptsShouldBuildCorrectAnswersMapFromCurrentQuestionOptionsInDb() {
+        User student = user(1L, "learner@example.com", "Learner A");
+        Exam e = exam(1L, "Exam A", "PUBLISHED", 50, null);
+        LocalDateTime t = LocalDateTime.of(2026, 1, 1, 10, 0);
+        ExamAttempt attempt = examAttempt(101L, e, student, new BigDecimal("6.0"), null, t, t);
+        when(examAttemptRepository.findByExamIdAndStudentIdOrderByStartedAtDesc(1L, 1L))
+                .thenReturn(List.of(attempt));
+        Question q0 = new Question();
+        q0.setId(10L);
+        q0.setOptions(List.of(questionOption(100L, false), questionOption(101L, true)));
+        when(questionRepository.findByExamIdOrderByQuestionOrder(1L)).thenReturn(List.of(q0));
+
+        List<ExamAttemptResponseDTO> result = examService.getExamAttempts(1L, 1L);
+
+        assertEquals(1, result.get(0).getCorrectAnswers().get("1"));
+    }
+
+    @Test
+    void getExamAttemptsShouldFormatDateAsSubmittedAtTruncatedToMinutes() {
+        User student = user(1L, "learner@example.com", "Learner A");
+        Exam e = exam(1L, "Exam A", "PUBLISHED", 50, null);
+        LocalDateTime t = LocalDateTime.of(2026, 1, 1, 10, 30, 45);
+        ExamAttempt attempt = examAttempt(101L, e, student, new BigDecimal("6.0"), null, t, t);
+        when(examAttemptRepository.findByExamIdAndStudentIdOrderByStartedAtDesc(1L, 1L))
+                .thenReturn(List.of(attempt));
+
+        List<ExamAttemptResponseDTO> result = examService.getExamAttempts(1L, 1L);
+
+        assertEquals("2026-01-01 10:30", result.get(0).getDate());
     }
 
     // =================================================================
@@ -236,12 +310,11 @@ class ExamServiceTest {
         ExamAttempt attemptOnB = examAttempt(202L, examB, student, new BigDecimal("6.0"), null, tB, tB);
         when(examAttemptRepository.findByStudentIdOrderByStartedAtDesc(1L))
                 .thenReturn(List.of(attemptOnB, attemptOnA));
-        when(examAttemptRepository.countByExamIdAndStudentIdAndStartedAtLessThanEqual(2L, 1L, tB)).thenReturn(3);
-        when(examAttemptRepository.countByExamIdAndStudentIdAndStartedAtLessThanEqual(1L, 1L, tA)).thenReturn(1);
 
         List<ExamAttemptResponseDTO> result = examService.getMyExamAttempts(1L);
 
-        assertEquals(3, result.get(0).getAttemptNumber());
+        // Each exam has only 1 attempt, so attemptNumber is 1 for both
+        assertEquals(1, result.get(0).getAttemptNumber());
         assertEquals(1, result.get(1).getAttemptNumber());
     }
 

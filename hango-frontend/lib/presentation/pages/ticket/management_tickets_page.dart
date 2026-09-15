@@ -81,7 +81,7 @@ class _ManagementTicketsPageState extends State<ManagementTicketsPage> {
     if (status == 'APPROVED') {
       bg = const Color(0xFFDCFCE7);
       fg = const Color(0xFF15803D);
-      label = 'Approved';
+      label = 'Accepted';
     } else if (status == 'REJECTED') {
       bg = const Color(0xFFFEE2E2);
       fg = const Color(0xFFDC2626);
@@ -152,10 +152,22 @@ class _ManagementTicketsPageState extends State<ManagementTicketsPage> {
                           },
                           decoration: InputDecoration(
                             hintText: 'Search code, title, sender...',
-                            hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                            prefixIcon: const Icon(Icons.search, size: 18, color: Color(0xFF94A3B8)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                            hintStyle: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF94A3B8),
+                            ),
+                            prefixIcon: const Icon(
+                              Icons.search,
+                              size: 18,
+                              color: Color(0xFF94A3B8),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                             fillColor: const Color(0xFFF8FAFC),
                             filled: true,
                           ),
@@ -172,12 +184,28 @@ class _ManagementTicketsPageState extends State<ManagementTicketsPage> {
                         ),
                         child: Row(
                           children: [
-                            const Text('Show: ', style: TextStyle(color: Color(0xFF6B7280), fontSize: 13, fontFamily: 'Outfit')),
+                            const Text(
+                              'Show: ',
+                              style: TextStyle(
+                                color: Color(0xFF6B7280),
+                                fontSize: 13,
+                                fontFamily: 'Outfit',
+                              ),
+                            ),
                             DropdownButtonHideUnderline(
                               child: DropdownButton<int>(
                                 value: _pageSize,
-                                icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF4B5563), size: 16),
-                                style: const TextStyle(color: Color(0xFF1F2937), fontSize: 13, fontFamily: 'Outfit', fontWeight: FontWeight.bold),
+                                icon: const Icon(
+                                  Icons.keyboard_arrow_down,
+                                  color: Color(0xFF4B5563),
+                                  size: 16,
+                                ),
+                                style: const TextStyle(
+                                  color: Color(0xFF1F2937),
+                                  fontSize: 13,
+                                  fontFamily: 'Outfit',
+                                  fontWeight: FontWeight.bold,
+                                ),
                                 onChanged: (int? newValue) {
                                   if (newValue != null) {
                                     setState(() {
@@ -187,12 +215,14 @@ class _ManagementTicketsPageState extends State<ManagementTicketsPage> {
                                     _fetchTickets(isSilent: true);
                                   }
                                 },
-                                items: <int>[5, 10, 20, 50].map<DropdownMenuItem<int>>((int value) {
-                                  return DropdownMenuItem<int>(
-                                    value: value,
-                                    child: Text('$value'),
-                                  );
-                                }).toList(),
+                                items: <int>[5, 10, 20, 50]
+                                    .map<DropdownMenuItem<int>>((int value) {
+                                      return DropdownMenuItem<int>(
+                                        value: value,
+                                        child: Text('$value'),
+                                      );
+                                    })
+                                    .toList(),
                               ),
                             ),
                           ],
@@ -210,13 +240,18 @@ class _ManagementTicketsPageState extends State<ManagementTicketsPage> {
               if (_isLoading && _tickets.isEmpty)
                 const SizedBox(
                   height: 300,
-                  child: Center(child: CircularProgressIndicator(color: Color(0xFF28B79B))),
+                  child: Center(
+                    child: CircularProgressIndicator(color: Color(0xFF28B79B)),
+                  ),
                 )
               else if (_tickets.isEmpty)
                 const SizedBox(
                   height: 250,
                   child: Center(
-                    child: Text('No ticket records found', style: TextStyle(color: Color(0xFF94A3B8))),
+                    child: Text(
+                      'No ticket records found',
+                      style: TextStyle(color: Color(0xFF94A3B8)),
+                    ),
                   ),
                 )
               else
@@ -227,26 +262,82 @@ class _ManagementTicketsPageState extends State<ManagementTicketsPage> {
                         return SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           child: ConstrainedBox(
-                            constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                            constraints: BoxConstraints(
+                              minWidth: constraints.maxWidth,
+                            ),
                             child: DataTable(
                               columnSpacing: 28,
-                              headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
+                              headingRowColor: WidgetStateProperty.all(
+                                const Color(0xFFF8FAFC),
+                              ),
                               columns: const [
-                                DataColumn(label: Text('Ticket Code', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155)))),
-                                DataColumn(label: Text('Title', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155)))),
-                                DataColumn(label: Text('Sender', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155)))),
-                                DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155)))),
-                                DataColumn(label: Text('Created At', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155)))),
-                                DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155)))),
+                                DataColumn(
+                                  label: Text(
+                                    'Ticket Code',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF334155),
+                                    ),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Text(
+                                    'Title',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF334155),
+                                    ),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Text(
+                                    'Sender',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF334155),
+                                    ),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Text(
+                                    'Status',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF334155),
+                                    ),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Text(
+                                    'Created At',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF334155),
+                                    ),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Text(
+                                    'Actions',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF334155),
+                                    ),
+                                  ),
+                                ),
                               ],
                               rows: _tickets.map((t) {
-                                final sender = t.userName ?? t.userEmail ?? 'User';
+                                final sender =
+                                    t.userName ?? t.userEmail ?? 'User';
                                 return DataRow(
                                   cells: [
                                     DataCell(
                                       Text(
                                         '#${t.ticketCode}',
-                                        style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF28B79B)),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF28B79B),
+                                        ),
                                       ),
                                     ),
                                     DataCell(
@@ -256,24 +347,50 @@ class _ManagementTicketsPageState extends State<ManagementTicketsPage> {
                                           t.title,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(color: Color(0xFF0F172A)),
+                                          style: const TextStyle(
+                                            color: Color(0xFF0F172A),
+                                          ),
                                         ),
                                       ),
                                     ),
-                                    DataCell(Text('$sender (${t.userRole})', style: const TextStyle(fontSize: 13, color: Color(0xFF475569)))),
+                                    DataCell(
+                                      Text(
+                                        '$sender (${t.userRole})',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: Color(0xFF475569),
+                                        ),
+                                      ),
+                                    ),
                                     DataCell(_buildStatusBadge(t.status)),
-                                    DataCell(Text(t.createdAt, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)))),
+                                    DataCell(
+                                      Text(
+                                        t.createdAt,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFF64748B),
+                                        ),
+                                      ),
+                                    ),
                                     DataCell(
                                       IconButton(
-                                        icon: const Icon(Icons.remove_red_eye_outlined, color: Color(0xFF0284C7), size: 20),
+                                        icon: const Icon(
+                                          Icons.remove_red_eye_outlined,
+                                          color: Color(0xFF0284C7),
+                                          size: 20,
+                                        ),
                                         tooltip: 'View & Process Ticket',
                                         onPressed: () {
                                           showDialog(
                                             context: context,
-                                            builder: (context) => ProcessTicketModal(
-                                              ticket: t,
-                                              onSuccess: () => _fetchTickets(isSilent: true),
-                                            ),
+                                            builder: (context) =>
+                                                ProcessTicketModal(
+                                                  ticket: t,
+                                                  onSuccess: () =>
+                                                      _fetchTickets(
+                                                        isSilent: true,
+                                                      ),
+                                                ),
                                           );
                                         },
                                       ),
@@ -308,7 +425,11 @@ class _ManagementTicketsPageState extends State<ManagementTicketsPage> {
                   children: [
                     Text(
                       'Total $_totalElements ticket(s)',
-                      style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontFamily: 'Outfit'),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF64748B),
+                        fontFamily: 'Outfit',
+                      ),
                     ),
                     Row(
                       children: [
@@ -322,7 +443,9 @@ class _ManagementTicketsPageState extends State<ManagementTicketsPage> {
                               : null,
                         ),
                         const SizedBox(width: 4),
-                        ...List.generate(_totalPages > 0 ? _totalPages : 1, (index) {
+                        ...List.generate(_totalPages > 0 ? _totalPages : 1, (
+                          index,
+                        ) {
                           final pageNum = index + 1;
                           final isCurrent = index == _currentPage;
 
@@ -336,14 +459,18 @@ class _ManagementTicketsPageState extends State<ManagementTicketsPage> {
                               height: 32,
                               margin: const EdgeInsets.symmetric(horizontal: 4),
                               decoration: BoxDecoration(
-                                color: isCurrent ? const Color(0xFF28B79B) : Colors.transparent,
+                                color: isCurrent
+                                    ? const Color(0xFF28B79B)
+                                    : Colors.transparent,
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Center(
                                 child: Text(
                                   '$pageNum',
                                   style: TextStyle(
-                                    color: isCurrent ? Colors.white : const Color(0xFF4B5563),
+                                    color: isCurrent
+                                        ? Colors.white
+                                        : const Color(0xFF4B5563),
                                     fontWeight: FontWeight.bold,
                                     fontSize: 13,
                                     fontFamily: 'Outfit',
@@ -402,10 +529,16 @@ class _ManagementTicketsPageState extends State<ManagementTicketsPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: InternalAppHeader(isMobile: !isDesktop),
-      drawer: !isDesktop ? const Drawer(child: CourseManagerSidebar(currentRoute: 'support')) : null,
+      drawer: !isDesktop
+          ? const Drawer(child: CourseManagerSidebar(currentRoute: 'support'))
+          : null,
       body: Row(
         children: [
-          if (isDesktop) const SizedBox(width: 240, child: CourseManagerSidebar(currentRoute: 'support')),
+          if (isDesktop)
+            const SizedBox(
+              width: 240,
+              child: CourseManagerSidebar(currentRoute: 'support'),
+            ),
           Expanded(child: bodyContent),
         ],
       ),
@@ -433,6 +566,14 @@ class _ManagementTicketsPageState extends State<ManagementTicketsPage> {
               fontFamily: 'Outfit',
             ),
           ),
+          const Spacer(),
+          IconButton(
+            tooltip: 'Refresh tickets',
+            onPressed: _isFetchingBackground
+                ? null
+                : () => _fetchTickets(isSilent: true),
+            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF28B79B)),
+          ),
         ],
       ),
     );
@@ -457,7 +598,9 @@ class _ManagementTicketsPageState extends State<ManagementTicketsPage> {
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? const Color(0xFF0284C7) : const Color(0xFF64748B),
+            color: isSelected
+                ? const Color(0xFF0284C7)
+                : const Color(0xFF64748B),
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
             fontSize: 13,
           ),

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../routes/app_routes.dart';
 import '../../data/services/auth_service.dart';
 import '../../utils/toast_helper.dart';
 import 'verify_otp_page.dart';
@@ -312,7 +314,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
                         // Back to Sign In Link
                         GestureDetector(
-                          onTap: () => Navigator.pop(context),
+                          onTap: () => context.go(AppRoutes.login),
                           child: MouseRegion(
                             cursor: SystemMouseCursors.click,
                             child: Row(

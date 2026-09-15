@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../pages/terms_and_privacy_page.dart';
-import '../pages/course/list_courses_page.dart';
+import 'package:go_router/go_router.dart';
+import '../../routes/app_routes.dart';
 
 class SharedFooter extends StatelessWidget {
   final bool isDesktop;
@@ -155,26 +155,11 @@ class SharedFooter extends StatelessWidget {
       child: InkWell(
         onTap: () {
           if (label == 'Grammar Courses') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const ListCoursesPage(),
-              ),
-            );
+            context.go(AppRoutes.courses);
           } else if (label == 'Terms of Service') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const TermsAndPrivacyPage(initialTab: 0),
-              ),
-            );
+            context.push('${AppRoutes.termsAndPrivacy}?tab=0');
           } else if (label == 'Privacy Policy') {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const TermsAndPrivacyPage(initialTab: 1),
-              ),
-            );
+            context.push('${AppRoutes.termsAndPrivacy}?tab=1');
           }
         },
         child: Text(

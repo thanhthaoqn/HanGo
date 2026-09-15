@@ -27,7 +27,7 @@
 | File | Purpose |
 |---|---|
 | [`sys-function-index.csv`](sys-function-index.csv) | One row per workflow, mapping `Function Name → Sheet Name → Description → Pre-Condition`. Since this layer is organized one-sheet-per-workflow (not one row per granular function, unlike the IT layer's `itc-function-index.csv`), Function Name and Sheet Name are two views of the same workflow. |
-| [`sys-summary.csv`](sys-summary.csv) | One row per workflow: `Passed / Failed / Pending / N/A / Number of test cases`, plus a Sub-total row (255 test cases across 13 workflows). Update this after each execution round — it's the at-a-glance rollup for reporting. |
+| [`sys-summary.csv`](sys-summary.csv) | One row per workflow: `Passed / Failed / Pending / N/A / Number of test cases`, plus a Sub-total row (265 test cases across 13 workflows as of 2026-08-18). Update this after each execution round — it's the at-a-glance rollup for reporting. |
 
 ## 2. What changed vs. the previous version of this plan
 
@@ -42,6 +42,16 @@ The previous System Test layer (built 2026-07-25, 12 sheets) used the same workf
    - **Confirmed fixed / no longer reproducible:** the exam-attempt "answers echo" bug (previously GAP-EXM-01) no longer reproduces against the current `ExamService`/`ExamReviewPage` code — reframed as a regression check rather than an expected-gap case.
    - **Confirmed removed/never-existed:** the old "dual approve/reject path" scenario for Course review (old `SYS_FLOW_CRS` TC15–18) — no such second path exists in `TrainerDashboardController`; only the single `CourseManagerDashboardController` review path is real. Drag-and-drop Section/Lesson reordering and a media-upload "Retry" option were also never implemented in the current frontend and have been removed from the plan.
 
+## 2b. 2026-08-18 verification round (full retest, all 13 sheets re-read against current code/UI)
+
+Same full-retest trigger and workstream split as `integration_test_plan.md`'s 2b entry (see there for the shared context) — 255→265 test cases (+10). Backend-side findings largely mirror the IT-layer round (see that doc for the full list); System-Test-specific / UI-level findings worth calling out here:
+
+- **Trainer Onboarding flow:** the Agreement-signing screen was restructured — it now appears right after Trainer Type Selection (before profile completion, not after Admin approval), dropped its confirmation checkbox in favor of a scroll-gated "Continue to Profile" button, and always routes to the profile-details form even in the rare already-VERIFIED fallback case. Admin's Approve dialog also lost its custom revenue-share input (fixed split now). Rewrote TC01/02/17/18/22.
+- **Course Authoring flow:** the "Price (Desired)" + "Reason" fields on the course-edit page are gone — replaced by a read-only "System Auto-Price" box. Rewrote TC03/04.
+- **AI Learning Pathway / Lesson Learning flows:** added coverage for the "Take Mastery Quiz"/"Review Now" UI and course-completion certificates (both previously undocumented — see IT-layer 2b entry for the underlying endpoints). Real frontend bug flagged: both mastery buttons submit a hard-coded mock score (90/100) rather than a real quiz result.
+- **Support Ticket flow:** confirmed the previously-documented "masked-500-instead-of-403" and cross-account-message-IDOR gaps have actually been **fixed** (a real ownership-or-staff authorization check now exists) — but a *different*, previously-undocumented authorization gap was found in its place: the PAYOUT_INFO_UPDATE/REFUND_REQUEST category check inside `processTicket` has been removed entirely, so any staff (not just Administrator) can now approve/reject those categories. Also newly found: `ManagementTicketController` requires the `MANAGE_ACCOUNTS_ROLES` permission, which Course Manager doesn't hold by default — the whole "Staff Queue" section assumed Course-Manager access that doesn't actually work out of the box.
+- **Payment/Revenue-adjacent finding (documented here, owned by the Course module):** `CourseServiceImpl.enrollCourse` has no server-side price check — a Learner can enroll in a paid course for free via the raw enroll endpoint, bypassing the whole Cart/PayOS flow this document otherwise assumes is mandatory for paid courses. Flagged, not fixed.
+
 ## 3. Sheet index
 
 | # | File | Workflow | TCs |
@@ -50,16 +60,16 @@ The previous System Test layer (built 2026-07-25, 12 sheets) used the same workf
 | 2 | `sys-sheet-trainer-onboarding-flow.csv` | Trainer Onboarding & Profile Approval | 22 |
 | 3 | `sys-sheet-course-authoring-publishing-flow.csv` | Course Authoring- Content Building & Publishing | 26 |
 | 4 | `sys-sheet-course-purchase-enrollment-flow.csv` | Course Discovery- Cart- PayOS Payment & Enrollment | 22 |
-| 5 | `sys-sheet-lesson-learning-progress-flow.csv` | Lesson Learning- Quiz & Progress Tracking | 17 |
-| 6 | `sys-sheet-exam-authoring-taking-flow.csv` | Exam Authoring- Matrix Generation- Review & Taking | 22 |
-| 7 | `sys-sheet-ai-learning-pathway-flow.csv` | AI-Generated Learning Pathway | 18 |
+| 5 | `sys-sheet-lesson-learning-progress-flow.csv` | Lesson Learning- Quiz & Progress Tracking | 19 |
+| 6 | `sys-sheet-exam-authoring-taking-flow.csv` | Exam Authoring- Matrix Generation- Review & Taking | 25 |
+| 7 | `sys-sheet-ai-learning-pathway-flow.csv` | AI-Generated Learning Pathway | 20 |
 | 8 | `sys-sheet-ai-assistant-recommendation-flow.csv` | AI Assistant Q&A & Course Recommendation | 16 |
-| 9 | `sys-sheet-comment-moderation-flow.csv` | Lesson Comment- Like & Moderation | 15 |
+| 9 | `sys-sheet-comment-moderation-flow.csv` | Lesson Comment- Like & Moderation | 16 |
 | 10 | `sys-sheet-notification-delivery-flow.csv` | Cross-Module Notification Delivery & Read-Tracking | 14 |
 | 11 | `sys-sheet-trainer-revenue-settlement-flow.csv` | Trainer Revenue- Monthly Statement & Settlement | 21 |
 | 12 | `sys-sheet-account-access-administration-flow.csv` | Account- Role & Access Administration | 25 |
-| 13 | `sys-sheet-support-ticket-flow.csv` | Support Ticket Submission- Triage & Resolution | 16 |
-| | | **Sub total** | **255** |
+| 13 | `sys-sheet-support-ticket-flow.csv` | Support Ticket Submission- Triage & Resolution | 18 |
+| | | **Sub total** | **265** |
 
 **Excluded on purpose:** `TestDBController` (`/api/test-db/**`) is not exercised here either — same rationale as `integration_test_plan.md` (known unauthenticated credential-reset hole slated for removal, not a feature to validate). Profile Management (view/edit own profile, avatar, change password) is exercised inline as a supporting step inside other workflows (e.g. Trainer profile in Flow 2, account edits in Flow 12) rather than as its own top-level workflow, since it has no multi-actor end-to-end journey of its own beyond what `itc-sheet-profile.csv` already covers at the API level.
 

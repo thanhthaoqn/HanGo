@@ -42,6 +42,10 @@ public class JwtUtils {
         return generateJwtTokenFromUsername(userPrincipal.getUsername());
     }
 
+    // Tao ACCESS TOKEN (JWT that su, ky bang HMAC). Subject = email cua user.
+    // Token nay KHONG chua role/permission ben trong -> moi lan can biet quyen
+    // cua user, backend phai tra cuu lai DB (xem JwtAuthFilter + UserDetailsServiceImpl),
+    // dam bao quyen luon la moi nhat va co the bi thu hoi ngay khi Admin doi role.
     public String generateJwtTokenFromUsername(String username) {
         return Jwts.builder()
                 .setSubject(username)
@@ -79,6 +83,8 @@ public class JwtUtils {
     // ================================================================
     // Refresh token support: opaque random strings, stored hashed in DB
     // (unlike the access JWT, these must be revocable on logout/password change).
+    // Refresh token KHONG phai JWT -> khong tu giai ma duoc, phai so sanh hash
+    // voi bang refresh_tokens (xem AuthService.refreshAccessToken/logout).
     // ================================================================
 
     public long getRefreshExpirationMs() {

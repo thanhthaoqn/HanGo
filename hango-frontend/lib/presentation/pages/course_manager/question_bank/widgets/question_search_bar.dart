@@ -20,6 +20,8 @@ class QuestionSearchBar extends StatelessWidget {
   final ValueChanged<int?>? onGroupTypeChanged;
   final int? selectedDifficultyId;
   final ValueChanged<int?>? onDifficultyChanged;
+  final bool? selectedIsGroup;
+  final ValueChanged<bool?>? onIsGroupChanged;
 
   const QuestionSearchBar({
     Key? key,
@@ -42,6 +44,8 @@ class QuestionSearchBar extends StatelessWidget {
     this.onGroupTypeChanged,
     this.selectedDifficultyId,
     this.onDifficultyChanged,
+    this.selectedIsGroup,
+    this.onIsGroupChanged,
   }) : super(key: key);
 
   @override
@@ -93,6 +97,12 @@ class QuestionSearchBar extends StatelessWidget {
                     ),
                   ),
                 if (difficulties != null) const SizedBox(width: 12),
+                // Question Type filter (Single Question vs Question Group)
+                Expanded(
+                  flex: 2,
+                  child: _buildQuestionTypeDropdown(),
+                ),
+                const SizedBox(width: 12),
                 // Sort Dropdown
                 _buildSortDropdown(),
                 const SizedBox(width: 12),
@@ -143,6 +153,10 @@ class QuestionSearchBar extends StatelessWidget {
                         onDifficultyChanged,
                       ),
                     ),
+                  SizedBox(
+                    width: 170,
+                    child: _buildQuestionTypeDropdown(),
+                  ),
                   _buildSortDropdown(),
                   _buildRefreshButton(),
                 ],
@@ -389,6 +403,61 @@ class QuestionSearchBar extends StatelessWidget {
           border: Border.all(color: const Color(0xFFCBD5E1)),
         ),
         child: const Icon(Icons.refresh, color: Color(0xFF64748B), size: 20),
+      ),
+    );
+  }
+
+  Widget _buildQuestionTypeDropdown() {
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFCBD5E1)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<bool?>(
+          hint: const Text(
+            'Question Type',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF94A3B8),
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+          value: selectedIsGroup,
+          icon: const Icon(
+            Icons.keyboard_arrow_down,
+            color: Color(0xFF64748B),
+            size: 16,
+          ),
+          dropdownColor: Colors.white,
+          isExpanded: true,
+          selectedItemBuilder: (BuildContext context) {
+            return const [
+              Text('All Question Types', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)), overflow: TextOverflow.ellipsis),
+              Text('Single Question', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)), overflow: TextOverflow.ellipsis),
+              Text('Question Group', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)), overflow: TextOverflow.ellipsis),
+            ].map((child) => Align(alignment: Alignment.centerLeft, child: child)).toList();
+          },
+          items: const [
+            DropdownMenuItem<bool?>(
+              value: null,
+              child: Text('All Question Types', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1E293B))),
+            ),
+            DropdownMenuItem<bool?>(
+              value: false,
+              child: Text('Single Question', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1E293B))),
+            ),
+            DropdownMenuItem<bool?>(
+              value: true,
+              child: Text('Question Group', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1E293B))),
+            ),
+          ],
+          onChanged: onIsGroupChanged,
+        ),
       ),
     );
   }

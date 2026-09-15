@@ -184,6 +184,10 @@ class CourseManagerApi {
     );
   }
 
+  // User action: Course Manager bam "Approve/Publish" tren hang doi cho duyet.
+  // Goi POST /api/v1/course-manager/courses/{id}/publish ->
+  // CourseManagerDashboardServiceImpl.publishCourse() ben backend se doi
+  // status PENDING_APPROVAL -> PUBLISHED va gui notification cho Trainer.
   Future<void> publishCourse(int courseId) async {
     final response = await _post('/courses/$courseId/publish');
     if (response.statusCode != 200) {
@@ -193,6 +197,10 @@ class CourseManagerApi {
     }
   }
 
+  // User action: Course Manager bam "Reject" kem ly do. Backend yeu cau reason
+  // khong duoc rong (AdminController-style validation trong
+  // CourseManagerDashboardController.rejectCourse) va se luu vao
+  // course.rejectionReason de Trainer xem va sua lai truoc khi nop lai.
   Future<void> rejectCourse(int courseId, {String? reason}) async {
     final response = await _post(
       '/courses/$courseId/reject',
@@ -231,13 +239,15 @@ class CourseManagerApi {
       String? description,
       int? durationMinutes,
       int? expectedQuestionCount,
-      double? passingScore) async {
+      double? passingScore,
+      {int? questionSourceType}) async {
     final payload = {};
     if (title != null && title.isNotEmpty) payload['title'] = title;
     if (description != null && description.isNotEmpty) payload['description'] = description;
     if (durationMinutes != null) payload['durationMinutes'] = durationMinutes;
     if (expectedQuestionCount != null) payload['expectedQuestionCount'] = expectedQuestionCount;
     if (passingScore != null) payload['passingScore'] = passingScore;
+    if (questionSourceType != null) payload['questionSourceType'] = questionSourceType;
 
     final response = await _post('/matrices/$matrixId/generate', body: jsonEncode(payload));
     if (response.statusCode == 200 || response.statusCode == 201) {
@@ -366,6 +376,30 @@ class CourseManagerApi {
 
     throw Exception(
       'Failed to count available questions: ${response.statusCode}',
+    );
+  }
+
+  /// Checks whether the Question Bank has enough questions to satisfy every
+  /// row of the given matrix, using the same filters exam generation itself
+  /// uses - so this matches what generating an exam from it would find.
+  Future<Map<String, dynamic>> checkMatrixSufficiency(
+    int matrixId, {
+    int? questionSourceType,
+  }) async {
+    final response = await _get(
+      '/matrices/$matrixId/check-sufficiency',
+      queryParameters: {
+        if (questionSourceType != null)
+          'questionSourceType': questionSourceType.toString(),
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    }
+
+    throw Exception(
+      'Failed to check matrix sufficiency: ${response.statusCode}',
     );
   }
 

@@ -15,9 +15,18 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 import java.time.LocalDateTime;
 
+// Bat toan cuc: bat ky Controller nao trong app nem ra 1 trong cac Exception
+// duoc khai bao ben duoi deu se bi handler tuong ung o day bat lay va doi
+// thanh JSON ApiErrorDTO (thay vi Spring tra ve trang loi HTML mac dinh).
+// Thu tu uu tien: Spring chon handler co kieu Exception "khop nhat" truoc,
+// vi du ApiException se duoc handleApiException() xu ly, KHONG roi xuong
+// handleGlobalException(Exception) o cuoi file.
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    // ApiException la loai exception "co chu dinh" duoc cac Service tu nem ra
+    // (vd: AuthService, CourseManagerDashboardServiceImpl...) voi HttpStatus
+    // ro rang do chinh nguoi viet code chon (400, 401, 403, 404, 409...).
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiErrorDTO> handleApiException(ApiException ex, HttpServletRequest request) {
         ApiErrorDTO errorDTO = ApiErrorDTO.builder()
@@ -98,6 +107,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorDTO);
     }
 
+    // Bat khi @PreAuthorize("hasRole(...)"/"hasAuthority(...)") tren 1 method
+    // Controller danh gia la FALSE (user dang nhap nhung KHONG du quyen).
+    // Day la 1 trong 2 noi xu ly 403: noi con lai la CustomAccessDeniedHandler
+    // (dang ky trong SecurityConfig) - no bat AccessDeniedException xay ra o
+    // tang Security Filter (truoc khi vao toi DispatcherServlet/Controller).
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiErrorDTO> handleAccessDeniedException(AccessDeniedException ex, HttpServletRequest request) {
         ApiErrorDTO errorDTO = ApiErrorDTO.builder()
@@ -110,9 +124,9 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorDTO);
     }
 
-    @ExceptionHandler(Exception.class)
+    @ExceptionHandler(Exception.class) // Bat TAT CA nhung loi ngoai y muon (NullPointer, Loi ket noi DB...) ma lap trinh vien chua kip xu ly
     public ResponseEntity<ApiErrorDTO> handleGlobalException(Exception ex, HttpServletRequest request) {
-        // Log the exception securely on the server side
+        // Ghi log vao server de dev biet duong sua, khong in ra man hinh cua user
         ex.printStackTrace();
         
         ApiErrorDTO errorDTO = ApiErrorDTO.builder()

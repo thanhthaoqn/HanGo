@@ -27,13 +27,17 @@ class QuestionTable extends StatelessWidget {
     this.isCourseManager = false,
   }) : super(key: key);
 
-  String _formatTime(DateTime dt) {
+  // Legacy/imported questions can have no recorded timestamp at all - show
+  // "--:--" / "--" for those instead of silently making one up.
+  String _formatTime(DateTime? dt) {
+    if (dt == null) return '--:--';
     final hh = dt.hour.toString().padLeft(2, '0');
     final mm = dt.minute.toString().padLeft(2, '0');
     return '$hh:$mm';
   }
 
-  String _formatDate(DateTime dt) {
+  String _formatDate(DateTime? dt) {
+    if (dt == null) return '--';
     final d = dt.day.toString().padLeft(2, '0');
     final m = dt.month.toString().padLeft(2, '0');
     final y = dt.year.toString();
@@ -259,6 +263,21 @@ class QuestionTable extends StatelessWidget {
                       spacing: 8,
                       runSpacing: 4,
                       children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: q.isGroup ? const Color(0xFFFDF2F8) : const Color(0xFFF0FDF4),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            q.isGroup ? 'Question Group' : 'Single Question',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: q.isGroup ? const Color(0xFFDB2777) : const Color(0xFF16A34A),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
                         if (q.categoryName.isNotEmpty && q.categoryName != 'Chưa phân loại')
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),

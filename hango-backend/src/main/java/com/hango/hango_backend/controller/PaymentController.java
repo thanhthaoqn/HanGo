@@ -27,7 +27,7 @@ public class PaymentController {
     private final PaymentService paymentService;
 
     /**
-     * Tạo URL thanh toán VNPay cho khóa học
+     * Create PayOS payment URL for courses
      * POST /api/v1/payment/create
      */
     @PostMapping("/create")
@@ -73,7 +73,7 @@ public class PaymentController {
     }
 
     /**
-     * Lấy danh sách lịch sử giao dịch của Learner (có phân trang & lọc trạng thái)
+     * Get transaction history of current Learner (supports pagination & status filtering)
      * GET /api/v1/payment/my-history?page=0&size=10&status=ALL
      */
     @GetMapping("/my-history")
@@ -90,13 +90,14 @@ public class PaymentController {
 
             return ResponseEntity.ok(paymentService.getMyPaymentHistory(currentUser.getId(), status, page, size));
         } catch (Exception e) {
-            log.error("Error fetching payment history for userId={}", currentUser != null ? currentUser.getId() : null, e);
+            log.error("Error fetching payment history for userId={}", currentUser != null ? currentUser.getId() : null,
+                    e);
             return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
         }
     }
 
     /**
-     * Kiểm tra trạng thái giao dịch (Frontend polling)
+     * Check transaction status (Frontend polling)
      * GET /api/v1/payment/status/{txnRef}
      */
     @GetMapping("/status/{txnRef}")
@@ -118,7 +119,7 @@ public class PaymentController {
     }
 
     /**
-     * Lấy danh sách toàn bộ giao dịch mua khóa học cho Course Manager
+     * Get all course payment transactions for Course Manager
      * GET /api/v1/payment/manager/all
      */
     @GetMapping("/manager/all")
@@ -130,7 +131,8 @@ public class PaymentController {
             @RequestParam(required = false) String settlementStatus,
             @RequestParam(required = false) String search) {
         try {
-            return ResponseEntity.ok(paymentService.getAllPaymentsForManager(status, settlementStatus, search, page, size));
+            return ResponseEntity
+                    .ok(paymentService.getAllPaymentsForManager(status, settlementStatus, search, page, size));
         } catch (Exception e) {
             log.error("Error fetching all payments for manager", e);
             return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
@@ -138,7 +140,7 @@ public class PaymentController {
     }
 
     /**
-     * Xuất danh sách toàn bộ giao dịch mua khóa học ra file Excel (.xlsx)
+     * Export all course payment transactions to Excel (.xlsx)
      * GET /api/v1/payment/manager/export-excel
      */
     @GetMapping("/manager/export-excel")
@@ -151,8 +153,10 @@ public class PaymentController {
             byte[] excelBytes = paymentService.exportPaymentsToExcel(status, settlementStatus, search);
             String filename = "HanGo_Payment_Transactions.xlsx";
             return ResponseEntity.ok()
-                    .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-                    .header(org.springframework.http.HttpHeaders.CONTENT_TYPE, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"" + filename + "\"")
+                    .header(org.springframework.http.HttpHeaders.CONTENT_TYPE,
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
                     .body(excelBytes);
         } catch (Exception e) {
             log.error("Error exporting payment transactions to excel: {}", e.getMessage(), e);
@@ -160,14 +164,13 @@ public class PaymentController {
         }
     }
 
-
     private String getClientIpAddress(HttpServletRequest request) {
         String xForwardedFor = request.getHeader("X-Forwarded-For");
         if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
             return xForwardedFor.split(",")[0].trim();
         }
         String remoteAddr = request.getRemoteAddr();
-        // VNPay không chấp nhận IPv6 loopback
+        // Payment gateway loopback check
         if ("0:0:0:0:0:0:0:1".equals(remoteAddr) || "::1".equals(remoteAddr)) {
             return "127.0.0.1";
         }
