@@ -478,9 +478,15 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _errorMessage = e.toString();
-      });
+      final cleanMsg = e.toString().replaceFirst('Exception: ', '');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isVi
+              ? 'Không thể tạo lại lộ trình: $cleanMsg'
+              : 'Unable to regenerate pathway: $cleanMsg'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -528,7 +534,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
             ),
             child: _isLoading
                 ? _buildLoading()
-                : _errorMessage != null
+                : (_errorMessage != null && _pathway == null)
                     ? _buildErrorBody()
                     : _pathway == null
                         ? _buildErrorBody()

@@ -10,6 +10,7 @@ class AppRoutes {
 
   // Detail routes
   static const String courseDetail = '/courses/:id';
+  static const String courseCompletion = '/courses/:id/completion';
   static const String courseLesson = '/courses/:courseId/lessons/:lessonId';
   static const String takeExam = '/take-exam/:id';
   static const String entryExam = '/entry-exam';

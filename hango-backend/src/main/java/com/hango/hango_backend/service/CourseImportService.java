@@ -119,7 +119,8 @@ public class CourseImportService {
         Map<String, String> courseData = new java.util.HashMap<>();
         if (hasCourseSheet) {
             for (SheetRow r : courseRowsRaw) {
-                String field = valueOrDefault(r.data(), "Information Field", valueOrDefault(r.data(), "Field", "")).trim();
+                String field = valueOrDefault(r.data(), "Information Field", valueOrDefault(r.data(), "Field", ""))
+                        .trim();
                 String data = valueOrDefault(r.data(), "Fill Data", valueOrDefault(r.data(), "Value", "")).trim();
                 if (!field.isEmpty()) {
                     courseData.put(field, data);
@@ -147,12 +148,14 @@ public class CourseImportService {
             String codeUpper = courseCodeRaw.trim().toUpperCase(Locale.ROOT);
             if (!codeUpper.matches("^[A-Z0-9_]+$")) {
                 addError(errors, "COURSE", null, "Course Code", "INVALID_FORMAT", courseCodeRaw,
-                        "Course Code must contain only uppercase letters, digits, and underscores (e.g. ENGLISH_GRAMMAR_01). Got: '" + courseCodeRaw + "'");
+                        "Course Code must contain only uppercase letters, digits, and underscores (e.g. ENGLISH_GRAMMAR_01). Got: '"
+                                + courseCodeRaw + "'");
             }
         }
 
         // §8: Category — required, must exist in DB
-        String rawCategory = valueOrDefault(courseData, "Category", valueOrDefault(courseData, "Primary Category", "")).trim();
+        String rawCategory = valueOrDefault(courseData, "Category", valueOrDefault(courseData, "Primary Category", ""))
+                .trim();
         SystemParameter category = null;
         if (rawCategory.isBlank()) {
             addError(errors, "COURSE", null, "Category", "MISSING_FIELD", rawCategory,
@@ -167,7 +170,8 @@ public class CourseImportService {
         }
 
         // §9: Difficulty — required, must be BASIC/INTERMEDIATE/ADVANCED
-        String rawDifficulty = valueOrDefault(courseData, "Difficulty", valueOrDefault(courseData, "Academic Level", "")).trim();
+        String rawDifficulty = valueOrDefault(courseData, "Difficulty",
+                valueOrDefault(courseData, "Academic Level", "")).trim();
         SystemParameter difficulty = null;
         if (rawDifficulty.isBlank()) {
             addError(errors, "COURSE", null, "Difficulty", "MISSING_FIELD", rawDifficulty,
@@ -235,7 +239,8 @@ public class CourseImportService {
                 // §14: Lesson before first section
                 if (currentParsedSection == null) {
                     addError(errors, "SYLLABUS", sr.rowNumber(), "Type", "INVALID_ORDER", type,
-                            "Lesson/Quiz found before any Section: '" + title + "'. All lessons must belong to a Section.");
+                            "Lesson/Quiz found before any Section: '" + title
+                                    + "'. All lessons must belong to a Section.");
                     continue;
                 }
                 // Title required for all lesson types
@@ -268,7 +273,8 @@ public class CourseImportService {
                     }
                 }
                 // Video lessons are intentionally allowed to have empty URLs during import.
-                // Trainers will upload/import the actual video files later through the platform UI.
+                // Trainers will upload/import the actual video files later through the platform
+                // UI.
 
                 // Track in section
                 if (type.equals("quiz")) {
@@ -296,7 +302,8 @@ public class CourseImportService {
             if (section.regularLessonCount < 2) {
                 addError(errors, "SYLLABUS", section.rowNumber, null, "INSUFFICIENT_LESSONS",
                         String.valueOf(section.regularLessonCount),
-                        "Section '" + section.title + "' must contain at least 2 regular Lessons (VIDEO/TEXT/PDF). Found: "
+                        "Section '" + section.title
+                                + "' must contain at least 2 regular Lessons (VIDEO/TEXT/PDF). Found: "
                                 + section.regularLessonCount + ".");
             }
             // §10: Minimum 1 quiz per section
@@ -326,8 +333,10 @@ public class CourseImportService {
                 }
             }
 
-            // Check exactly 1 final quiz (no other section's last item should be named as a "final quiz")
-            // Per Option B, final quiz is auto-detected as last quiz of last section, so we just need
+            // Check exactly 1 final quiz (no other section's last item should be named as a
+            // "final quiz")
+            // Per Option B, final quiz is auto-detected as last quiz of last section, so we
+            // just need
             // to verify the last item is indeed a quiz (handled above).
         } else if (hasSyllabusSheet) {
             addError(errors, "SYLLABUS", null, null, "NO_FINAL_QUIZ", null,
@@ -370,8 +379,8 @@ public class CourseImportService {
 
             // §18: Validate correct answer matches an option
             String correctAnswer = valueOrDefault(row, "Correct Answer", "").trim();
-            String[] optionColumns = {"Option A", "Option B", "Option C", "Option D"};
-            String[] optionKeys = {"A", "B", "C", "D"};
+            String[] optionColumns = { "Option A", "Option B", "Option C", "Option D" };
+            String[] optionKeys = { "A", "B", "C", "D" };
             List<String> presentOptions = new ArrayList<>();
             for (int i = 0; i < optionColumns.length; i++) {
                 String optionText = valueOrDefault(row, optionColumns[i], "");
@@ -444,7 +453,8 @@ public class CourseImportService {
             }
         }
 
-        // Warn about orphaned questions (in QUESTIONS but not mapped to any quiz in CURRICULUM)
+        // Warn about orphaned questions (in QUESTIONS but not mapped to any quiz in
+        // CURRICULUM)
         for (Map.Entry<String, List<SheetRow>> entry : questionsByQuizTitle.entrySet()) {
             if (!allQuizTitlesInCurriculum.contains(entry.getKey())) {
                 warnings.add("Questions mapped to '" + entry.getValue().get(0).data().get("Question Title")
@@ -590,12 +600,16 @@ public class CourseImportService {
                 continue;
             }
 
-            String groupName = valueOrDefault(questionRow, "Group", "").trim();
+            String groupName = valueOrDefault(questionRow, "Group", valueOrDefault(questionRow, "Group Type", ""))
+                    .trim();
             String passageText = valueOrDefault(questionRow, "Passage Text", "").trim();
+            if (groupName.isEmpty() && !passageText.isEmpty()) {
+                groupName = "GROUP_" + Math.abs(passageText.hashCode());
+            }
             com.hango.hango_backend.entity.QuestionGroup questionGroup = null;
 
             if (!groupName.isEmpty() && !passageText.isEmpty()) {
-                String groupKey = groupName.toLowerCase(Locale.ROOT);
+                String groupKey = groupName.toLowerCase(Locale.ROOT) + "::" + Math.abs(passageText.hashCode());
                 questionGroup = questionGroupsByPassage.get(groupKey);
                 if (questionGroup == null) {
                     questionGroup = new com.hango.hango_backend.entity.QuestionGroup();
@@ -648,7 +662,7 @@ public class CourseImportService {
         if (resource.exists()) {
             return resource.getInputStream().readAllBytes();
         }
-        
+
         throw new IOException("Course import template not found. Expected " + TEMPLATE_FILE_NAME
                 + " under classpath:templates/.");
     }
@@ -967,9 +981,9 @@ public class CourseImportService {
         }
 
         String normalizedSkill = normalizeParameterKey(rawSkill);
-        
-        // We pass the normalizedSkill as the fallbackKey. 
-        // If it's not found in the DB (or in the aliases), resolveParameter will throw: 
+
+        // We pass the normalizedSkill as the fallbackKey.
+        // If it's not found in the DB (or in the aliases), resolveParameter will throw:
         // "System parameter not found: SKILL/[NORMALIZED_SKILL]"
         // This gives the exact error message requested.
         return resolveParameter(
@@ -1073,7 +1087,8 @@ public class CourseImportService {
     }
 
     private String normalizeParameterKey(String value) {
-        if (value == null) return "";
+        if (value == null)
+            return "";
         return value.trim()
                 .replace('-', '_')
                 .replace('/', '_')
@@ -1100,7 +1115,10 @@ public class CourseImportService {
         return key;
     }
 
-    /** Whether a SYLLABUS row's (lowercased) Type is one of the supported lesson content types. */
+    /**
+     * Whether a SYLLABUS row's (lowercased) Type is one of the supported lesson
+     * content types.
+     */
     private boolean isLessonType(String type) {
         return type.equals("video") || type.equals("text") || type.equals("quiz") || type.equals("pdf");
     }
@@ -1242,12 +1260,13 @@ public class CourseImportService {
         }
     }
 
-    // Gia THAM KHAO cho khoa hoc import tu Excel - dung CHINH XAC cong thuc va
-    // gioi han (lam tron boi so 50.000d, ke trong 300.000d-700.000d) nhu
-    // TrainerDashboardServiceImpl.calculateSuggestedPrice, de nhat quan giua
-    // 2 con duong tao course (thu cong qua UI vs import hang loat). Gia BAN
-    // THAT SU khong con tinh o day nua - xem importWorkbook() (doc cot "Price"
-    // tuy chon, hoac mac dinh ve dung gia tham khao nay).
+    // Price Reference for course imported from Excel - use exact formula and
+    // limit (rounded by 50,000d, between 300,000d-700,000d) like
+    // TrainerDashboardServiceImpl.calculateSuggestedPrice, to maintain consistency
+    // between the 2 ways of creating courses (manual via UI vs bulk import). The
+    // FINAL SALE PRICE is no longer calculated here - see importWorkbook()
+    // (optional
+    // "Price" column, or default to this reference price).
     private BigDecimal calculateSuggestedPrice(TrainerProfile profile,
             SystemParameter difficulty, int lessonCount, int durationMinutes) {
         long price = 0;
@@ -1293,16 +1312,21 @@ public class CourseImportService {
      * multiple internal spaces into a single space, preserve original case.
      */
     private String normalizeCourseName(String name) {
-        if (name == null) return null;
+        if (name == null)
+            return null;
         String trimmed = name.trim();
-        if (trimmed.isEmpty()) return trimmed;
+        if (trimmed.isEmpty())
+            return trimmed;
         return trimmed.replaceAll("\\s+", " ");
     }
 
     private record WorkbookData(Map<String, List<SheetRow>> rowsBySheet) {
     }
 
-    /** One data row from a sheet, paired with its original Excel row number (1-indexed) for error reporting. */
+    /**
+     * One data row from a sheet, paired with its original Excel row number
+     * (1-indexed) for error reporting.
+     */
     private record SheetRow(int rowNumber, Map<String, String> data) {
     }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_html/flutter_html.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
@@ -1735,6 +1736,33 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     }
   }
 
+  String _prepareContent(String raw) {
+    if (raw.isEmpty) return raw;
+    // 1. Normalize line endings (\r\n and \r -> \n)
+    String text = raw.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+
+    // 2. Normalize escaped newlines like '\n' if no real newlines exist
+    if (text.contains(r'\n') && !text.contains('\n')) {
+      text = text.replaceAll(r'\n', '\n');
+    }
+
+    // 3. Normalize unicode bullets (•, ●, ⁃) at start of lines into standard markdown list items
+    text = text.replaceAllMapped(
+      RegExp(r'(^|\n)[\t ]*[•●⁃]\s*'),
+      (m) => '${m.group(1)}- ',
+    );
+
+    return text;
+  }
+
+  bool _isHtmlContent(String text) {
+    final htmlRegex = RegExp(
+      r'<(p|div|h[1-6]|ul|ol|li|table|thead|tbody|tr|td|th|br|span|section|article|header|footer|b|i|strong|em)\b[^>]*>',
+      caseSensitive: false,
+    );
+    return htmlRegex.hasMatch(text);
+  }
+
   Widget _buildHtmlContent(LessonDetail lesson) {
     if (_itemType?.toLowerCase() == 'video' || _youtubeVideoId != null) {
       return Container(
@@ -1751,7 +1779,10 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       );
     }
 
-    final Widget htmlContent = lesson.content.isEmpty
+    final String preparedContent = _prepareContent(lesson.content);
+    final bool isHtml = _isHtmlContent(preparedContent);
+
+    final Widget textContent = preparedContent.trim().isEmpty
         ? const Center(
             child: Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
@@ -1764,66 +1795,157 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
               ),
             ),
           )
-        : Html(
-            data: lesson.content,
-            style: {
-              "h1": Style(
-                color: const Color(0xFF1E293B),
-                fontSize: FontSize(22),
-                fontWeight: FontWeight.bold,
-                margin: Margins.only(top: 24, bottom: 12),
-              ),
-              "h2": Style(
-                color: const Color(0xFF1E293B),
-                fontSize: FontSize(18),
-                fontWeight: FontWeight.bold,
-                margin: Margins.only(top: 20, bottom: 10),
-              ),
-              "p": Style(
-                color: const Color(0xFF475569),
-                fontSize: FontSize(15),
-                lineHeight: LineHeight.number(1.7),
-                margin: Margins.only(bottom: 16),
-              ),
-              "ul": Style(
-                color: const Color(0xFF475569),
-                fontSize: FontSize(15),
-                margin: Margins.only(bottom: 16),
-              ),
-              "ol": Style(
-                color: const Color(0xFF475569),
-                fontSize: FontSize(15),
-                margin: Margins.only(bottom: 16),
-              ),
-              "li": Style(margin: Margins.only(bottom: 8.0)),
-              "blockquote": Style(
-                backgroundColor: const Color(0xFFF8FAFC),
-                border: const Border(
-                  left: BorderSide(color: Color(0xFF28B79B), width: 4),
+        : isHtml
+            ? Html(
+                data: preparedContent,
+                style: {
+                  "h1": Style(
+                    color: const Color(0xFF1E293B),
+                    fontSize: FontSize(22),
+                    fontWeight: FontWeight.bold,
+                    margin: Margins.only(top: 24, bottom: 12),
+                  ),
+                  "h2": Style(
+                    color: const Color(0xFF1E293B),
+                    fontSize: FontSize(18),
+                    fontWeight: FontWeight.bold,
+                    margin: Margins.only(top: 20, bottom: 10),
+                  ),
+                  "h3": Style(
+                    color: const Color(0xFF1E293B),
+                    fontSize: FontSize(16),
+                    fontWeight: FontWeight.bold,
+                    margin: Margins.only(top: 16, bottom: 8),
+                  ),
+                  "p": Style(
+                    color: const Color(0xFF334155),
+                    fontSize: FontSize(16),
+                    lineHeight: LineHeight.number(1.75),
+                    margin: Margins.only(bottom: 16),
+                  ),
+                  "ul": Style(
+                    color: const Color(0xFF334155),
+                    fontSize: FontSize(16),
+                    margin: Margins.only(bottom: 16),
+                  ),
+                  "ol": Style(
+                    color: const Color(0xFF334155),
+                    fontSize: FontSize(16),
+                    margin: Margins.only(bottom: 16),
+                  ),
+                  "li": Style(margin: Margins.only(bottom: 8.0)),
+                  "blockquote": Style(
+                    backgroundColor: const Color(0xFFF8FAFC),
+                    border: const Border(
+                      left: BorderSide(color: Color(0xFF28B79B), width: 4),
+                    ),
+                    padding: HtmlPaddings.symmetric(horizontal: 16, vertical: 12),
+                    margin: Margins.only(bottom: 16),
+                  ),
+                  "code": Style(
+                    backgroundColor: const Color(0xFFF1F5F9),
+                    color: const Color(0xFFE11D48),
+                    padding: HtmlPaddings.symmetric(horizontal: 6, vertical: 2),
+                  ),
+                },
+              )
+            : MarkdownBody(
+                data: preparedContent,
+                selectable: true,
+                softLineBreak: true,
+                onTapLink: (text, href, title) async {
+                  if (href != null && href.isNotEmpty) {
+                    final uri = Uri.tryParse(href);
+                    if (uri != null && await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
+                  }
+                },
+                styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+                  h1: const TextStyle(
+                    fontFamily: 'Outfit',
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E293B),
+                    height: 1.4,
+                  ),
+                  h2: const TextStyle(
+                    fontFamily: 'Outfit',
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E293B),
+                    height: 1.4,
+                  ),
+                  h3: const TextStyle(
+                    fontFamily: 'Outfit',
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E293B),
+                    height: 1.4,
+                  ),
+                  p: const TextStyle(
+                    fontFamily: 'Outfit',
+                    fontSize: 16,
+                    color: Color(0xFF334155),
+                    height: 1.75,
+                  ),
+                  pPadding: const EdgeInsets.only(bottom: 12),
+                  strong: const TextStyle(
+                    fontFamily: 'Outfit',
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                  ),
+                  em: const TextStyle(
+                    fontFamily: 'Outfit',
+                    fontStyle: FontStyle.italic,
+                    color: Color(0xFF334155),
+                  ),
+                  listBullet: const TextStyle(
+                    fontFamily: 'Outfit',
+                    color: Color(0xFF28B79B),
+                    fontWeight: FontWeight.bold,
+                  ),
+                  listBulletPadding: const EdgeInsets.only(right: 8),
+                  listIndent: 24,
+                  blockquote: const TextStyle(
+                    fontFamily: 'Outfit',
+                    color: Color(0xFF475569),
+                    fontStyle: FontStyle.italic,
+                  ),
+                  blockquoteDecoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    border: const Border(
+                      left: BorderSide(color: Color(0xFF28B79B), width: 4),
+                    ),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  blockquotePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  code: const TextStyle(
+                    fontFamily: 'Outfit',
+                    backgroundColor: Color(0xFFF1F5F9),
+                    color: Color(0xFFE11D48),
+                    fontSize: 14,
+                  ),
+                  horizontalRuleDecoration: const BoxDecoration(
+                    border: Border(
+                      top: BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
+                    ),
+                  ),
                 ),
-                padding: HtmlPaddings.symmetric(horizontal: 16, vertical: 12),
-                margin: Margins.only(bottom: 16),
-              ),
-              "code": Style(
-                backgroundColor: const Color(0xFFF1F5F9),
-                color: const Color(0xFFE11D48),
-                padding: HtmlPaddings.symmetric(horizontal: 6, vertical: 2),
-              ),
-            },
-          );
+              );
 
     final bool hasPdf = lesson.mediaType == 'pdf' && 
                         lesson.mediaFileUrl != null && 
                         lesson.mediaFileUrl!.isNotEmpty;
 
     if (!hasPdf) {
-      return htmlContent;
+      return textContent;
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        htmlContent,
+        textContent,
         const SizedBox(height: 24),
         Container(
           padding: const EdgeInsets.all(16),
@@ -2358,38 +2480,59 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (passage != null && passage.trim().isNotEmpty) ...[
-              Container(
-                constraints: const BoxConstraints(maxHeight: 220),
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                padding: const EdgeInsets.all(16),
-                child: SingleChildScrollView(
-                  child: Html(
-                    data: passage,
-                    style: {
-                      "body": Style(
-                        fontSize: FontSize(14.5),
-                        color: const Color(0xFF334155),
-                        lineHeight: LineHeight.number(1.5),
-                        fontWeight: FontWeight.w500,
-                        margin: Margins.zero,
-                        padding: HtmlPaddings.zero,
-                      ),
-                      "p": Style(
-                        fontSize: FontSize(14.5),
-                        color: const Color(0xFF334155),
-                        lineHeight: LineHeight.number(1.5),
-                        fontWeight: FontWeight.w500,
-                        margin: Margins.zero,
-                        padding: HtmlPaddings.zero,
-                      ),
-                    },
-                  ),
-                ),
+              Builder(
+                builder: (context) {
+                  final cleanPassage = _prepareContent(passage);
+                  final isPassageHtml = _isHtmlContent(cleanPassage);
+                  return Container(
+                    constraints: const BoxConstraints(maxHeight: 220),
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    child: SingleChildScrollView(
+                      child: isPassageHtml
+                          ? Html(
+                              data: cleanPassage,
+                              style: {
+                                "body": Style(
+                                  fontSize: FontSize(14.5),
+                                  color: const Color(0xFF334155),
+                                  lineHeight: LineHeight.number(1.6),
+                                  fontWeight: FontWeight.w500,
+                                  margin: Margins.zero,
+                                  padding: HtmlPaddings.zero,
+                                ),
+                                "p": Style(
+                                  fontSize: FontSize(14.5),
+                                  color: const Color(0xFF334155),
+                                  lineHeight: LineHeight.number(1.6),
+                                  fontWeight: FontWeight.w500,
+                                  margin: Margins.zero,
+                                  padding: HtmlPaddings.zero,
+                                ),
+                              },
+                            )
+                          : MarkdownBody(
+                              data: cleanPassage,
+                              selectable: true,
+                              softLineBreak: true,
+                              styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+                                p: const TextStyle(
+                                  fontFamily: 'Outfit',
+                                  fontSize: 14.5,
+                                  color: Color(0xFF334155),
+                                  height: 1.6,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 20),
             ],
