@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../routes/app_routes.dart';
+import '../../routes/app_router.dart';
 import '../../../data/services/auth_service.dart';
 import '../../utils/cart_manager.dart';
 import '../../utils/permission_utils.dart';
@@ -124,8 +125,12 @@ class _SharedDrawerState extends State<SharedDrawer> {
       return;
     }
     final targetRoute = _getLearnerRoute(tabIndex, subTab: subTab);
+    final nav = Navigator.of(context, rootNavigator: true);
+    while (nav.canPop()) {
+      nav.pop();
+    }
     try {
-      context.go(targetRoute);
+      (AppRouter.rootNavigatorKey.currentContext ?? context).go(targetRoute);
     } catch (_) {
       Navigator.pushAndRemoveUntil(
         context,

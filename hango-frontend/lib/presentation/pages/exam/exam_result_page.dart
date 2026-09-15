@@ -9,12 +9,6 @@ import '../../widgets/shared_footer.dart';
 import '../../widgets/shared_header.dart';
 import '../course/course_detail_page.dart';
 import 'exam_review_page.dart';
-import 'list_exams_page.dart';
-import '../../../services/hango_api.dart';
-import '../../../utils/config.dart';
-import '../../../data/services/auth_service.dart';
-
-
 import '../../../data/repositories/exam_ai_recommendation_repository.dart';
 import '../../widgets/learner/pathway_goal_dialog.dart';
 
@@ -331,6 +325,9 @@ class _ExamResultPageState extends State<ExamResultPage> {
                             child: IconButton(
                               icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF1F2937)),
                               onPressed: () {
+                                if (Navigator.of(context, rootNavigator: true).canPop()) {
+                                  Navigator.of(context, rootNavigator: true).pop();
+                                }
                                 context.go(AppRoutes.myLearning);
                               },
                               tooltip: 'Go back',
@@ -601,6 +598,9 @@ class _ExamResultPageState extends State<ExamResultPage> {
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () {
+                    if (Navigator.of(context, rootNavigator: true).canPop()) {
+                      Navigator.of(context, rootNavigator: true).pop();
+                    }
                     context.go(AppRoutes.exams);
                   },
                   icon: const Icon(Icons.arrow_back, size: 18),
@@ -888,6 +888,9 @@ class _ExamResultPageState extends State<ExamResultPage> {
                                   ElevatedButton(
                                     onPressed: () {
                                       if (courseId > 0) {
+                                        if (Navigator.of(context, rootNavigator: true).canPop()) {
+                                          Navigator.of(context, rootNavigator: true).pop();
+                                        }
                                         try {
                                           context.push('/courses/$courseId');
                                         } catch (_) {
@@ -1061,6 +1064,9 @@ class _ExamResultPageState extends State<ExamResultPage> {
                                 ElevatedButton(
                                   onPressed: () {
                                     if (courseId > 0) {
+                                      if (Navigator.of(context, rootNavigator: true).canPop()) {
+                                        Navigator.of(context, rootNavigator: true).pop();
+                                      }
                                       try {
                                         context.push('/courses/$courseId');
                                       } catch (_) {

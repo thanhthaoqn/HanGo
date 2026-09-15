@@ -5,6 +5,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../domain/entities/exam.dart';
 import '../../../data/repositories/exam_repository.dart';
 import '../../../utils/fullscreen_helper.dart';
+import 'package:go_router/go_router.dart';
+import '../../../routes/app_routes.dart';
+import '../../../routes/app_router.dart';
 import 'exam_result_page.dart';
 
 class TakeExamPage extends StatefulWidget {
@@ -274,18 +277,30 @@ class _TakeExamPageState extends State<TakeExamPage>
       };
 
       if (!mounted) return;
-      Navigator.of(context, rootNavigator: true).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => ExamResultPage(
-            exam: widget.exam,
-            score: score,
-            correctCount: correctCount,
-            examQuestions: _examQuestions,
-            userAnswers: _userAnswers,
-            attempt: resultExtra['attempt'] as Map<String, dynamic>,
+      try {
+        final rootNav = Navigator.of(context, rootNavigator: true);
+        if (rootNav.canPop()) {
+          rootNav.pop();
+        }
+        (AppRouter.rootNavigatorKey.currentContext ?? context).go(
+          AppRoutes.examResult,
+          extra: resultExtra,
+        );
+      } catch (e) {
+        debugPrint("GoRouter navigation to examResult failed, fallback: $e");
+        Navigator.of(context, rootNavigator: true).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => ExamResultPage(
+              exam: widget.exam,
+              score: score,
+              correctCount: correctCount,
+              examQuestions: _examQuestions,
+              userAnswers: _userAnswers,
+              attempt: resultExtra['attempt'] as Map<String, dynamic>,
+            ),
           ),
-        ),
-      );
+        );
+      }
     } catch (e) {
       debugPrint("Error during exam submit: $e");
       if (mounted) {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../routes/app_routes.dart';
+import '../../routes/app_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
 import 'shared_drawer.dart';
@@ -786,11 +787,15 @@ class _SharedHeaderState extends State<SharedHeader> {
       }
       return;
     }
-    // When outside any shell (e.g. on CourseDetailPage, LessonDetailPage, TakeExamPage),
+    // When outside any shell (e.g. on CourseDetailPage, LessonDetailPage, TakeExamPage, ExamResultPage),
     // navigate via GoRouter so the active route and browser address bar update cleanly.
     final targetRoute = _getLearnerRoute(tabIndex, subTab: subTab);
+    final nav = Navigator.of(context, rootNavigator: true);
+    while (nav.canPop()) {
+      nav.pop();
+    }
     try {
-      context.go(targetRoute);
+      (AppRouter.rootNavigatorKey.currentContext ?? context).go(targetRoute);
     } catch (_) {
       Navigator.pushAndRemoveUntil(
         context,
