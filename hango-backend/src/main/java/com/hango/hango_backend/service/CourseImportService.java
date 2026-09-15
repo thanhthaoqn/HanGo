@@ -266,6 +266,19 @@ public class CourseImportService {
                         addError(errors, "SYLLABUS", sr.rowNumber(), "Content / Media URL", "INVALID_VALUE", contentUrl,
                                 "QUIZ '" + title + "' must not have Content/Media URL.");
                     }
+                    String rawPassingScore = valueOrDefault(row, "Passing Score (%)", valueOrDefault(row, "Passing Score", "")).trim();
+                    if (!rawPassingScore.isEmpty()) {
+                        try {
+                            double ps = Double.parseDouble(rawPassingScore.replace("%", "").trim());
+                            if (ps <= 0 || ps > 100) {
+                                addError(errors, "SYLLABUS", sr.rowNumber(), "Passing Score (%)", "INVALID_VALUE", rawPassingScore,
+                                        "Passing score must be between 1 and 100 (%). Found: '" + rawPassingScore + "'.");
+                            }
+                        } catch (NumberFormatException e) {
+                            addError(errors, "SYLLABUS", sr.rowNumber(), "Passing Score (%)", "INVALID_FORMAT", rawPassingScore,
+                                    "Passing score must be a valid number (e.g. 80). Found: '" + rawPassingScore + "'.");
+                        }
+                    }
                 }
                 // Video lessons are intentionally allowed to have empty URLs during import.
                 // Trainers will upload/import the actual video files later through the platform UI.
@@ -546,6 +559,21 @@ public class CourseImportService {
 
                 Integer estimatedTimeMinutes = parseInteger(valueOrDefault(row, "Duration (Mins)", ""), null);
 
+                Double passingScore = null;
+                if ("quiz".equalsIgnoreCase(lessonType) || Lesson.DISPLAY_TYPE_FINAL_QUIZ.equalsIgnoreCase(lessonType)) {
+                    String rawPassingScore = valueOrDefault(row, "Passing Score (%)", valueOrDefault(row, "Passing Score", "")).trim();
+                    if (!rawPassingScore.isEmpty()) {
+                        try {
+                            double ps = Double.parseDouble(rawPassingScore.replace("%", "").trim());
+                            if (ps > 0 && ps <= 1.0) {
+                                ps = ps * 100.0;
+                            }
+                            passingScore = ps;
+                        } catch (Exception ignored) {
+                        }
+                    }
+                }
+
                 Lesson lesson = Lesson.builder()
                         .section(currentSection)
                         .code(currentSection.getCode() + "_L" + (importedLessons + 1))
@@ -562,6 +590,7 @@ public class CourseImportService {
                         .mediaDurationSeconds(estimatedTimeMinutes != null ? estimatedTimeMinutes * 60 : null)
                         .mediaSizeBytes(null)
                         .estimatedTimeMinutes(estimatedTimeMinutes)
+                        .passingScore(passingScore)
                         .version("")
                         .build();
                 Lesson savedLesson = lessonRepository.save(lesson);
