@@ -83,6 +83,9 @@ public class Lesson {
     @JoinColumn(name = "exam_id")
     private Exam exam;
 
+    @Column(name = "passing_score")
+    private Double passingScore;
+
     @com.fasterxml.jackson.annotation.JsonIgnore
     @Lob
     @Column(name = "content_embedding", columnDefinition = "TEXT")

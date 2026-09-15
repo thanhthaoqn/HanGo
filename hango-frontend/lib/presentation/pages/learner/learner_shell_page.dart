@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../widgets/shared_header.dart';
+import '../../widgets/shared_drawer.dart';
 import 'learner_home_page.dart';
 import '../course/list_courses_page.dart';
 import '../exam/list_exams_page.dart';
@@ -209,6 +210,7 @@ class LearnerShellPageState extends State<LearnerShellPage> {
         isDesktop: isDesktop,
         activeTab: _getActiveTabName(),
       ),
+      drawer: isDesktop ? null : SharedDrawer(activeTab: _getActiveTabName()),
       body: widget.navigationShell ??
           IndexedStack(
             index: _currentIndex,

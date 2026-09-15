@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../routes/app_routes.dart';
+import '../../routes/app_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/services/auth_service.dart';
+import 'shared_drawer.dart';
 import '../pages/course/course_detail_page.dart';
 import '../pages/learner/learner_shell_page.dart';
 import '../pages/course_manager/course_manager_my_information_page.dart';
@@ -785,11 +787,15 @@ class _SharedHeaderState extends State<SharedHeader> {
       }
       return;
     }
-    // When outside any shell (e.g. on CourseDetailPage, LessonDetailPage, TakeExamPage),
+    // When outside any shell (e.g. on CourseDetailPage, LessonDetailPage, TakeExamPage, ExamResultPage),
     // navigate via GoRouter so the active route and browser address bar update cleanly.
     final targetRoute = _getLearnerRoute(tabIndex, subTab: subTab);
+    final nav = Navigator.of(context, rootNavigator: true);
+    while (nav.canPop()) {
+      nav.pop();
+    }
     try {
-      context.go(targetRoute);
+      (AppRouter.rootNavigatorKey.currentContext ?? context).go(targetRoute);
     } catch (_) {
       Navigator.pushAndRemoveUntil(
         context,
@@ -801,36 +807,68 @@ class _SharedHeaderState extends State<SharedHeader> {
     }
   }
 
+  void _openDrawer(BuildContext context) {
+    final scaffold = Scaffold.maybeOf(context);
+    if (scaffold != null && scaffold.hasDrawer) {
+      scaffold.openDrawer();
+      return;
+    }
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Navigation Menu',
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 250),
+      pageBuilder: (ctx, anim1, anim2) => Align(
+        alignment: Alignment.centerLeft,
+        child: FractionallySizedBox(
+          widthFactor: MediaQuery.of(ctx).size.width < 500 ? 0.85 : 0.4,
+          child: SharedDrawer(activeTab: widget.activeTab),
+        ),
+      ),
+      transitionBuilder: (ctx, anim1, anim2, child) => SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(-1, 0),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic)),
+        child: child,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    Widget? leadingButton;
+    if (widget.showBackButton) {
+      leadingButton = IconButton(
+        icon: const Icon(Icons.arrow_back, color: Color(0xFF1F2937)),
+        tooltip: 'Back',
+        onPressed: () {
+          if (context.canPop()) {
+            context.pop();
+          } else if (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          } else {
+            context.go(AppRoutes.courses);
+          }
+        },
+      );
+    } else if (!widget.isDesktop && !widget.hideNavLinks) {
+      leadingButton = Builder(
+        builder: (btnContext) => IconButton(
+          icon: const Icon(Icons.menu, color: Color(0xFF1F2937)),
+          tooltip: 'Menu',
+          onPressed: () => _openDrawer(btnContext),
+        ),
+      );
+    }
+
     final logoWidget = InkWell(
       onTap: () => _navigateToLearnerTab(0),
+      borderRadius: BorderRadius.circular(8),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (widget.showBackButton) ...[
-            IconButton(
-              icon: const Icon(Icons.arrow_back, color: Color(0xFF1F2937)),
-              onPressed: () {
-                if (context.canPop()) {
-                  context.pop();
-                } else if (Navigator.canPop(context)) {
-                  Navigator.pop(context);
-                } else {
-                  context.go(AppRoutes.courses);
-                }
-              },
-            ),
-            const SizedBox(width: 8),
-          ] else if (!widget.isDesktop && !widget.hideNavLinks) ...[
-            Builder(
-              builder: (context) => IconButton(
-                icon: const Icon(Icons.menu, color: Color(0xFF1F2937)),
-                onPressed: () => Scaffold.of(context).openDrawer(),
-              ),
-            ),
-            const SizedBox(width: 8),
-          ],
           Image.network(
             'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
             height: 36,
@@ -867,6 +905,17 @@ class _SharedHeaderState extends State<SharedHeader> {
           ),
         ],
       ),
+    );
+
+    final leftGroupWidget = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (leadingButton != null) ...[
+          leadingButton,
+          const SizedBox(width: 4),
+        ],
+        logoWidget,
+      ],
     );
 
     final navLinksWidget = Row(
@@ -1478,7 +1527,7 @@ class _SharedHeaderState extends State<SharedHeader> {
                   Expanded(
                     child: Align(
                       alignment: Alignment.centerLeft,
-                      child: logoWidget,
+                      child: leftGroupWidget,
                     ),
                   ),
                   if (!widget.hideNavLinks)
@@ -1492,7 +1541,7 @@ class _SharedHeaderState extends State<SharedHeader> {
                     ),
                   ),
                 ]
-              : [logoWidget, rightActionsWidget],
+              : [leftGroupWidget, rightActionsWidget],
         ),
       ),
     );

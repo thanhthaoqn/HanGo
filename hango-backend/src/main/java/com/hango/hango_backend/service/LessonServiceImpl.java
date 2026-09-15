@@ -154,6 +154,11 @@ public class LessonServiceImpl implements LessonService {
         int estTime = lesson.getEstimatedTime() != null ? lesson.getEstimatedTime()
                 : (isQuizType ? (10 + qCount * 2) : 15);
 
+        Double passingScore = lesson.getPassingScore();
+        if (passingScore == null && lesson.getExam() != null) {
+            passingScore = lesson.getExam().getPassingScore();
+        }
+
         return LessonDetailDTO.builder()
                 .id(lesson.getId())
                 .title(lesson.getTitle())
@@ -175,6 +180,7 @@ public class LessonServiceImpl implements LessonService {
                 .mediaType(lesson.getPdfName() != null && !lesson.getPdfName().isEmpty() ? "pdf" : null)
                 .itemType(Lesson.displayItemType(lesson.getLessonType()))
                 .videoTranscript(lesson.getVideoTranscript())
+                .passingScore(passingScore)
                 .build();
     }
 
@@ -245,14 +251,29 @@ public class LessonServiceImpl implements LessonService {
             try { syncPathwayMasteryFromFinalQuiz(lesson, student, finalScore); } catch (Exception e) { org.slf4j.LoggerFactory.getLogger(LessonServiceImpl.class).warn("syncPathwayMastery failed: {}", e.getMessage()); }
         }
 
-        // Auto mark the lesson as completed upon quiz attempt submission
-        // Du diem cao hay thap van danh dau bai hoc la "da hoan thanh" (khong bat
-        // buoc phai dat/pass) - viec dieu huong lai lo trinh hoc (pathway reroute)
-        // khi diem thap la logic RIENG o Frontend, khong lien quan completeLesson nay.
-        try {
-            completeLesson(lessonId, userId, true);
-        } catch (Exception e) {
-            e.printStackTrace(); // Log warning but let transaction commit quiz attempt
+        Double passingScoreThreshold = lesson.getPassingScore();
+        if (passingScoreThreshold == null && lesson.getExam() != null) {
+            passingScoreThreshold = lesson.getExam().getPassingScore();
+        }
+
+        boolean hasPassingScore = passingScoreThreshold != null && passingScoreThreshold > 0;
+        double requiredScore10 = 0.0;
+        if (hasPassingScore && passingScoreThreshold != null) {
+            double thresholdVal = passingScoreThreshold.doubleValue();
+            // Neu passingScoreThreshold > 10 (vi du 80%), quy ra thang 10 la 8.0
+            requiredScore10 = thresholdVal > 10.0 ? (thresholdVal / 10.0) : thresholdVal;
+        }
+
+        boolean isPassed = !hasPassingScore || (finalScore >= (requiredScore10 - 0.001));
+
+        // Chi danh dau bai hoc hoan thanh neu dat diem (isPassed == true).
+        // Neu chua dat passing score thi khong goi completeLesson(true).
+        if (isPassed) {
+            try {
+                completeLesson(lessonId, userId, true);
+            } catch (Exception e) {
+                e.printStackTrace(); // Log warning but let transaction commit quiz attempt
+            }
         }
 
         return LessonQuizAttemptDTO.builder()
@@ -261,6 +282,8 @@ public class LessonServiceImpl implements LessonService {
                 .grade(String.format(java.util.Locale.US, "%.1f / 10.0", saved.getScore()))
                 .submittedTime(saved.getSubmittedAt().toString().replace("T", " ").substring(0, 16))
                 .answers(request.getAnswers())
+                .isPassed(isPassed)
+                .passingScore(hasPassingScore ? (requiredScore10 * 10.0) : null)
                 .build();
     }
 

@@ -7,12 +7,13 @@ import '../../../data/repositories/exam_repository.dart';
 import '../../../utils/fullscreen_helper.dart';
 import 'package:go_router/go_router.dart';
 import '../../../routes/app_routes.dart';
+import '../../../routes/app_router.dart';
 import 'exam_result_page.dart';
 
 class TakeExamPage extends StatefulWidget {
   final Exam exam;
 
-  const TakeExamPage({Key? key, required this.exam}) : super(key: key);
+  const TakeExamPage({super.key, required this.exam});
 
   @override
   State<TakeExamPage> createState() => _TakeExamPageState();
@@ -25,6 +26,7 @@ class _TakeExamPageState extends State<TakeExamPage>
   Timer? _timer;
   int _currentQuestionIndex = 0;
   bool _isSubmitted = false;
+  bool _isSubmitting = false;
 
   // Answers cache: questionIndex -> selectedOptionIndex (0 to 3)
   Map<int, int> _userAnswers = {};
@@ -234,67 +236,97 @@ class _TakeExamPageState extends State<TakeExamPage>
     _saveAnswersToCache();
   }
 
-  Future<void> _autoSubmit() async {
-    if (_isSubmitted) return;
-    _clearCache();
+  Future<void> _submitExam() async {
+    if (_isSubmitting) return;
     setState(() {
+      _isSubmitting = true;
       _isSubmitted = true;
     });
+    _timer?.cancel();
+    _clearCache();
 
-    final attemptMap = await _saveAttemptToHistory();
-    double score = 0.0;
-    if (attemptMap != null && attemptMap['score'] != null) {
-      score = (attemptMap['score'] as num).toDouble();
-    }
-
-    int correctCount = (score * _examQuestions.length / 10).round();
-
-    final resultExtra = {
-      'exam': widget.exam,
-      'score': score,
-      'correctCount': correctCount,
-      'examQuestions': _examQuestions,
-      'userAnswers': _userAnswers,
-      'attempt': attemptMap ??
-          {
-            "attemptNumber": 1,
-            "date": DateTime.now()
-                .toString()
-                .substring(0, 16)
-                .replaceFirst('T', ' '),
-            "score": score,
-            "status": score >= 5.0 ? "PASSED" : "FAILED",
-            "answers": _userAnswers.map(
-              (key, value) => MapEntry((key + 1).toString(), value),
-            ),
-            "correctness": {},
-          },
-    };
-
-    if (!mounted) return;
     try {
-      context.pushReplacement(AppRoutes.examResult, extra: resultExtra);
-    } catch (_) {
+      final attemptMap = await _saveAttemptToHistory();
+      double score = 0.0;
+      if (attemptMap != null && attemptMap['score'] != null) {
+        score = (attemptMap['score'] as num).toDouble();
+      }
+
+      int correctCount = (score * _examQuestions.length / 10).round();
+
+      final resultExtra = {
+        'exam': widget.exam,
+        'score': score,
+        'correctCount': correctCount,
+        'examQuestions': _examQuestions,
+        'userAnswers': _userAnswers,
+        'attempt': attemptMap ??
+            {
+              "attemptNumber": 1,
+              "date": DateTime.now()
+                  .toString()
+                  .substring(0, 16)
+                  .replaceFirst('T', ' '),
+              "score": score,
+              "status": score >= 5.0 ? "PASSED" : "FAILED",
+              "answers": _userAnswers.map(
+                (key, value) => MapEntry((key + 1).toString(), value),
+              ),
+              "correctness": {},
+            },
+      };
+
       if (!mounted) return;
-      Navigator.of(context, rootNavigator: true).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => ExamResultPage(
-            exam: widget.exam,
-            score: score,
-            correctCount: correctCount,
-            examQuestions: _examQuestions,
-            userAnswers: _userAnswers,
-            attempt: resultExtra['attempt'] as Map<String, dynamic>,
+      try {
+        final rootNav = Navigator.of(context, rootNavigator: true);
+        if (rootNav.canPop()) {
+          rootNav.pop();
+        }
+        (AppRouter.rootNavigatorKey.currentContext ?? context).go(
+          AppRoutes.examResult,
+          extra: resultExtra,
+        );
+      } catch (e) {
+        debugPrint("GoRouter navigation to examResult failed, fallback: $e");
+        Navigator.of(context, rootNavigator: true).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => ExamResultPage(
+              exam: widget.exam,
+              score: score,
+              correctCount: correctCount,
+              examQuestions: _examQuestions,
+              userAnswers: _userAnswers,
+              attempt: resultExtra['attempt'] as Map<String, dynamic>,
+            ),
           ),
-        ),
-      );
+        );
+      }
+    } catch (e) {
+      debugPrint("Error during exam submit: $e");
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to submit exam: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
+  Future<void> _autoSubmit() async {
+    if (_isSubmitted || _isSubmitting) return;
+    await _submitExam();
+  }
+
   void _confirmSubmit() {
+    if (_isSubmitting) return;
     showDialog(
       context: context,
-      builder: (context) => Dialog(
+      builder: (dialogCtx) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         backgroundColor: Colors.white,
         elevation: 10,
@@ -340,7 +372,7 @@ class _TakeExamPageState extends State<TakeExamPage>
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () => Navigator.pop(dialogCtx),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         side: const BorderSide(color: Color(0xFFCBD5E1)),
@@ -361,65 +393,9 @@ class _TakeExamPageState extends State<TakeExamPage>
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () async {
-                        Navigator.pop(context); // Close confirm dialog
-                        _clearCache();
-                        setState(() {
-                          _isSubmitted = true;
-                        });
-                        _timer?.cancel();
-
-                        final attemptMap = await _saveAttemptToHistory();
-                        double score = 0.0;
-                        if (attemptMap != null && attemptMap['score'] != null) {
-                          score = (attemptMap['score'] as num).toDouble();
-                        }
-                        int correctCount = (score * _examQuestions.length / 10)
-                            .round();
-
-                        final resultExtra = {
-                          'exam': widget.exam,
-                          'score': score,
-                          'correctCount': correctCount,
-                          'userAnswers': _userAnswers,
-                          'examQuestions': _examQuestions,
-                          'attempt': attemptMap ??
-                              {
-                                "attemptNumber": 1,
-                                "date": DateTime.now()
-                                    .toString()
-                                    .substring(0, 16)
-                                    .replaceFirst('T', ' '),
-                                "score": score,
-                                "status": score >= 5.0
-                                    ? "PASSED"
-                                    : "FAILED",
-                                "answers": _userAnswers.map(
-                                  (key, value) =>
-                                      MapEntry((key + 1).toString(), value),
-                                ),
-                                "correctness": {},
-                              },
-                        };
-
-                        if (!mounted) return;
-                        try {
-                          context.pushReplacement(AppRoutes.examResult, extra: resultExtra);
-                        } catch (_) {
-                          if (!mounted) return;
-                          Navigator.of(context, rootNavigator: true).pushReplacement(
-                            MaterialPageRoute(
-                              builder: (context) => ExamResultPage(
-                                exam: widget.exam,
-                                score: score,
-                                correctCount: correctCount,
-                                userAnswers: _userAnswers,
-                                examQuestions: _examQuestions,
-                                attempt: resultExtra['attempt'] as Map<String, dynamic>,
-                              ),
-                            ),
-                          );
-                        }
+                      onPressed: () {
+                        Navigator.pop(dialogCtx);
+                        _submitExam();
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF28B79B),
@@ -433,7 +409,7 @@ class _TakeExamPageState extends State<TakeExamPage>
                       child: const Text(
                         'Submit',
                         style: TextStyle(
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.bold,
                           fontSize: 14,
                         ),
                       ),
@@ -643,7 +619,7 @@ class _TakeExamPageState extends State<TakeExamPage>
                   color: const Color(0xFFE6F7F4),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: const Color(0xFF28B79B).withOpacity(0.3),
+                    color: const Color(0xFF28B79B).withValues(alpha: 0.3),
                   ),
                 ),
                 child: Row(
@@ -725,7 +701,7 @@ class _TakeExamPageState extends State<TakeExamPage>
     );
   }
 
-  Widget _buildExamActiveQuestionPane() {
+  Widget _buildExamActiveQuestionPane(bool isDesktop) {
     final currentQuestion = _examQuestions[_currentQuestionIndex];
 
     // Find passage if exists
@@ -738,6 +714,181 @@ class _TakeExamPageState extends State<TakeExamPage>
       }
     }
 
+    final contentBody = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Skill header
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 4,
+              ),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                currentQuestion['skill'].toString().toUpperCase(),
+                style: const TextStyle(
+                  color: Color(0xFF3B82F6),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                ),
+              ),
+            ),
+            Text(
+              'Question ${_currentQuestionIndex + 1} of ${_examQuestions.length}',
+              style: TextStyle(
+                color: Colors.grey.shade500,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+
+        // Passage text if available
+        if (passageText != null && passageText.isNotEmpty) ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Text(
+              passageText,
+              style: const TextStyle(
+                fontSize: 16,
+                color: Color(0xFF334155),
+                height: 1.6,
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+
+        // Question text
+        Text(
+          currentQuestion['content'],
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1F2937),
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 32),
+
+        // Option cards
+        ...List.generate(4, (index) {
+          final isSelected =
+              _userAnswers[_currentQuestionIndex] == index;
+          final optionLabel = String.fromCharCode(
+            65 + index,
+          ); // A, B, C, D
+          final optionText = currentQuestion['options'][index];
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16.0),
+            child: InkWell(
+              onTap: () =>
+                  _selectAnswer(_currentQuestionIndex, index),
+              borderRadius: BorderRadius.circular(12),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? const Color(0xFFE8F8F5)
+                      : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isSelected
+                        ? const Color(0xFF28B79B)
+                        : Colors.grey.shade200,
+                    width: isSelected ? 2 : 1,
+                  ),
+                  boxShadow: [
+                    if (isSelected)
+                      BoxShadow(
+                        color: const Color(
+                          0xFF28B79B,
+                        ).withValues(alpha: 0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      )
+                    else
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.02),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    // Circle label (A, B, C, D)
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isSelected
+                            ? const Color(0xFF28B79B)
+                            : Colors.grey.shade100,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        optionLabel,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: isSelected
+                              ? Colors.white
+                              : Colors.grey.shade700,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Option Text
+                    Expanded(
+                      child: Text(
+                        optionText,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                          color: isSelected
+                              ? const Color(0xFF1E293B)
+                              : Colors.grey.shade800,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                    // Radio checklist indicator
+                    if (isSelected)
+                      const Icon(
+                        Icons.check_circle,
+                        color: Color(0xFF28B79B),
+                        size: 22,
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -748,183 +899,15 @@ class _TakeExamPageState extends State<TakeExamPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: SingleChildScrollView(
-              controller: _contentScrollController,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Skill header
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEFF6FF),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          currentQuestion['skill'].toString().toUpperCase(),
-                          style: const TextStyle(
-                            color: Color(0xFF3B82F6),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        'Question ${_currentQuestionIndex + 1} of ${_examQuestions.length}',
-                        style: TextStyle(
-                          color: Colors.grey.shade500,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Passage text if available
-                  if (passageText != null && passageText.isNotEmpty) ...[
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: Text(
-                        passageText,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: Color(0xFF334155),
-                          height: 1.6,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-
-                  // Question text
-                  Text(
-                    currentQuestion['content'],
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1F2937),
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-
-                  // Option cards
-                  ...List.generate(4, (index) {
-                    final isSelected =
-                        _userAnswers[_currentQuestionIndex] == index;
-                    final optionLabel = String.fromCharCode(
-                      65 + index,
-                    ); // A, B, C, D
-                    final optionText = currentQuestion['options'][index];
-
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16.0),
-                      child: InkWell(
-                        onTap: () =>
-                            _selectAnswer(_currentQuestionIndex, index),
-                        borderRadius: BorderRadius.circular(12),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 150),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 16,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? const Color(0xFFE8F8F5)
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isSelected
-                                  ? const Color(0xFF28B79B)
-                                  : Colors.grey.shade200,
-                              width: isSelected ? 2 : 1,
-                            ),
-                            boxShadow: [
-                              if (isSelected)
-                                BoxShadow(
-                                  color: const Color(
-                                    0xFF28B79B,
-                                  ).withOpacity(0.1),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                )
-                              else
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.02),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
-                                ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              // Circle label (A, B, C, D)
-                              Container(
-                                width: 32,
-                                height: 32,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: isSelected
-                                      ? const Color(0xFF28B79B)
-                                      : Colors.grey.shade100,
-                                ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  optionLabel,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: isSelected
-                                        ? Colors.white
-                                        : Colors.grey.shade700,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              // Option text
-                              Expanded(
-                                child: Text(
-                                  optionText,
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: isSelected
-                                        ? FontWeight.bold
-                                        : FontWeight.normal,
-                                    color: isSelected
-                                        ? const Color(0xFF167B66)
-                                        : const Color(0xFF374151),
-                                  ),
-                                ),
-                              ),
-                              // Radio checklist indicator
-                              if (isSelected)
-                                const Icon(
-                                  Icons.check_circle,
-                                  color: Color(0xFF28B79B),
-                                  size: 22,
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
-                ],
+          if (isDesktop)
+            Expanded(
+              child: SingleChildScrollView(
+                controller: _contentScrollController,
+                child: contentBody,
               ),
-            ),
-          ),
+            )
+          else
+            contentBody,
           const SizedBox(height: 16),
           // Bottom Navigation Buttons
           Row(
@@ -974,7 +957,56 @@ class _TakeExamPageState extends State<TakeExamPage>
     );
   }
 
-  Widget _buildExamRightSidebarPane() {
+  Widget _buildExamRightSidebarPane(bool isDesktop) {
+    final gridContent = Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: List.generate(_examQuestions.length, (index) {
+        final isAnswered = _userAnswers.containsKey(index);
+        final isActive = _currentQuestionIndex == index;
+
+        Color bgColor = Colors.white;
+        Color borderColor = Colors.grey.shade200;
+        Color textColor = Colors.grey.shade700;
+
+        if (isActive) {
+          bgColor = Colors.white;
+          borderColor = const Color(0xFF28B79B);
+          textColor = const Color(0xFF28B79B);
+        } else if (isAnswered) {
+          bgColor = const Color(0xFFE8F8F5);
+          borderColor = const Color(0xFF28B79B).withValues(alpha: 0.5);
+          textColor = const Color(0xFF167B66);
+        }
+
+        return InkWell(
+          onTap: () => setState(() => _currentQuestionIndex = index),
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: borderColor,
+                width: isActive ? 2 : 1,
+              ),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '${index + 1}',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: textColor,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -997,80 +1029,45 @@ class _TakeExamPageState extends State<TakeExamPage>
           const SizedBox(height: 24),
 
           // Question Grid
-          Expanded(
-            child: SingleChildScrollView(
-              controller: _gridScrollController,
-              child: Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: List.generate(_examQuestions.length, (index) {
-                  final isAnswered = _userAnswers.containsKey(index);
-                  final isActive = _currentQuestionIndex == index;
-
-                  Color bgColor = Colors.white;
-                  Color borderColor = Colors.grey.shade200;
-                  Color textColor = Colors.grey.shade700;
-
-                  if (isActive) {
-                    bgColor = Colors.white;
-                    borderColor = const Color(0xFF28B79B);
-                    textColor = const Color(0xFF28B79B);
-                  } else if (isAnswered) {
-                    bgColor = const Color(0xFFE8F8F5);
-                    borderColor = const Color(0xFF28B79B).withOpacity(0.5);
-                    textColor = const Color(0xFF167B66);
-                  }
-
-                  return InkWell(
-                    onTap: () => setState(() => _currentQuestionIndex = index),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: bgColor,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: borderColor,
-                          width: isActive ? 2 : 1,
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '${index + 1}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: textColor,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  );
-                }),
+          if (isDesktop)
+            Expanded(
+              child: SingleChildScrollView(
+                controller: _gridScrollController,
+                child: gridContent,
               ),
-            ),
-          ),
+            )
+          else
+            gridContent,
           const SizedBox(height: 24),
 
           // Submit button
           SizedBox(
             height: 50,
             child: ElevatedButton(
-              onPressed: _confirmSubmit,
+              onPressed: _isSubmitting ? null : _confirmSubmit,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF28B79B),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: const Text(
-                'Submit Exam',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              child: _isSubmitting
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
+                    )
+                  : const Text(
+                      'Submit Exam',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
             ),
           ),
         ],
@@ -1086,11 +1083,14 @@ class _TakeExamPageState extends State<TakeExamPage>
       backgroundColor: const Color(0xFFF9FAFB),
       appBar: null,
       body: SafeArea(
-        child: _isLoading
-            ? const Center(
+        child: Stack(
+          children: [
+            if (_isLoading)
+              const Center(
                 child: CircularProgressIndicator(color: Color(0xFF28B79B)),
               )
-            : Column(
+            else
+              Column(
                 children: [
                   _buildExitExamHeader(),
                   Expanded(
@@ -1108,21 +1108,22 @@ class _TakeExamPageState extends State<TakeExamPage>
                                     children: [
                                       Expanded(
                                         flex: 7,
-                                        child: _buildExamActiveQuestionPane(),
+                                        child:
+                                            _buildExamActiveQuestionPane(true),
                                       ),
                                       const SizedBox(width: 24),
                                       SizedBox(
                                         width: 320,
-                                        child: _buildExamRightSidebarPane(),
+                                        child: _buildExamRightSidebarPane(true),
                                       ),
                                     ],
                                   )
                                 : SingleChildScrollView(
                                     child: Column(
                                       children: [
-                                        _buildExamActiveQuestionPane(),
+                                        _buildExamActiveQuestionPane(false),
                                         const SizedBox(height: 24),
-                                        _buildExamRightSidebarPane(),
+                                        _buildExamRightSidebarPane(false),
                                       ],
                                     ),
                                   ),
@@ -1133,6 +1134,60 @@ class _TakeExamPageState extends State<TakeExamPage>
                   ),
                 ],
               ),
+            if (_isSubmitting)
+              Container(
+                color: Colors.black.withValues(alpha: 0.4),
+                child: Center(
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 360),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 28,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        CircularProgressIndicator(
+                          color: Color(0xFF28B79B),
+                        ),
+                        SizedBox(height: 20),
+                        Text(
+                          'Submitting Exam...',
+                          style: TextStyle(
+                            fontFamily: 'Outfit',
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'Grading your test, please wait a moment.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: 'Outfit',
+                            fontSize: 13,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

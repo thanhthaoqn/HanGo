@@ -2097,6 +2097,25 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                       color: Color(0xFF28B79B),
                     ),
                   ),
+                  if (_lessonDetail?.passingScore != null && _lessonDetail!.passingScore! > 0) ...[
+                    const SizedBox(width: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                      ),
+                      child: Text(
+                        'Passing: ${_lessonDetail!.passingScore!.toStringAsFixed(0)}%',
+                        style: const TextStyle(
+                          color: Color(0xFF475569),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                   if (_lessonDetail?.isCompleted == true) ...[
                     const SizedBox(width: 12),
                     Container(
@@ -2808,15 +2827,25 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         debugPrint('Error refreshing lesson detail after quiz submit: $e');
       }
 
-      // Neu diem duoi 60% (6/10): goi rieng sang tinh nang Learning Pathway
-      // (AI dieu huong lo trinh hoc) de tao lai lo trinh phu hop hon cho hoc
-      // vien - day la tinh nang KHAC voi completeLesson, khong anh huong toi
-      // viec bai hoc da duoc danh dau hoan thanh hay chua.
+      final double passingThresholdPercent = (_lessonDetail?.passingScore != null && _lessonDetail!.passingScore! > 0)
+          ? _lessonDetail!.passingScore!
+          : 60.0;
       final quizScorePercent = (displayScore * 10).round();
-      if (quizScorePercent < 60) {
-        final pathwayRepository = PathwayRepository();
-        final pathway = await pathwayRepository.getMyPathway();
-        await pathwayRepository.reroutePathway(pathwayId: pathway.pathwayId);
+      bool isPassed = false;
+      if (postResult is Map && postResult['isPassed'] is bool) {
+        isPassed = postResult['isPassed'] as bool;
+      } else {
+        isPassed = quizScorePercent >= passingThresholdPercent;
+      }
+
+      if (!isPassed) {
+        try {
+          final pathwayRepository = PathwayRepository();
+          final pathway = await pathwayRepository.getMyPathway();
+          await pathwayRepository.reroutePathway(pathwayId: pathway.pathwayId);
+        } catch (ignored) {
+          // Pathway reroute failure is non-fatal for quiz attempt submission
+        }
       } else {
         // Passed quiz! Update local completed state
         setState(() {
@@ -2855,14 +2884,25 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     }
 
     if (!mounted) return;
+    final double passingThresholdPercent = (_lessonDetail?.passingScore != null && _lessonDetail!.passingScore! > 0)
+        ? _lessonDetail!.passingScore!
+        : 60.0;
     final quizScorePercent = (displayScore * 10).round();
-    final isPassed = quizScorePercent >= 60;
-    ToastHelper.showSuccess(
-      context,
-      'Quiz submitted! Score: ${displayScore.toStringAsFixed(1)} / 10.0${isPassed ? " (Passed 🎉)" : ""}',
-    );
+    final bool isPassedFinal = _lessonDetail?.isCompleted == true || quizScorePercent >= passingThresholdPercent;
 
-    if (isPassed && _courseDetail != null) {
+    if (isPassedFinal) {
+      ToastHelper.showSuccess(
+        context,
+        'Quiz submitted! Score: ${displayScore.toStringAsFixed(1)} / 10.0 ($quizScorePercent%) - Passed 🎉',
+      );
+    } else {
+      ToastHelper.showError(
+        context,
+        'Quiz submitted! Score: ${displayScore.toStringAsFixed(1)} / 10.0 ($quizScorePercent%). Required: ${passingThresholdPercent.toStringAsFixed(0)}% to pass.',
+      );
+    }
+
+    if (isPassedFinal && _courseDetail != null) {
       final totalLessons = _courseDetail!.sessions.fold(0, (sum, s) => sum + s.lessons.length);
       final completedLessons = _courseDetail!.sessions.fold(0, (sum, s) => sum + s.lessons.where((l) => l.isCompleted).length);
       final isCourseFullyCompleted = totalLessons > 0 && completedLessons == totalLessons;

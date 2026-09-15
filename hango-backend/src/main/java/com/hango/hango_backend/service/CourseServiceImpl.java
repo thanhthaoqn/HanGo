@@ -299,6 +299,10 @@ public class CourseServiceImpl implements CourseService {
                 }
                 int estTime = lesson.getEstimatedTime() != null ? lesson.getEstimatedTime()
                         : ("quiz".equalsIgnoreCase(lesson.getLessonType()) ? (10 + qCount * 2) : 15);
+                Double passingScore = lesson.getPassingScore();
+                if (passingScore == null && lesson.getExam() != null) {
+                    passingScore = lesson.getExam().getPassingScore();
+                }
                 return CourseLessonDTO.builder()
                         .id(lesson.getId())
                         .title(lesson.getTitle())
@@ -307,6 +311,7 @@ public class CourseServiceImpl implements CourseService {
                         .examId(examId)
                         .questionCount(qCount)
                         .isCompleted(completedLessonIds.contains(lesson.getId()))
+                        .passingScore(passingScore)
                         .description(lesson.getDescription())
                         .questionText(lesson.getContent())
                         .pdfName(lesson.getPdfName())
