@@ -146,7 +146,7 @@ class ExamRepository {
             (key, value) => MapEntry(key.toString(), value),
           ),
         }),
-      );
+      ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(
