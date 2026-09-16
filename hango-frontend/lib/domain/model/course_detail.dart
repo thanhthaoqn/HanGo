@@ -80,6 +80,8 @@ class CourseDetail {
   final int id;
   final String title;
   final String creatorName;
+  final int? creatorId;
+  final bool isCreator;
   final String difficultyName;
   final double rating;
   final int learnersCount;
@@ -99,6 +101,8 @@ class CourseDetail {
     required this.id,
     required this.title,
     required this.creatorName,
+    this.creatorId,
+    this.isCreator = false,
     required this.difficultyName,
     required this.rating,
     required this.learnersCount,
@@ -125,6 +129,8 @@ class CourseDetail {
       id: json['id'] as int,
       title: json['title'] as String,
       creatorName: json['creatorName'] as String? ?? 'Unknown',
+      creatorId: json['creatorId'] as int?,
+      isCreator: json['isCreator'] as bool? ?? false,
       difficultyName: json['difficultyName'] as String? ?? 'Unknown',
       rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
       learnersCount: json['learnersCount'] as int? ?? 0,
@@ -146,6 +152,8 @@ class CourseDetail {
     int? id,
     String? title,
     String? creatorName,
+    int? creatorId,
+    bool? isCreator,
     String? difficultyName,
     double? rating,
     int? learnersCount,
@@ -165,6 +173,8 @@ class CourseDetail {
       id: id ?? this.id,
       title: title ?? this.title,
       creatorName: creatorName ?? this.creatorName,
+      creatorId: creatorId ?? this.creatorId,
+      isCreator: isCreator ?? this.isCreator,
       difficultyName: difficultyName ?? this.difficultyName,
       rating: rating ?? this.rating,
       learnersCount: learnersCount ?? this.learnersCount,

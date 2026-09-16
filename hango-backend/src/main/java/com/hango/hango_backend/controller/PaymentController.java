@@ -31,7 +31,7 @@ public class PaymentController {
      * POST /api/v1/payment/create
      */
     @PostMapping("/create")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
     public ResponseEntity<?> createPayment(
             @RequestBody PaymentRequestDTO request,
             @AuthenticationPrincipal UserDetailsImpl currentUser,
