@@ -11,6 +11,8 @@ import '../presentation/pages/course/lesson_detail_page.dart';
 import '../presentation/pages/course/cart_page.dart';
 import '../presentation/pages/exam/list_exams_page.dart';
 import '../presentation/pages/exam/entry_exam_instruction_page.dart';
+import '../presentation/pages/exam/exam_detail_history_page.dart';
+import '../presentation/pages/exam/take_exam_page.dart';
 import '../presentation/pages/exam/exam_result_page.dart';
 import '../domain/entities/exam.dart';
 import '../presentation/pages/learner/learning_pathway_page.dart';
@@ -201,6 +203,24 @@ class AppRouter {
           builder: (context, state) {
             final exam = state.extra as Exam?;
             return EntryExamInstructionPage(exam: exam);
+          },
+        ),
+        GoRoute(
+          path: AppRoutes.examDetail,
+          parentNavigatorKey: rootNavigatorKey,
+          builder: (context, state) {
+            final id = state.pathParameters['id'] ?? '';
+            final exam = state.extra as Exam?;
+            return ExamDetailHistoryPage(exam: exam, examId: id);
+          },
+        ),
+        GoRoute(
+          path: AppRoutes.takeExam,
+          parentNavigatorKey: rootNavigatorKey,
+          builder: (context, state) {
+            final id = state.pathParameters['id'] ?? '';
+            final exam = state.extra as Exam?;
+            return TakeExamPage(exam: exam, examId: id);
           },
         ),
         GoRoute(

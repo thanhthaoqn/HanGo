@@ -7,13 +7,13 @@ import '../../../data/repositories/exam_repository.dart';
 import '../../../utils/fullscreen_helper.dart';
 import 'package:go_router/go_router.dart';
 import '../../../routes/app_routes.dart';
-import '../../../routes/app_router.dart';
 import 'exam_result_page.dart';
 
 class TakeExamPage extends StatefulWidget {
-  final Exam exam;
+  final Exam? exam;
+  final String? examId;
 
-  const TakeExamPage({super.key, required this.exam});
+  const TakeExamPage({super.key, this.exam, this.examId});
 
   @override
   State<TakeExamPage> createState() => _TakeExamPageState();
@@ -21,8 +21,11 @@ class TakeExamPage extends StatefulWidget {
 
 class _TakeExamPageState extends State<TakeExamPage>
     with SingleTickerProviderStateMixin {
-  late int _durationInSeconds;
-  late int _timeLeft;
+  Exam? _exam;
+  bool _isLoadingExam = false;
+  String? _examError;
+  int _durationInSeconds = 3000;
+  int _timeLeft = 3000;
   Timer? _timer;
   int _currentQuestionIndex = 0;
   bool _isSubmitted = false;
@@ -47,13 +50,44 @@ class _TakeExamPageState extends State<TakeExamPage>
   @override
   void initState() {
     super.initState();
-    _loadQuestions();
+    if (widget.exam != null) {
+      _exam = widget.exam;
+      _loadQuestions();
+    } else if (widget.examId != null) {
+      _fetchExam();
+    }
+  }
+
+  Future<void> _fetchExam() async {
+    setState(() {
+      _isLoadingExam = true;
+      _examError = null;
+    });
+    try {
+      final fetched = await _examRepository.fetchExamById(widget.examId!);
+      if (mounted) {
+        setState(() {
+          _exam = fetched;
+          _isLoadingExam = false;
+        });
+        _loadQuestions();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingExam = false;
+          _examError = e.toString();
+        });
+      }
+    }
   }
 
   Future<void> _loadQuestions() async {
+    final examId = _exam?.id ?? widget.exam?.id ?? widget.examId;
+    if (examId == null || examId.isEmpty) return;
     try {
       final questions = await _examRepository.fetchExamQuestions(
-        widget.exam.id,
+        examId,
       );
 
       final Map<int, List<Map<String, dynamic>>> groupMap = {};
@@ -118,8 +152,9 @@ class _TakeExamPageState extends State<TakeExamPage>
 
   void _initializeTimer() {
     // Set duration
-    int durationMinutes = widget.exam.durationMinutes > 0
-        ? widget.exam.durationMinutes
+    final currentDuration = _exam?.durationMinutes ?? widget.exam?.durationMinutes ?? 0;
+    int durationMinutes = currentDuration > 0
+        ? currentDuration
         : 50;
     _durationInSeconds = durationMinutes * 60;
     _timeLeft = _durationInSeconds;
@@ -156,11 +191,13 @@ class _TakeExamPageState extends State<TakeExamPage>
     super.dispose();
   }
 
+  String get _currentExamId => _exam?.id ?? widget.exam?.id ?? widget.examId ?? '';
+
   // Load answers from local cache (SharedPreferences)
   Future<void> _loadCachedAnswers() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final cacheKey = 'take_exam_${widget.exam.id}';
+      final cacheKey = 'take_exam_$_currentExamId';
       final cachedJson = prefs.getString(cacheKey);
       if (cachedJson != null) {
         final Map<String, dynamic> decoded = jsonDecode(cachedJson);
@@ -179,7 +216,7 @@ class _TakeExamPageState extends State<TakeExamPage>
   Future<void> _saveAnswersToCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final cacheKey = 'take_exam_${widget.exam.id}';
+      final cacheKey = 'take_exam_$_currentExamId';
       final Map<String, String> stringified = _userAnswers.map(
         (key, value) => MapEntry(key.toString(), value.toString()),
       );
@@ -193,7 +230,7 @@ class _TakeExamPageState extends State<TakeExamPage>
   Future<void> _clearCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final cacheKey = 'take_exam_${widget.exam.id}';
+      final cacheKey = 'take_exam_$_currentExamId';
       await prefs.remove(cacheKey);
     } catch (e) {
       debugPrint("Error clearing cached answers: $e");
@@ -254,8 +291,9 @@ class _TakeExamPageState extends State<TakeExamPage>
 
       int correctCount = (score * _examQuestions.length / 10).round();
 
+      final currentExam = _exam ?? widget.exam;
       final resultExtra = {
-        'exam': widget.exam,
+        'exam': currentExam,
         'score': score,
         'correctCount': correctCount,
         'examQuestions': _examQuestions,
@@ -278,28 +316,26 @@ class _TakeExamPageState extends State<TakeExamPage>
 
       if (!mounted) return;
       try {
-        final rootNav = Navigator.of(context, rootNavigator: true);
-        if (rootNav.canPop()) {
-          rootNav.pop();
-        }
-        (AppRouter.rootNavigatorKey.currentContext ?? context).go(
+        context.go(
           AppRoutes.examResult,
           extra: resultExtra,
         );
       } catch (e) {
         debugPrint("GoRouter navigation to examResult failed, fallback: $e");
-        Navigator.of(context, rootNavigator: true).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => ExamResultPage(
-              exam: widget.exam,
-              score: score,
-              correctCount: correctCount,
-              examQuestions: _examQuestions,
-              userAnswers: _userAnswers,
-              attempt: resultExtra['attempt'] as Map<String, dynamic>,
+        if (currentExam != null) {
+          Navigator.of(context, rootNavigator: true).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => ExamResultPage(
+                exam: currentExam,
+                score: score,
+                correctCount: correctCount,
+                examQuestions: _examQuestions,
+                userAnswers: _userAnswers,
+                attempt: resultExtra['attempt'] as Map<String, dynamic>,
+              ),
             ),
-          ),
-        );
+          );
+        }
       }
     } catch (e) {
       debugPrint("Error during exam submit: $e");
@@ -431,8 +467,10 @@ class _TakeExamPageState extends State<TakeExamPage>
       _userAnswers.forEach((key, value) {
         answersForSubmit[(key + 1).toString()] = value;
       });
+      final examId = _currentExamId;
+      if (examId.isEmpty) return null;
       final attempt = await repository.submitExamAttempt(
-        widget.exam.id,
+        examId,
         0.0,
         answersForSubmit,
       );
@@ -515,7 +553,12 @@ class _TakeExamPageState extends State<TakeExamPage>
                     child: ElevatedButton(
                       onPressed: () {
                         Navigator.pop(context); // Close confirm
-                        Navigator.pop(context); // Close take exam screen
+                        final examId = _currentExamId;
+                        if (examId.isNotEmpty) {
+                          context.go(AppRoutes.examDetailRoute(examId), extra: _exam ?? widget.exam);
+                        } else {
+                          context.go(AppRoutes.exams);
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFEF4444),
@@ -1085,9 +1128,26 @@ class _TakeExamPageState extends State<TakeExamPage>
       body: SafeArea(
         child: Stack(
           children: [
-            if (_isLoading)
+            if (_isLoadingExam || _isLoading)
               const Center(
                 child: CircularProgressIndicator(color: Color(0xFF28B79B)),
+              )
+            else if (_examError != null)
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Failed to load exam: $_examError',
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _fetchExam,
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
               )
             else
               Column(

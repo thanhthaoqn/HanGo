@@ -50,6 +50,11 @@ public class ExamController {
         Page<ExamResponseDTO> exams = examService.getAllExams(status, pageable);
         return ResponseEntity.ok(exams);
     }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ExamResponseDTO> getExamById(@PathVariable Long id) {
+        return ResponseEntity.ok(examService.getExamById(id));
+    }
     
     @GetMapping("/{id}/questions")
     @PreAuthorize("hasAuthority('ATTEMPT_QUIZ_AND_EXAM') or hasAuthority('CREATE_EXAMS_TRAINER') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")

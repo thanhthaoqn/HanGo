@@ -105,6 +105,22 @@ public class ExamService {
         return mapToDTO(chosen, qCount, sCount);
     }
 
+    public ExamResponseDTO getExamById(Long id) {
+        Exam exam = examRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Exam not found with id: " + id));
+
+        int qCount = examQuestionRepository.countQuestionsByExamIds(List.of(exam.getId())).stream()
+                .findFirst()
+                .map(row -> ((Number) row[1]).intValue())
+                .orElse(0);
+        Long sCount = examAttemptRepository.countDistinctStudentsByExamIds(List.of(exam.getId())).stream()
+                .findFirst()
+                .map(row -> ((Number) row[1]).longValue())
+                .orElse(0L);
+
+        return mapToDTO(exam, qCount, sCount);
+    }
+
     /**
      * Whether the given learner has already completed ANY exam currently
      * flagged as an Entry Exam - checked against the live flagged set (not a

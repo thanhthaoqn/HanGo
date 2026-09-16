@@ -325,9 +325,6 @@ class _ExamResultPageState extends State<ExamResultPage> {
                             child: IconButton(
                               icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF1F2937)),
                               onPressed: () {
-                                if (Navigator.of(context, rootNavigator: true).canPop()) {
-                                  Navigator.of(context, rootNavigator: true).pop();
-                                }
                                 context.go(AppRoutes.myLearning);
                               },
                               tooltip: 'Go back',
@@ -598,9 +595,6 @@ class _ExamResultPageState extends State<ExamResultPage> {
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    if (Navigator.of(context, rootNavigator: true).canPop()) {
-                      Navigator.of(context, rootNavigator: true).pop();
-                    }
                     context.go(AppRoutes.exams);
                   },
                   icon: const Icon(Icons.arrow_back, size: 18),
@@ -888,21 +882,7 @@ class _ExamResultPageState extends State<ExamResultPage> {
                                   ElevatedButton(
                                     onPressed: () {
                                       if (courseId > 0) {
-                                        if (Navigator.of(context, rootNavigator: true).canPop()) {
-                                          Navigator.of(context, rootNavigator: true).pop();
-                                        }
-                                        try {
-                                          context.push('/courses/$courseId');
-                                        } catch (_) {
-                                          Navigator.of(context, rootNavigator: true).push(
-                                            MaterialPageRoute(
-                                              builder: (context) =>
-                                                  CourseDetailPage(
-                                                    courseId: courseId,
-                                                  ),
-                                            ),
-                                          );
-                                        }
+                                        context.go('/courses/$courseId');
                                       }
                                     },
                                     style: ElevatedButton.styleFrom(
@@ -1064,21 +1044,7 @@ class _ExamResultPageState extends State<ExamResultPage> {
                                 ElevatedButton(
                                   onPressed: () {
                                     if (courseId > 0) {
-                                      if (Navigator.of(context, rootNavigator: true).canPop()) {
-                                        Navigator.of(context, rootNavigator: true).pop();
-                                      }
-                                      try {
-                                        context.push('/courses/$courseId');
-                                      } catch (_) {
-                                        Navigator.of(context, rootNavigator: true).push(
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                CourseDetailPage(
-                                                  courseId: courseId,
-                                                ),
-                                          ),
-                                        );
-                                      }
+                                      context.go('/courses/$courseId');
                                     }
                                   },
                                   style: ElevatedButton.styleFrom(
