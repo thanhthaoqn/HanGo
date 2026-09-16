@@ -5,9 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../domain/entities/exam.dart';
 import '../../../data/repositories/exam_repository.dart';
 import '../../../utils/fullscreen_helper.dart';
-import 'package:go_router/go_router.dart';
-import '../../../routes/app_routes.dart';
-import '../../../routes/app_router.dart';
 import 'exam_result_page.dart';
 
 class TakeExamPage extends StatefulWidget {
@@ -253,6 +250,10 @@ class _TakeExamPageState extends State<TakeExamPage>
       }
 
       int correctCount = (score * _examQuestions.length / 10).round();
+      if (attemptMap != null && attemptMap['correctness'] is Map) {
+        final correctness = attemptMap['correctness'] as Map;
+        correctCount = correctness.values.where((v) => v == true).length;
+      }
 
       final resultExtra = {
         'exam': widget.exam,
@@ -277,36 +278,28 @@ class _TakeExamPageState extends State<TakeExamPage>
       };
 
       if (!mounted) return;
-      try {
-        final rootNav = Navigator.of(context, rootNavigator: true);
-        if (rootNav.canPop()) {
-          rootNav.pop();
-        }
-        (AppRouter.rootNavigatorKey.currentContext ?? context).go(
-          AppRoutes.examResult,
-          extra: resultExtra,
-        );
-      } catch (e) {
-        debugPrint("GoRouter navigation to examResult failed, fallback: $e");
-        Navigator.of(context, rootNavigator: true).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => ExamResultPage(
-              exam: widget.exam,
-              score: score,
-              correctCount: correctCount,
-              examQuestions: _examQuestions,
-              userAnswers: _userAnswers,
-              attempt: resultExtra['attempt'] as Map<String, dynamic>,
-            ),
+      Navigator.of(context, rootNavigator: true).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => ExamResultPage(
+            exam: widget.exam,
+            score: score,
+            correctCount: correctCount,
+            examQuestions: _examQuestions,
+            userAnswers: _userAnswers,
+            attempt: resultExtra['attempt'] as Map<String, dynamic>,
           ),
-        );
-      }
+        ),
+      );
     } catch (e) {
       debugPrint("Error during exam submit: $e");
       if (mounted) {
         setState(() {
           _isSubmitting = false;
+          _isSubmitted = false;
         });
+        if (_timeLeft > 0) {
+          _startTimer();
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to submit exam: $e'),

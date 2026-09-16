@@ -10,6 +10,7 @@ import '../../widgets/learning_pathway/daily_plan_card.dart';
 import '../../../domain/entities/learning_pathway.dart';
 import '../../../data/repositories/pathway_repository.dart';
 import '../../../utils/language_manager.dart';
+import '../../../utils/toast_helper.dart';
 import '../course/course_detail_page.dart';
 import 'mastery_quiz_page.dart';
 
@@ -93,13 +94,9 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
               orElse: () => updatedPathway.nodes.first,
             );
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(LanguageManager.isVi
-                  ? 'Đã cập nhật mục tiêu và lộ trình học!'
-                  : 'Pathway goals updated successfully!'),
-              backgroundColor: const Color(0xFF10B981),
-            ),
+          ToastHelper.showSuccess(
+            context,
+            'Pathway goals updated successfully!',
           );
         },
       ),
@@ -193,10 +190,9 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
   Future<void> _openCourseAndRefresh(PathwayNode node) async {
     if (node.courseId <= 0) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Course information is not available.'),
-          ),
+        ToastHelper.showError(
+          context,
+          'Course information is not available.',
         );
       }
       return;
@@ -410,13 +406,15 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
         // chon luon node hien tai moi de UI update phan ben trai
         _selectedNode = updated.nodes.firstWhere((n) => n.id == node.id, orElse: () => updated.nodes.first);
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Course skipped successfully.'), backgroundColor: Colors.green),
+      ToastHelper.showSuccess(
+        context,
+        'Course skipped successfully.',
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      ToastHelper.showError(
+        context,
+        'Error: $e',
       );
     }
   }
@@ -424,11 +422,9 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
   Future<void> _showRegenerateFreeWarningDialog() async {
     final pathway = _pathway;
     if (pathway == null || pathway.examAttemptId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Cannot regenerate: Missing Exam Attempt ID.'),
-          backgroundColor: Colors.redAccent,
-        ),
+      ToastHelper.showError(
+        context,
+        'Cannot regenerate: Missing Exam Attempt ID.',
       );
       return;
     }
@@ -470,22 +466,16 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
         _pathway = _preparePathwayForDisplay(newPathway);
         _selectedNode = _initialSelectedNode(newPathway.nodes);
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đã tạo lộ trình mới chỉ với các khóa học miễn phí!'),
-          backgroundColor: Color(0xFF28B79B),
-        ),
+      ToastHelper.showSuccess(
+        context,
+        'New pathway generated with free courses only!',
       );
     } catch (e) {
       if (!mounted) return;
       final cleanMsg = e.toString().replaceFirst('Exception: ', '');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(isVi
-              ? 'Không thể tạo lại lộ trình: $cleanMsg'
-              : 'Unable to regenerate pathway: $cleanMsg'),
-          backgroundColor: Colors.redAccent,
-        ),
+      ToastHelper.showError(
+        context,
+        'Unable to regenerate pathway: $cleanMsg',
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
