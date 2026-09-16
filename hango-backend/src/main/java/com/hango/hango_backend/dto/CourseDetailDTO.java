@@ -17,6 +17,8 @@ public class CourseDetailDTO {
     private String title;
     private String code;
     private String creatorName;
+    private Long creatorId;
+    private Boolean isCreator;
     private String difficultyName;
     private Double rating;
     private Integer totalRatings;

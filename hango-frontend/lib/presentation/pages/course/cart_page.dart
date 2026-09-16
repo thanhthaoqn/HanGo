@@ -12,9 +12,7 @@ import '../../widgets/shared_header.dart';
 import '../../widgets/shared_footer.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../data/repositories/payment_repository.dart';
-import 'list_courses_page.dart';
 import 'course_detail_page.dart';
-import '../login_page.dart';
 
 class CartPage extends StatefulWidget {
   final bool isEmbedded;
@@ -116,7 +114,9 @@ class _CartPageState extends State<CartPage> {
           _enrolledCourseIds = enrolled;
           _canEnroll =
               roles.contains('ENROLL_AND_LEARN_COURSES') ||
-              roles.contains('ROLE_ADMINISTRATOR');
+              roles.contains('ROLE_ADMINISTRATOR') ||
+              roles.contains('ROLE_TRAINER') ||
+              roles.contains('TRAINER');
           _isLoading = false;
         });
       }

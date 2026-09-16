@@ -205,9 +205,13 @@ public class CourseServiceImpl implements CourseService {
             isEnrolled = enrollmentOpt.isPresent();
         }
 
+        boolean isCreator = (currentUserId != null && course.getCreator() != null
+                && course.getCreator().getId().equals(currentUserId));
+        if (isCreator) {
+            isEnrolled = true;
+        }
+
         if (!"PUBLISHED".equalsIgnoreCase(course.getStatus())) {
-            boolean isCreator = (currentUserId != null && course.getCreator() != null
-                    && course.getCreator().getId().equals(currentUserId));
             boolean isHiddenOrArchivedAndEnrolled = ("HIDDEN".equalsIgnoreCase(course.getStatus())
                     || "ARCHIVED".equalsIgnoreCase(course.getStatus())) && isEnrolled;
 
@@ -414,6 +418,8 @@ public class CourseServiceImpl implements CourseService {
                 .title(course.getTitle())
                 .code(course.getCode())
                 .creatorName(creatorName)
+                .creatorId(course.getCreator() != null ? course.getCreator().getId() : null)
+                .isCreator(isCreator)
                 .trainerBio(trainerBio)
                 .trainerCertificates(trainerCertificates)
                 .difficultyName(difficultyName)
@@ -522,6 +528,10 @@ public class CourseServiceImpl implements CourseService {
         Course courseToEnroll = actualCourseId.equals(courseId)
                 ? requestedCourse
                 : courseRepository.findById(actualCourseId).orElse(requestedCourse);
+
+        if (courseToEnroll.getCreator() != null && courseToEnroll.getCreator().getId().equals(userId)) {
+            throw new RuntimeException("You are the author of this course, no enrollment is needed.");
+        }
 
         if (courseToEnroll.getCreator() != null) {
             com.hango.hango_backend.entity.TrainerProfile profile = trainerProfileRepository

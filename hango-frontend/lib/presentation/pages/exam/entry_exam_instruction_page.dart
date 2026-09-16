@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import '../../../routes/app_routes.dart';
 import '../../../domain/entities/exam.dart';
 import '../../../data/repositories/exam_repository.dart';
-import 'take_exam_page.dart';
 
 class EntryExamInstructionPage extends StatefulWidget {
   final Exam? exam;
@@ -251,10 +250,9 @@ class _EntryExamInstructionPageState extends State<EntryExamInstructionPage> {
             height: 56,
             child: ElevatedButton(
               onPressed: () {
-                Navigator.of(context, rootNavigator: true).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (context) => TakeExamPage(exam: exam),
-                  ),
+                context.go(
+                  AppRoutes.takeExamRoute(exam.id),
+                  extra: exam,
                 );
               },
               style: ElevatedButton.styleFrom(

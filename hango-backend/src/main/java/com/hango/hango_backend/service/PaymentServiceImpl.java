@@ -95,6 +95,12 @@ public class PaymentServiceImpl implements PaymentService {
 
         Course primaryCourse = courses.get(0);
 
+        for (Course c : courses) {
+            if (c.getCreator() != null && c.getCreator().getId().equals(userId)) {
+                throw new RuntimeException("You are the author of the course \"" + c.getTitle() + "\" and cannot purchase your own course.");
+            }
+        }
+
         // Check if user is already enrolled in all requested courses
         boolean allEnrolled = true;
         for (Course c : courses) {

@@ -12,9 +12,14 @@ class AppRoutes {
   static const String courseDetail = '/courses/:id';
   static const String courseCompletion = '/courses/:id/completion';
   static const String courseLesson = '/courses/:courseId/lessons/:lessonId';
+  static const String examDetail = '/exams/:id';
   static const String takeExam = '/take-exam/:id';
   static const String entryExam = '/entry-exam';
   static const String examResult = '/exam-results';
+
+  // Helper route formatters
+  static String examDetailRoute(String id) => '/exams/$id';
+  static String takeExamRoute(String id) => '/take-exam/$id';
 
   // Auth routes
   static const String login = '/login';

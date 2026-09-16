@@ -2509,11 +2509,9 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
 
     return GestureDetector(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ExamDetailHistoryPage(exam: exam),
-          ),
+        context.go(
+          AppRoutes.examDetailRoute(exam.id),
+          extra: exam,
         );
       },
       child: HoverableCard(

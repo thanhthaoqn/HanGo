@@ -42,6 +42,31 @@ class ExamRepository {
     }
   }
 
+  Future<Exam> fetchExamById(String id) async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/exams/$id'));
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(utf8.decode(response.bodyBytes));
+        return Exam(
+          id: data['id'].toString(),
+          title: data['title'] ?? '',
+          description: data['description'] ?? '',
+          status: data['status'] ?? '',
+          creatorName: data['creatorName'] ?? 'Unknown',
+          questionCount: data['questionCount'] ?? 0,
+          durationMinutes: data['durationMinutes'] ?? 0,
+          rating: (data['rating'] ?? 0.0).toDouble(),
+          learnerCountFormatted: data['learnerCountFormatted'] ?? '0 Learner',
+          thumbnailUrl: data['thumbnailUrl'] ?? '',
+        );
+      } else {
+        throw Exception('Failed to load exam $id: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching exam $id: $e');
+    }
+  }
+
   Future<PaginatedResponse<Exam>> fetchExamsPaginated({
     String status = 'All',
     int page = 0,

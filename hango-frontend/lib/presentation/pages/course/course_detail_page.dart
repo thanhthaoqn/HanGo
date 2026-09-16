@@ -10,7 +10,6 @@ import '../../widgets/shared_header.dart';
 import '../../widgets/shared_footer.dart';
 import '../learner/learner_shell_page.dart';
 import 'review_tab.dart';
-import 'lesson_detail_page.dart';
 import 'course_completion_page.dart';
 import '../../../utils/cart_manager.dart';
 import '../../../utils/language_manager.dart';
@@ -97,7 +96,9 @@ class _CourseDetailPageState extends State<CourseDetailPage>
         _userRoles = roles;
         _canEnroll =
             roles.contains('ENROLL_AND_LEARN_COURSES') ||
-            roles.contains('ROLE_ADMINISTRATOR');
+            roles.contains('ROLE_ADMINISTRATOR') ||
+            roles.contains('ROLE_TRAINER') ||
+            roles.contains('TRAINER');
         _canRateAndComment =
             roles.contains('RATE_AND_COMMENT') ||
             roles.contains('ROLE_ADMINISTRATOR');
@@ -559,6 +560,15 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   }
 
   void _enroll(CourseDetail course) async {
+    final isOwner = course.isCreator ||
+        (course.creatorId != null && course.creatorId == _currentUserId);
+    if (isOwner) {
+      _showNotification(
+        'You are the author of this course!',
+        isError: true,
+      );
+      return;
+    }
     if (!_canEnroll) {
       _showNotification(
         'Enrollment is not available for your role.',
@@ -1319,8 +1329,12 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                   final itemType = lesson.itemType?.toLowerCase();
                   final isExercise =
                       itemType == 'quiz' || itemType == 'practice';
+                  final isOwner = course.isCreator ||
+                      (course.creatorId != null &&
+                          course.creatorId == _currentUserId);
+                  final hasAccess = course.isEnrolled || isOwner;
                   return InkWell(
-                    onTap: course.isEnrolled
+                    onTap: hasAccess
                         ? () {
                             context.push(
                               '/courses/${course.id}/lessons/${lesson.id}',
@@ -1343,7 +1357,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                           Icon(
                             _getLessonIcon(lesson.itemType),
                             size: 18,
-                            color: course.isEnrolled
+                            color: hasAccess
                                 ? const Color(0xFF28B79B)
                                 : Colors.grey,
                           ),
@@ -1353,7 +1367,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                               lesson.title,
                               style: TextStyle(
                                 fontSize: 14,
-                                color: course.isEnrolled
+                                color: hasAccess
                                     ? const Color(0xFF4B5563)
                                     : Colors.grey.shade500,
                               ),
@@ -1372,7 +1386,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                           ],
                           if (isExercise)
                             TextButton(
-                              onPressed: course.isEnrolled
+                              onPressed: hasAccess
                                   ? () {
                                       context.push(
                                         '/courses/${course.id}/lessons/${lesson.id}?startQuiz=true',
@@ -1382,7 +1396,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                               child: Text(
                                 'Try Now',
                                 style: TextStyle(
-                                  color: course.isEnrolled
+                                  color: hasAccess
                                       ? const Color(0xFF28B79B)
                                       : Colors.grey,
                                   fontSize: 13,
@@ -1425,6 +1439,16 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   Future<void> _addToCart() async {
     final isVi = LanguageManager.isVi;
     if (_courseDetail == null) return;
+    final isOwner = _courseDetail!.isCreator ||
+        (_courseDetail!.creatorId != null &&
+            _courseDetail!.creatorId == _currentUserId);
+    if (isOwner) {
+      _showNotification(
+        'You are the author of this course!',
+        isError: true,
+      );
+      return;
+    }
 
     // 1. Optimistic UI update (0ms lag)
     setState(() {
@@ -1455,7 +1479,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
 
   String _getCoursePrice(CourseDetail course) {
     if (course.price <= 0) {
-      return 'Miễn phí';
+      return 'Free';
     }
     final formatted = course.price
         .toStringAsFixed(0)
@@ -1661,7 +1685,10 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     }
 
     final priceStr = _getCoursePrice(course);
-    final isFree = priceStr == 'Miễn phí';
+    final isFree = priceStr == 'Free' || course.price <= 0;
+    final isOwner = course.isCreator ||
+        (course.creatorId != null && course.creatorId == _currentUserId);
+    final hasAccess = course.isEnrolled || isOwner;
 
     return Container(
       padding: const EdgeInsets.all(28),
@@ -1681,14 +1708,40 @@ class _CourseDetailPageState extends State<CourseDetailPage>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Price Display Section
-          Text(
-            isFree ? 'Free' : priceStr,
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              color: isFree ? const Color(0xFF28B79B) : const Color(0xFF0F172A),
-              fontFamily: 'Outfit',
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                isFree ? 'Free' : priceStr,
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  color:
+                      isFree ? const Color(0xFF28B79B) : const Color(0xFF0F172A),
+                  fontFamily: 'Outfit',
+                ),
+              ),
+              if (isOwner)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE6F4EA),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF28B79B)),
+                  ),
+                  child: const Text(
+                    'Your Course',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F9D58),
+                      fontFamily: 'Outfit',
+                    ),
+                  ),
+                ),
+            ],
           ),
 
           const SizedBox(height: 24),
@@ -1717,7 +1770,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
 
           const SizedBox(height: 28),
 
-          if (course.isEnrolled) ...[
+          if (hasAccess) ...[
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -1744,9 +1797,9 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                   ),
                   elevation: 0,
                 ),
-                child: const Text(
-                  'Study Now',
-                  style: TextStyle(
+                child: Text(
+                  isOwner ? 'View Course Content' : 'Study Now',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
