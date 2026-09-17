@@ -19,6 +19,7 @@ import '../../widgets/admin/role/role_matrix_tab.dart';
 import '../../widgets/admin/role/role_detail_drawer.dart';
 import '../../widgets/admin/dashboard/comprehensive_dashboard_tab.dart';
 import '../../../utils/file_picker_helper.dart';
+import '../../../utils/language_manager.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 class AdminDashboardPage extends StatefulWidget {
@@ -1535,6 +1536,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 onSelected: (val) {
                   if (val == 'logout') {
                     _handleLogout();
+                  } else if (val == 'home') {
+                    context.go(AppRoutes.home);
                   } else if (val == 'profile') {
                     _initProfileFields();
                     setState(() {
@@ -1779,6 +1782,38 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       ),
                     ),
                   ),
+                  PopupMenuItem(
+                    value: 'home',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE6FFFA),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.school_outlined,
+                              size: 18,
+                              color: Color(0xFF28B79B),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            LanguageManager.isVi ? 'Giao diện Học viên' : 'Learner View',
+                            style: const TextStyle(
+                              fontFamily: 'Outfit',
+                              color: Color(0xFF1E293B),
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                   const PopupMenuDivider(height: 1),
                   PopupMenuItem(
                     value: 'logout',
@@ -1860,7 +1895,45 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
                 const Spacer(),
                 const Divider(color: Color(0xFFE5E7EB)),
-                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.only(top: 6.0, bottom: 8.0),
+                  child: InkWell(
+                    onTap: () {
+                      if (isMobileDrawer) {
+                        Navigator.pop(context);
+                      }
+                      context.go(AppRoutes.home);
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    hoverColor: const Color(0xFF28B79B).withValues(alpha: 0.08),
+                    child: Container(
+                      height: 44,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.school_outlined,
+                            color: Color(0xFF28B79B),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            LanguageManager.isVi ? 'Giao diện Học viên' : 'Learner View',
+                            style: const TextStyle(
+                              color: Color(0xFF28B79B),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
 
 
               ],

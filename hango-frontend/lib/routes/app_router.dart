@@ -53,12 +53,7 @@ class AppRouter {
             return AppRoutes.home;
           }
 
-          // If at root '/' on initial load, navigate to specific role dashboard
-          if (path == AppRoutes.home) {
-            if (role == 'ADMIN') return AppRoutes.admin;
-            if (role == 'COURSE_MANAGER') return AppRoutes.courseManager;
-            // Allow TRAINER to visit the home page (dual-persona LMS model)
-          }
+          // Allow all internal roles (TRAINER, ADMIN, COURSE_MANAGER) to visit the home page (dual-persona model)
 
           // Role guard: prevent wrong dashboard URLs
           if (role == 'TRAINER') {
