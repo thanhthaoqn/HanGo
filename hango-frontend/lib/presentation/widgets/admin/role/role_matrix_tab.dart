@@ -168,13 +168,13 @@ class _RoleMatrixTabState extends State<RoleMatrixTab> {
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFE6FFFA),
+                                        color: const Color(0xFFF3F4F6),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: const Text(
-                                        'Full Access',
+                                        'System Admin',
                                         style: TextStyle(
-                                          color: Color(0xFF1F9E84),
+                                          color: Color(0xFF4B5563),
                                           fontSize: 11,
                                           fontWeight: FontWeight.bold,
                                         ),
@@ -273,12 +273,10 @@ class _RoleMatrixTabState extends State<RoleMatrixTab> {
                                       final restrictedRoles = perm['restrictedForRoles'] as String? ?? '';
                                       
                                       final isCore = coreRoles.contains(roleName);
-                                      final isRestricted = restrictedRoles.contains(roleName);
+                                      final isRestricted = restrictedRoles.contains(roleName) || (roleName == 'ADMINISTRATOR' && !isCore);
                                       
                                       Widget icon;
-                                      if (roleName == 'ADMINISTRATOR') {
-                                        icon = const Icon(Icons.check_circle, color: Color(0xFF28B79B), size: 22);
-                                      } else if (isCore) {
+                                      if (isCore) {
                                         icon = const Icon(Icons.check_circle, color: Color(0xFF28B79B), size: 22);
                                       } else if (isRestricted) {
                                         icon = const Icon(Icons.remove, color: Color(0xFFD1D5DB), size: 22);

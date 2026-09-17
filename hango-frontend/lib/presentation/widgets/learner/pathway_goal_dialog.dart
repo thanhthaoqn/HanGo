@@ -191,7 +191,10 @@ class _PathwayGoalDialogState extends State<PathwayGoalDialog> {
       context: context,
       builder: (ctx) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Padding(
+        backgroundColor: Colors.white,
+        child: Container(
+          width: 400,
+          constraints: const BoxConstraints(maxWidth: 420),
           padding: const EdgeInsets.all(24.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
