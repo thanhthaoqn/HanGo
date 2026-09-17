@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../pages/trainer/trainer_shell_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../utils/toast_helper.dart';
 import '../../../utils/language_manager.dart';
+import '../../../routes/app_routes.dart';
 
 class TrainerSidebar extends StatefulWidget {
   final int activeIndex;
@@ -105,44 +107,48 @@ class _TrainerSidebarState extends State<TrainerSidebar> {
         children: [
           Padding(
             padding: const EdgeInsets.only(left: 8.0, bottom: 24.0),
-            child: Row(
-              children: [
-                Image.network(
-                  'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
-                  height: 36,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFE6FFFA),
-                            shape: BoxShape.circle,
+            child: InkWell(
+              onTap: () => context.go(AppRoutes.home),
+              borderRadius: BorderRadius.circular(8),
+              child: Row(
+                children: [
+                  Image.network(
+                    'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png',
+                    height: 36,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFE6FFFA),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.school,
+                              size: 18,
+                              color: Color(0xFF28B79B),
+                            ),
                           ),
-                          child: const Icon(
-                            Icons.school,
-                            size: 18,
-                            color: Color(0xFF28B79B),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'HanGo',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1F2937),
+                              fontFamily: 'Outfit',
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'HanGo',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1F2937),
-                            fontFamily: 'Outfit',
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ],
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
           _buildItem(context, 0, Icons.dashboard_outlined, 'Dashboard'),
@@ -168,7 +174,39 @@ class _TrainerSidebarState extends State<TrainerSidebar> {
           ),
           const Spacer(),
           const Divider(color: Color(0xFFE2E8F0)),
-
+          Padding(
+            padding: const EdgeInsets.only(top: 6.0),
+            child: InkWell(
+              onTap: () => context.go(AppRoutes.home),
+              borderRadius: BorderRadius.circular(12),
+              hoverColor: const Color(0xFF20B486).withValues(alpha: 0.08),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.school_outlined,
+                      color: Color(0xFF20B486),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 14),
+                    Text(
+                      LanguageManager.isVi ? 'Giao diện Học viên' : 'Learner View',
+                      style: const TextStyle(
+                        color: Color(0xFF20B486),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
