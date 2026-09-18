@@ -199,17 +199,21 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
         ? course['id'] as int
         : int.parse(course['id'].toString());
 
+    final isDraft = (course['status'] ?? '').toString().toUpperCase() == 'DRAFT' && course['parentId'] != null;
+
     // Show confirmation dialog
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Delete Course',
-          style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
+        title: Text(
+          isDraft ? 'Cancel Draft Version' : 'Delete Course',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
         ),
         content: Text(
-          'Are you sure you want to delete "$title"? This action cannot be undone.',
+          isDraft
+              ? 'Are you sure you want to discard this draft? Your currently published version of "$title" will remain active with all its learners.'
+              : 'Are you sure you want to delete "$title"? This action cannot be undone.',
           style: const TextStyle(fontFamily: 'Outfit', fontSize: 14),
         ),
         actions: [
@@ -226,9 +230,9 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              'Delete',
-              style: TextStyle(
+            child: Text(
+              isDraft ? 'Discard Draft' : 'Delete',
+              style: const TextStyle(
                 color: Colors.redAccent,
                 fontWeight: FontWeight.bold,
                 fontFamily: 'Outfit',
@@ -257,7 +261,10 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
 
       if (response.statusCode == 200) {
         if (mounted) {
-          ToastHelper.showSuccess(context, 'Course deleted successfully');
+          ToastHelper.showSuccess(
+            context,
+            isDraft ? 'Draft version cancelled' : 'Course deleted successfully',
+          );
           _fetchCoursesData();
         }
       } else {
@@ -1304,18 +1311,76 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
     return (published: published, draft: draft, pending: pending, all: group);
   }
 
-  /// Groups _coursesList by `parentId` (if exists) or `id`, falling back to `code` if necessary.
+  /// Groups _coursesList by `parentId`, `id`, `code` (case-insensitive base), and `title`.
   List<({dynamic published, dynamic draft, dynamic pending, List<dynamic> all})>
   get _groupedCourses {
-    final Map<String, List<dynamic>> byKey = {};
-    for (final c in _coursesList) {
-      final code = (c['code'] ?? '').toString();
-      // Code is like COURSE-1234 or COURSE-1234-V2. We group by the base code.
-      final baseCode = code.contains('-V') ? code.split('-V')[0] : code;
+    final List<List<dynamic>> groups = [];
+    final Set<dynamic> visited = {};
 
-      byKey.putIfAbsent(baseCode, () => []).add(c);
+    String getNormalizedBaseCode(dynamic c) {
+      final code = (c['code'] ?? '').toString().trim();
+      if (code.isEmpty) return '';
+      return code.replaceAll(RegExp(r'[-_][vV]\d+.*$'), '').trim().toUpperCase();
     }
-    return byKey.values.map(_resolveGroup).toList();
+
+    String getNormalizedTitle(dynamic c) {
+      return (c['title'] ?? '').toString().trim().toLowerCase();
+    }
+
+    for (final c in _coursesList) {
+      if (visited.contains(c)) continue;
+
+      final currentGroup = <dynamic>[];
+      final queue = <dynamic>[c];
+      visited.add(c);
+
+      while (queue.isNotEmpty) {
+        final curr = queue.removeAt(0);
+        currentGroup.add(curr);
+
+        final currId = curr['id'];
+        final currParentId = curr['parentId'];
+        final currBaseCode = getNormalizedBaseCode(curr);
+        final currTitle = getNormalizedTitle(curr);
+
+        for (final other in _coursesList) {
+          if (visited.contains(other)) continue;
+
+          final otherId = other['id'];
+          final otherParentId = other['parentId'];
+          final otherBaseCode = getNormalizedBaseCode(other);
+          final otherTitle = getNormalizedTitle(other);
+
+          bool isMatch = false;
+
+          // 1. Direct parent-child relationship via DB IDs
+          if (currId != null && (currId == otherParentId || (currParentId != null && currParentId == otherParentId))) {
+            isMatch = true;
+          } else if (otherId != null && otherId == currParentId) {
+            isMatch = true;
+          }
+
+          // 2. Matching base code (case-insensitive, version stripped)
+          if (!isMatch && currBaseCode.isNotEmpty && currBaseCode == otherBaseCode) {
+            isMatch = true;
+          }
+
+          // 3. Exact same title
+          if (!isMatch && currTitle.isNotEmpty && currTitle == otherTitle) {
+            isMatch = true;
+          }
+
+          if (isMatch) {
+            visited.add(other);
+            queue.add(other);
+          }
+        }
+      }
+
+      groups.add(currentGroup);
+    }
+
+    return groups.map(_resolveGroup).toList();
   }
 
   int get _totalPages {
@@ -1364,7 +1429,15 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
     final title = (course['title'] ?? 'Untitled Course') as String;
     final desc =
         (course['description'] ?? 'No description provided.') as String;
-    final learners = course['learnersCount'] ?? 0;
+    final learners = group.all.fold<int>(
+      (course['learnersCount'] ?? 0) is int ? course['learnersCount'] as int : int.tryParse(course['learnersCount']?.toString() ?? '0') ?? 0,
+      (max, c) {
+        final count = (c['learnersCount'] ?? 0) is int
+            ? c['learnersCount'] as int
+            : int.tryParse(c['learnersCount']?.toString() ?? '0') ?? 0;
+        return count > max ? count : max;
+      },
+    );
     final lessons = course['lessonsCount'] ?? 0;
     final dateStr = _formatDate(course['createdAt']);
     final thumbnail = (course['thumbnailUrl'] ?? '') as String;

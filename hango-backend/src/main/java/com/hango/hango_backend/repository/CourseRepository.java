@@ -103,7 +103,14 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
         }
 
         @Query(value = "SELECT c.id AS id, c.title AS title, " +
-                        "(SELECT COUNT(e.id) FROM enrollments e WHERE e.course_id = c.id) AS learnersCount, " +
+                        "(SELECT COUNT(DISTINCT e.user_id) FROM enrollments e " +
+                        " JOIN courses ec ON e.course_id = ec.id " +
+                        " WHERE ec.id = c.id " +
+                        "    OR ec.parent_id = c.id " +
+                        "    OR ec.id = c.parent_id " +
+                        "    OR (c.parent_id IS NOT NULL AND ec.parent_id = c.parent_id) " +
+                        "    OR (c.code IS NOT NULL AND ec.code IS NOT NULL AND (ec.code = c.code OR ec.code LIKE CONCAT(SUBSTRING_INDEX(c.code, '-V', 1), '-V%') OR ec.code = SUBSTRING_INDEX(c.code, '-V', 1))) " +
+                        ") AS learnersCount, " +
                         "(SELECT COUNT(l.id) FROM lessons l JOIN sections s ON l.section_id = s.id WHERE s.course_id = c.id AND l.deleted_at IS NULL) AS lessonsCount, "
                         +
                         "c.thumbnail_url AS thumbnailUrl " +
@@ -117,7 +124,14 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
                         @Param("status") String status);
 
         @Query(value = "SELECT c.id AS id, c.title AS title, c.status AS status, c.description AS description, " +
-                        "(SELECT COUNT(e.id) FROM enrollments e WHERE e.course_id = c.id) AS learnersCount, " +
+                        "(SELECT COUNT(DISTINCT e.user_id) FROM enrollments e " +
+                        " JOIN courses ec ON e.course_id = ec.id " +
+                        " WHERE ec.id = c.id " +
+                        "    OR ec.parent_id = c.id " +
+                        "    OR ec.id = c.parent_id " +
+                        "    OR (c.parent_id IS NOT NULL AND ec.parent_id = c.parent_id) " +
+                        "    OR (c.code IS NOT NULL AND ec.code IS NOT NULL AND (ec.code = c.code OR ec.code LIKE CONCAT(SUBSTRING_INDEX(c.code, '-V', 1), '-V%') OR ec.code = SUBSTRING_INDEX(c.code, '-V', 1))) " +
+                        ") AS learnersCount, " +
                         "(SELECT COUNT(l.id) FROM lessons l JOIN sections s ON l.section_id = s.id WHERE s.course_id = c.id AND l.deleted_at IS NULL) AS lessonsCount, "
                         +
                         "c.thumbnail_url AS thumbnailUrl, c.created_at AS createdAt, " +

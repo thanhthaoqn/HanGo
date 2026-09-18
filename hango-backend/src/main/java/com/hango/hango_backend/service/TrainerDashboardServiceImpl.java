@@ -18,6 +18,9 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -46,8 +49,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
     private String getBaseCode(String code, Long id) {
         if (code == null || code.isBlank())
-            return String.valueOf(id);
-        return code.replaceAll("-V\\d+$", "").toUpperCase();
+            return id != null ? String.valueOf(id) : "";
+        return code.replaceAll("[-_][vV]\\d+.*$", "").toUpperCase();
     }
 
     @Override
@@ -326,85 +329,140 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         List<TrainerCourseDetailProjection> allProjections = courseRepository.findTrainerCoursesDetailBase(trainerId,
                 "ALL", null);
 
-        // 2. Group by Root Code and get the Latest Version for each course
-        Map<String, List<TrainerCourseDetailProjection>> groupedByCode = allProjections.stream()
-                .collect(Collectors.groupingBy(p -> getBaseCode(p.getCode(), p.getId())));
+        // 2. Group into Course Families (connected components by parentId, baseCode, and title)
+        List<List<TrainerCourseDetailProjection>> groups = new ArrayList<>();
+        Set<Long> visited = new HashSet<>();
 
-        List<TrainerCourseDetailProjection> latestProjections = groupedByCode.values().stream()
-                .map(group -> group.stream()
-                        .max((p1, p2) -> {
-                            if (p1.getCreatedAt() == null)
-                                return -1;
-                            if (p2.getCreatedAt() == null)
-                                return 1;
-                            return p1.getCreatedAt().compareTo(p2.getCreatedAt());
-                        }).orElse(group.get(0)))
-                .collect(Collectors.toList());
+        for (TrainerCourseDetailProjection p : allProjections) {
+            if (p.getId() != null && visited.contains(p.getId())) continue;
 
-        // 3. Status Counts based on the Latest Versions
-        long allCount = latestProjections.size();
-        long draftCount = latestProjections.stream().filter(p -> "DRAFT".equalsIgnoreCase(p.getStatus())).count();
-        long publishedCount = latestProjections.stream().filter(p -> "PUBLISHED".equalsIgnoreCase(p.getStatus()))
+            List<TrainerCourseDetailProjection> currentGroup = new ArrayList<>();
+            List<TrainerCourseDetailProjection> queue = new ArrayList<>();
+            queue.add(p);
+            if (p.getId() != null) visited.add(p.getId());
+
+            while (!queue.isEmpty()) {
+                TrainerCourseDetailProjection curr = queue.remove(0);
+                currentGroup.add(curr);
+
+                Long currId = curr.getId();
+                Long currParentId = curr.getParentId();
+                String currBaseCode = getBaseCode(curr.getCode(), curr.getId());
+                String currTitle = curr.getTitle() != null ? curr.getTitle().trim().toLowerCase() : "";
+
+                for (TrainerCourseDetailProjection other : allProjections) {
+                    if (other.getId() != null && visited.contains(other.getId())) continue;
+
+                    Long otherId = other.getId();
+                    Long otherParentId = other.getParentId();
+                    String otherBaseCode = getBaseCode(other.getCode(), other.getId());
+                    String otherTitle = other.getTitle() != null ? other.getTitle().trim().toLowerCase() : "";
+
+                    boolean isMatch = false;
+
+                    // 1. Direct parent-child relationship via DB IDs
+                    if (currId != null && (currId.equals(otherParentId) || (currParentId != null && currParentId.equals(otherParentId)))) {
+                        isMatch = true;
+                    } else if (otherId != null && otherId.equals(currParentId)) {
+                        isMatch = true;
+                    }
+
+                    // 2. Matching base code (case-insensitive)
+                    if (!isMatch && !currBaseCode.isEmpty() && currBaseCode.equalsIgnoreCase(otherBaseCode)) {
+                        isMatch = true;
+                    }
+
+                    // 3. Exact same title (ignore empty / untitled)
+                    if (!isMatch && !currTitle.isEmpty() && !"untitled course".equalsIgnoreCase(currTitle) && currTitle.equalsIgnoreCase(otherTitle)) {
+                        isMatch = true;
+                    }
+
+                    if (isMatch) {
+                        if (other.getId() != null) visited.add(other.getId());
+                        queue.add(other);
+                    }
+                }
+            }
+            groups.add(currentGroup);
+        }
+
+        // 3. Status Counts based on Course Families
+        long allCount = groups.size();
+        long draftCount = groups.stream()
+                .filter(g -> g.stream().anyMatch(p -> "DRAFT".equalsIgnoreCase(p.getStatus())))
                 .count();
-        long hiddenCount = latestProjections.stream().filter(p -> "HIDDEN".equalsIgnoreCase(p.getStatus())).count();
-        long pendingCount = latestProjections.stream().filter(p -> "PENDING_APPROVAL".equalsIgnoreCase(p.getStatus()))
+        long publishedCount = groups.stream()
+                .filter(g -> g.stream().anyMatch(p -> "PUBLISHED".equalsIgnoreCase(p.getStatus())))
                 .count();
-        long rejectedCount = latestProjections.stream().filter(p -> "REJECTED".equalsIgnoreCase(p.getStatus())).count();
+        long hiddenCount = groups.stream()
+                .filter(g -> g.stream().anyMatch(p -> "HIDDEN".equalsIgnoreCase(p.getStatus())))
+                .count();
+        long pendingCount = groups.stream()
+                .filter(g -> g.stream().anyMatch(p -> "PENDING_APPROVAL".equalsIgnoreCase(p.getStatus())))
+                .count();
+        long rejectedCount = groups.stream()
+                .filter(g -> g.stream().anyMatch(p -> "REJECTED".equalsIgnoreCase(p.getStatus())))
+                .count();
 
         // 4. Apply Filters (Status, Search, Time Period)
         String searchParam = (search == null || search.trim().isEmpty()) ? null : search.trim().toLowerCase();
+        LocalDateTime cutoff = LocalDateTime.now();
+        if ("THIS_WEEK".equalsIgnoreCase(timePeriod)) {
+            cutoff = cutoff.minusWeeks(1);
+        } else if ("THIS_MONTH".equalsIgnoreCase(timePeriod)) {
+            cutoff = cutoff.minusMonths(1);
+        }
+        final LocalDateTime finalCutoff = cutoff;
 
-        List<TrainerCourseDetailProjection> filteredProjections = latestProjections.stream()
-                .filter(p -> status.equalsIgnoreCase("ALL") || status.equalsIgnoreCase(p.getStatus()))
-                .filter(p -> searchParam == null
-                        || (p.getTitle() != null && p.getTitle().toLowerCase().contains(searchParam)))
-                .filter(p -> {
-                    if (timePeriod == null || timePeriod.equalsIgnoreCase("ALL"))
-                        return true;
-                    if (p.getCreatedAt() == null)
-                        return false;
-                    LocalDateTime cutoff = LocalDateTime.now();
-                    if (timePeriod.equalsIgnoreCase("THIS_WEEK"))
-                        cutoff = cutoff.minusWeeks(1);
-                    else if (timePeriod.equalsIgnoreCase("THIS_MONTH"))
-                        cutoff = cutoff.minusMonths(1);
-                    return p.getCreatedAt().isAfter(cutoff);
+        List<List<TrainerCourseDetailProjection>> filteredGroups = groups.stream()
+                .filter(g -> {
+                    if (!"ALL".equalsIgnoreCase(status)) {
+                        boolean hasStatus = g.stream().anyMatch(p -> status.equalsIgnoreCase(p.getStatus()));
+                        if (!hasStatus) return false;
+                    }
+                    if (searchParam != null) {
+                        boolean matchesSearch = g.stream().anyMatch(p ->
+                                p.getTitle() != null && p.getTitle().toLowerCase().contains(searchParam));
+                        if (!matchesSearch) return false;
+                    }
+                    if (timePeriod != null && !"ALL".equalsIgnoreCase(timePeriod)) {
+                        boolean matchesTime = g.stream().anyMatch(p ->
+                                p.getCreatedAt() != null && p.getCreatedAt().isAfter(finalCutoff));
+                        if (!matchesTime) return false;
+                    }
+                    return true;
                 })
                 .collect(Collectors.toList());
 
-        // 5. Sort
-        if (sortBy != null) {
-            if (sortBy.equalsIgnoreCase("OLDEST")) {
-                filteredProjections.sort((p1, p2) -> {
-                    if (p1.getCreatedAt() == null)
-                        return 1;
-                    if (p2.getCreatedAt() == null)
-                        return -1;
-                    return p1.getCreatedAt().compareTo(p2.getCreatedAt());
-                });
-            } else if (sortBy.equalsIgnoreCase("ALPHABETICAL")) {
-                filteredProjections.sort((p1, p2) -> {
-                    String t1 = p1.getTitle() != null ? p1.getTitle() : "";
-                    String t2 = p2.getTitle() != null ? p2.getTitle() : "";
-                    return t1.compareToIgnoreCase(t2);
-                });
-            } else { // "NEWEST"
-                filteredProjections.sort((p1, p2) -> {
-                    if (p1.getCreatedAt() == null)
-                        return 1;
-                    if (p2.getCreatedAt() == null)
-                        return -1;
-                    return p2.getCreatedAt().compareTo(p1.getCreatedAt());
-                });
-            }
-        } else {
-            filteredProjections.sort((p1, p2) -> {
-                if (p1.getCreatedAt() == null)
-                    return 1;
-                if (p2.getCreatedAt() == null)
-                    return -1;
+        // 5. Sort Groups and flatten all versions into filteredProjections
+        if (sortBy != null && sortBy.equalsIgnoreCase("OLDEST")) {
+            filteredGroups.sort((g1, g2) -> {
+                LocalDateTime t1 = g1.stream().map(TrainerCourseDetailProjection::getCreatedAt).filter(Objects::nonNull).min(LocalDateTime::compareTo).orElse(LocalDateTime.MIN);
+                LocalDateTime t2 = g2.stream().map(TrainerCourseDetailProjection::getCreatedAt).filter(Objects::nonNull).min(LocalDateTime::compareTo).orElse(LocalDateTime.MIN);
+                return t1.compareTo(t2);
+            });
+        } else if (sortBy != null && sortBy.equalsIgnoreCase("ALPHABETICAL")) {
+            filteredGroups.sort((g1, g2) -> {
+                String t1 = g1.get(0).getTitle() != null ? g1.get(0).getTitle() : "";
+                String t2 = g2.get(0).getTitle() != null ? g2.get(0).getTitle() : "";
+                return t1.compareToIgnoreCase(t2);
+            });
+        } else { // "NEWEST"
+            filteredGroups.sort((g1, g2) -> {
+                LocalDateTime t1 = g1.stream().map(TrainerCourseDetailProjection::getCreatedAt).filter(Objects::nonNull).max(LocalDateTime::compareTo).orElse(LocalDateTime.MIN);
+                LocalDateTime t2 = g2.stream().map(TrainerCourseDetailProjection::getCreatedAt).filter(Objects::nonNull).max(LocalDateTime::compareTo).orElse(LocalDateTime.MIN);
+                return t2.compareTo(t1);
+            });
+        }
+
+        List<TrainerCourseDetailProjection> filteredProjections = new ArrayList<>();
+        for (List<TrainerCourseDetailProjection> g : filteredGroups) {
+            g.sort((p1, p2) -> {
+                if (p1.getCreatedAt() == null) return 1;
+                if (p2.getCreatedAt() == null) return -1;
                 return p2.getCreatedAt().compareTo(p1.getCreatedAt());
             });
+            filteredProjections.addAll(g);
         }
 
         // 6. Map to DTOs
