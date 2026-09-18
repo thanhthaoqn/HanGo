@@ -7,6 +7,8 @@ Round 2,0,0,17,0
 Round 3,0,0,17,0
 
 Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
+
+
 Become Trainer,,,,
 ONBOARDING_FT01,"A logged-in Learner becomes a Trainer immediately upon request, receiving a fresh session token with the new role already active.","1. Log in as a LEARNER who is not yet a TRAINER.
 2. Prepare POST /api/v1/trainers/become-trainer?trainerType=PROFESSIONAL with the Authorization header set.
@@ -21,11 +23,15 @@ ONBOARDING_FT03,"Attempting to become a trainer with no Authorization header at 
 2. Prepare POST /api/v1/trainers/become-trainer with no Authorization header.
 3. Send the request.
 4. Inspect the response status and body.","1. 401 Unauthorized, body {""error"": ""Unauthorized""}.","- None."
+
+
 View Own Trainer Profile,,,,
 ONBOARDING_FT04,"A user who already holds the TRAINER role but has no profile row yet gets one automatically created (just-in-time) the first time they view it.","1. Log in as a TRAINER (or ADMIN/TRAINER_LEAD) account confirmed to have no existing TrainerProfile row.
 2. Prepare GET /api/v1/trainers/profile with the Authorization header set.
 3. Send the request.
 4. Inspect the response body and confirm a new row was persisted for that user.","1. 200 OK; a new TrainerProfileDTO is returned with status=PENDING_VERIFICATION, revenueShare=0.70 defaults, and is now persisted.","- Logged in as TRAINER (or ADMIN/TRAINER_LEAD) with no prior TrainerProfile row."
+
+
 Save Trainer Profile Draft,,,,
 ONBOARDING_FT05,"Saving a profile draft with bio/workplace/bank details updates every field, and the bank account holder name is normalized to upper-case.","1. Log in as a TRAINER whose profile status is not AWAITING_APPROVAL/SUSPENDED.
 2. Prepare PUT /api/v1/trainers/profile body {""bio"":""...50+ chars..."",""workplace"":""ABC Corp"",""bankName"":""VCB"",""bankAccount"":""123456"",""bankAccountName"":""nguyen van a""}.
@@ -39,6 +45,8 @@ ONBOARDING_FT07,"Attempting to save a draft while the trainer account is SUSPEND
 2. Log back in as that suspended trainer and prepare PUT /api/v1/trainers/profile with any field change.
 3. Send the request.
 4. Inspect the response and confirm the profile's fields are unchanged.","1. Error response; message ""Tài khoản của bạn đã bị đình chỉ hoạt động.""; fields unchanged.","- Profile status is currently SUSPENDED."
+
+
 Submit Trainer Profile for Review,,,,
 ONBOARDING_FT08,"Submitting the trainer profile for review succeeds once every mandatory field meets its individual requirement, moving the application into the review queue.","1. Log in as a TRAINER and fill in bio (≥50 chars), a phone number matching ^(03|05|07|08|09)\d{8}$ (not all-same-digit and not exactly 1234567890), gender, avatarUrl, and scoreReportUrl.
 2. Prepare POST /api/v1/trainers/profile/submit.
@@ -63,6 +71,8 @@ ONBOARDING_FT11,"Submitting with gender, avatar, or credentials-proof left empty
 ONBOARDING_FT12,"Submitting a second time while the application is already AWAITING_APPROVAL from a prior submission is rejected.","1. Submit a fully valid profile once so its status becomes AWAITING_APPROVAL (per ONBOARDING_FT08).
 2. Before any admin review happens, prepare and send POST /api/v1/trainers/profile/submit again.
 3. Inspect the response message.","1. Error; message ""Hồ sơ đang ở trạng thái chờ xét duyệt.""","- Profile already AWAITING_APPROVAL from a prior submission."
+
+
 Review Trainer Profile (Admin),,,,
 ONBOARDING_FT13,"Admin lists and filters trainer applications, first by status alone and then combined with a search keyword, confirming the results narrow correctly each time.","1. Log in as ADMINISTRATOR with at least 2 applications in different statuses.
 2. Prepare and send GET /api/admin/trainer-profiles?status=AWAITING_APPROVAL; inspect the returned list.

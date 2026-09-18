@@ -47,10 +47,6 @@ public class Ticket {
     @Column(columnDefinition = "TEXT", nullable = false)
     private String description;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "assigned_to")
-    private User assignedTo;
-
     @Column(name = "admin_response", columnDefinition = "TEXT")
     private String adminResponse;
 

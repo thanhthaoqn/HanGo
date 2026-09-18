@@ -141,7 +141,7 @@ class _RoleDetailDrawerState extends State<RoleDetailDrawer> {
                               final restrictedRoles = perm['restrictedForRoles'] as String? ?? '';
                               
                               final isCore = coreRoles.contains(widget.roleName);
-                              final isRestricted = restrictedRoles.contains(widget.roleName);
+                              final isRestricted = restrictedRoles.contains(widget.roleName) || (widget.roleName == 'ADMINISTRATOR' && !isCore);
                               
                               if (isRestricted) {
                                 return const SizedBox.shrink(); // Hide restricted permissions completely

@@ -117,14 +117,11 @@ class TicketService {
   }
 
   // 5. Add Discussion Message
-  Future<Map<String, dynamic>> addMessage(int ticketId, String message, {String? attachmentUrls}) async {
+  Future<Map<String, dynamic>> addMessage(int ticketId, String message) async {
     try {
       final headers = await _getHeaders();
       final uri = Uri.parse('$baseUrl/tickets/$ticketId/messages');
-      final body = jsonEncode({
-        'message': message,
-        if (attachmentUrls != null) 'attachmentUrls': attachmentUrls,
-      });
+      final body = jsonEncode({'message': message});
 
       final response = await http.post(uri, headers: headers, body: body);
       if (response.statusCode == 200) {
@@ -138,7 +135,7 @@ class TicketService {
     }
   }
 
-  // 6. Management Tickets (Course Manager & Admin)
+  // 6. Administrator Ticket Management
   Future<Map<String, dynamic>> getManagementTickets({String? status, String? category, String? keyword, int page = 0, int size = 10}) async {
     try {
       final headers = await _getHeaders();

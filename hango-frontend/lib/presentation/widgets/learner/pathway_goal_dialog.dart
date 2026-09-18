@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../routes/app_routes.dart';
 
 import '../../../data/repositories/exam_repository.dart';
 import '../../../data/repositories/pathway_repository.dart';
-import '../../pages/learner/learning_pathway_page.dart';
 
 class PathwayGoalDialog extends StatefulWidget {
   final String weakestSkill;
@@ -27,7 +28,7 @@ class _PathwayGoalDialogState extends State<PathwayGoalDialog> {
   static const _textDark = Color(0xFF0F3D3E);
 
   // Target score options
-  static const List<double> _scoreOptions = [5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0];
+  static const List<double> _scoreOptions = [5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0];
 
   // Timeframe options (weeks)
   static const List<Map<String, dynamic>> _timeOptions = [
@@ -39,6 +40,9 @@ class _PathwayGoalDialogState extends State<PathwayGoalDialog> {
     {'weeks': 48, 'label': '1 Year'},
   ];
 
+  // Hours per week options
+  static const List<int> _hoursOptions = [5, 10, 14, 20, 30];
+
   bool _isLoadingAverage = true;
   double _averageScore = 0.0;
   String _aiFeedback = "";
@@ -47,6 +51,7 @@ class _PathwayGoalDialogState extends State<PathwayGoalDialog> {
 
   double? _selectedScore;
   int? _selectedWeeks;
+  int _selectedHours = 10;
 
   @override
   void initState() {
@@ -107,11 +112,18 @@ class _PathwayGoalDialogState extends State<PathwayGoalDialog> {
       _averageScore = double.parse(_averageScore.toStringAsFixed(1));
 
       // Build AI feedback using real data
-      final weakSkill = widget.weakestSkill.isNotEmpty ? widget.weakestSkill : "General";
-      _aiFeedback =
-          "Based on your overall history, your baseline score is ${_averageScore.toStringAsFixed(1)}/10. "
-          "However, in your recent exam, you struggled with $weakSkill. "
-          "This new pathway will prioritize $weakSkill while keeping you on track to reach your goal.";
+      if (_averageScore >= 10.0) {
+        _selectedScore = 10.0;
+        _aiFeedback =
+            "Outstanding! Your baseline score is 10.0/10. "
+            "This pathway will focus on advanced practice and maintaining peak mastery across all skills.";
+      } else {
+        final weakSkill = widget.weakestSkill.isNotEmpty ? widget.weakestSkill : "General";
+        _aiFeedback =
+            "Based on your overall history, your baseline score is ${_averageScore.toStringAsFixed(1)}/10. "
+            "However, in your recent exam, you struggled with $weakSkill. "
+            "This new pathway will prioritize $weakSkill while keeping you on track to reach your goal.";
+      }
 
       setState(() {
         _isLoadingAverage = false;
@@ -127,6 +139,7 @@ class _PathwayGoalDialogState extends State<PathwayGoalDialog> {
   }
 
   bool _isFeasible(double target, int weeks) {
+    if (target <= _averageScore) return true;
     return (target - _averageScore) <= (weeks * 0.5);
   }
 
@@ -143,6 +156,12 @@ class _PathwayGoalDialogState extends State<PathwayGoalDialog> {
       _selectedWeeks = weeks;
       _errorMessage = null;
       _validateSelection();
+    });
+  }
+
+  void _onHoursSelected(int hours) {
+    setState(() {
+      _selectedHours = hours;
     });
   }
 
@@ -172,7 +191,10 @@ class _PathwayGoalDialogState extends State<PathwayGoalDialog> {
       context: context,
       builder: (ctx) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Padding(
+        backgroundColor: Colors.white,
+        child: Container(
+          width: 400,
+          constraints: const BoxConstraints(maxWidth: 420),
           padding: const EdgeInsets.all(24.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -261,23 +283,23 @@ class _PathwayGoalDialogState extends State<PathwayGoalDialog> {
 
     try {
       final pathwayRepo = PathwayRepository();
-      
+
+      // Ghep muc tieu tu input user: targetDate = hom nay + so tuan chon
       final goalName = "Target Score: $_selectedScore";
       final targetDate = DateTime.now().add(Duration(days: _selectedWeeks! * 7)).toIso8601String().substring(0, 10);
-      
+
+      // POST /pathways/generate - backend se goi Gemini sinh pathway va luu DB
       await pathwayRepo.generatePathway(
         examAttemptId: widget.examAttemptId,
         goalName: goalName,
         targetDate: targetDate,
-        hoursPerWeek: 5, // Defaulting to 5 as there is no UI for hours per week in this dialog
+        hoursPerWeek: _selectedHours,
       );
 
       if (!mounted) return;
       Navigator.pop(context);
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LearningPathwayPage()),
-      );
+      // Chuyen thang sang man hinh pathway vua duoc tao
+      context.go(AppRoutes.pathway);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -397,7 +419,9 @@ class _PathwayGoalDialogState extends State<PathwayGoalDialog> {
                     runSpacing: 8,
                     children: _scoreOptions.map((score) {
                       final isSelected = _selectedScore == score;
-                      final isBelowAvg = score <= _averageScore;
+                      final isBelowAvg = _averageScore >= 10.0
+                          ? score < 10.0
+                          : (_averageScore >= 9.5 ? score < 9.5 : score <= _averageScore);
                       return GestureDetector(
                         onTap: isBelowAvg ? null : () => _onScoreSelected(score),
                         child: AnimatedContainer(
@@ -505,6 +529,58 @@ class _PathwayGoalDialogState extends State<PathwayGoalDialog> {
                                   : infeasible
                                       ? const Color(0xFFEF4444)
                                       : _emeraldDark,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Hours/Week Section
+                  const Text(
+                    "Study Time (Hours/Week)",
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: _textDark,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _hoursOptions.map((hours) {
+                      final isSelected = _selectedHours == hours;
+
+                      return GestureDetector(
+                        onTap: () => _onHoursSelected(hours),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isSelected ? _emerald : Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isSelected ? _emerald : _emeraldBorder,
+                              width: isSelected ? 2 : 1,
+                            ),
+                            boxShadow: isSelected
+                                ? [
+                                    BoxShadow(
+                                      color: _emerald.withValues(alpha: 0.25),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    )
+                                  ]
+                                : null,
+                          ),
+                          child: Text(
+                            '$hours hrs/week',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: isSelected ? Colors.white : _emeraldDark,
                             ),
                           ),
                         ),

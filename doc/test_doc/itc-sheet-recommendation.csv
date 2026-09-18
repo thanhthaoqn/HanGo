@@ -1,10 +1,10 @@
 Feature,Recommendation
 Test requirement,Functional integration tests for AI-driven weakness-based course recommendations (ExamCourseRecommendationController)
-Number of TCs,8
+Number of TCs,9
 Testing Round,Passed,Failed,Pending,N/A
-Round 1,0,0,8,0
-Round 2,0,0,8,0
-Round 3,0,0,8,0
+Round 1,0,0,9,0
+Round 2,0,0,9,0
+Round 3,0,0,9,0
 
 Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
 Recommend Courses via AI,,,,
@@ -38,3 +38,5 @@ RECOMMENDATION_FT07,"There is no role restriction at all on this endpoint — TR
 4. Confirm all three calls succeed identically.","1. All three succeed 200 OK — confirming zero @PreAuthorize/role gate exists on this controller.","- Each role has access to at least one exam attempt id."
 RECOMMENDATION_FT08,"When the AI names a course id that no longer matches any real, non-deleted course, that entry degrades to blank display fields rather than being silently dropped from the result.","1. (Best-effort/hard to force deterministically — document as designed behavior if directly reproducible, otherwise treat as a code-review note.) Trigger a recommendation where the AI names a stale/non-existent course id.
 2. Inspect the resulting recommendedCourses[] entry for that id.","1. The corresponding RecommendedCourseDTO entry has empty-string title/category/difficulty rather than being filtered out of the response.","- A reproducible way to make the AI return an invalid course id (may require test-double/prompt manipulation)."
+RECOMMENDATION_FT09,"KNOWN OPEN GAP (not fixed): if even ONE AI-recommended course has a malformed (non-numeric) courseId, the parse failure discards the ENTIRE otherwise-valid response — including weaknessSummary and the other, correctly-formed recommendations — because it throws inside the same try block guarded by the broad catch-all also used for real AI/network failures. This is distinct from RECOMMENDATION_FT08 (a numerically-valid but stale/non-existent id), which degrades gracefully per-entry instead.","1. (Best-effort/hard to force deterministically — requires a test-double/prompt manipulation to make the AI return a non-numeric courseId, e.g. courseId:""abc"" or courseId:null for one of the 3 recommendations, while the other 2 and weaknessSummary are well-formed.) Trigger such a response.
+2. Inspect the full response body.","1. 200 OK, but weaknessSummary="""" and recommendedCourses=[] — the entire response silently degrades to the AI-failure fallback shape (ExamCourseRecommendationAIService.recommendCoursesAI's Long.parseLong(String.valueOf(courseId)) throws NumberFormatException inside the try block, caught by the same catch (Exception e) branch as real Gemini failures), losing the 2 otherwise-valid recommendations and the weaknessSummary text along with the 1 bad entry. NOT FIXED — flag as a real, still-open bug; do not silently patch production code for this.","- A reproducible way to make the AI return a non-numeric/malformed courseId for exactly one of the three recommended courses."

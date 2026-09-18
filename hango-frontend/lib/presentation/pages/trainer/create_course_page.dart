@@ -28,6 +28,9 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
   // Form values
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
+  // Trainer tu chon gia ban ngay tu buoc tao khoa hoc (thay vi truoc day
+  // Backend luon tu tinh gia, bo qua moi gia tri Frontend gui len).
+  final TextEditingController _priceController = TextEditingController();
   bool _isSaving = false;
 
   // Dynamic dropdown lists (populated from DB with default fallbacks)
@@ -71,6 +74,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
+    _priceController.dispose();
     _versionController.dispose();
     super.dispose();
   }
@@ -208,6 +212,9 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
     }
   }
 
+  // User action: Trainer bam nut "Create course" tren man hinh tao khoa hoc.
+  // Ham nay validate form -> goi POST /api/v1/trainer/courses -> backend
+  // (TrainerDashboardController.createCourse) tao Course moi voi status DRAFT.
   void _saveCourse() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -236,6 +243,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
         'categoryKeys': [_selectedCategoryKey],
         'difficultyKey': _selectedLevelKey,
         'thumbnailUrl': _uploadedImageUrl ?? '',
+        'price': double.tryParse(_priceController.text.trim()) ?? 0,
       });
 
       final response = await http.post(
@@ -785,6 +793,66 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
               }
               return null;
             },
+          ),
+          const SizedBox(height: 20),
+          // Course Price - Trainer tu quyet dinh gia ban ngay tu buoc tao khoa
+          // hoc. Gia tham khao he thong tinh (dua tren so bai hoc/thoi luong)
+          // se hien thi sau, khi vao trang chinh sua sau khi tao xong.
+          const Text(
+            'Course Price (VNĐ)',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF4B5563),
+              fontFamily: 'Outfit',
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _priceController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: false),
+            decoration: InputDecoration(
+              hintText: 'e.g. 500000',
+              hintStyle: const TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+                fontFamily: 'Outfit',
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFF20B486)),
+              ),
+            ),
+            style: const TextStyle(fontFamily: 'Outfit', fontSize: 14),
+            validator: (value) {
+              final parsed = double.tryParse((value ?? '').trim());
+              if (parsed == null || parsed < 0) {
+                return 'Enter a valid, non-negative price';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'You can review the system-suggested reference price and adjust this later, once you start adding lessons in the course editor.',
+            style: TextStyle(
+              fontSize: 11,
+              color: Color(0xFF94A3B8),
+              fontFamily: 'Outfit',
+              height: 1.3,
+            ),
           ),
         ],
       ),

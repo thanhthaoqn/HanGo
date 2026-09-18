@@ -88,6 +88,7 @@ class LessonDetail {
   final String? mediaType;
   final String? itemType;
   final String? videoTranscript;
+  final double? passingScore;
 
   LessonDetail({
     required this.id,
@@ -108,6 +109,7 @@ class LessonDetail {
     this.mediaType,
     this.itemType,
     this.videoTranscript,
+    this.passingScore,
   });
 
   factory LessonDetail.fromJson(Map<String, dynamic> json) {
@@ -136,6 +138,7 @@ class LessonDetail {
       mediaType: json['mediaType'] as String?,
       itemType: json['itemType'] as String?,
       videoTranscript: json['videoTranscript'] as String?,
+      passingScore: (json['passingScore'] as num?)?.toDouble(),
     );
   }
 
@@ -158,6 +161,7 @@ class LessonDetail {
     String? mediaType,
     String? itemType,
     String? videoTranscript,
+    double? passingScore,
   }) {
     return LessonDetail(
       id: id ?? this.id,
@@ -178,6 +182,7 @@ class LessonDetail {
       mediaType: mediaType ?? this.mediaType,
       itemType: itemType ?? this.itemType,
       videoTranscript: videoTranscript ?? this.videoTranscript,
+      passingScore: passingScore ?? this.passingScore,
     );
   }
 }

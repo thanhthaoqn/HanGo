@@ -21,6 +21,7 @@ public class LessonDetailDTO {
     private List<QuizQuestionDTO> questions;
     private Boolean isCompleted;
     private Integer estimatedTime;
+    private Double passingScore;
 
     // Added fields
     private String lessonCode;

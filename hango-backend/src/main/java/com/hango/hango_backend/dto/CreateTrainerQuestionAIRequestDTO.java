@@ -5,8 +5,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.List;
-
 @Data
 @Builder
 @NoArgsConstructor
@@ -51,5 +49,10 @@ public class CreateTrainerQuestionAIRequestDTO {
      * skillType cho cả 2 (e.g., Synonym, Antonym, Grammar)
      */
     private String skillType;
+
+    /**
+     * Bật Google Search Grounding để tìm kiếm ngữ liệu thời sự thật trên Internet (BBC, The Guardian, National Geographic...)
+     */
+    private Boolean useSearchGrounding;
 }
 

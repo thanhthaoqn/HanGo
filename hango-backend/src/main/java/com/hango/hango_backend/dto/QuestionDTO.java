@@ -22,4 +22,7 @@ public class QuestionDTO {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private Boolean isGroup;
+    private Integer usageType;
+    private String usageTypeLabel;
+    private Integer optionsCount;
 }

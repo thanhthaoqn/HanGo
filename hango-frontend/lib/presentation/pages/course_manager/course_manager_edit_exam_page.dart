@@ -897,7 +897,7 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
             context,
             'Exam status updated to $selectedStatus successfully!',
           );
-          Navigator.pop(context);
+          _goBack();
         }
       } catch (e) {
         if (mounted) {

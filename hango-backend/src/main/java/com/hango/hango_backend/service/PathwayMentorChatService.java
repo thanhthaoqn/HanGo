@@ -35,6 +35,7 @@ public class PathwayMentorChatService {
     private final LessonRepository lessonRepository;
     private final LessonProgressRepository lessonProgressRepository;
     private final CourseRepository courseRepository;
+    private final PathwayMessageRepository pathwayMessageRepository;
 
     private static final int MAX_HISTORY_MESSAGES = 10;
 
@@ -57,10 +58,10 @@ public class PathwayMentorChatService {
         // Get or create conversation
         PathwayConversation conversation = getOrCreateConversation(request.getConversationId(), learnerId, pathway, learner);
 
-        // Build pathway-aware system prompt
+        // Build system prompt chua toan bo context: muc tieu, tien do tung node, diem yeu, khoa dang chon
         String systemPrompt = buildPathwaySystemPrompt(pathway, learnerId, request.getSelectedNodeCourseId());
 
-        // Build chat history from existing messages (limited to last N)
+        // Lich su chat gioi han 10 tin nhan gan nhat de khong tran token
         List<GeminiGenerateRequest.Content> geminiHistory = buildGeminiHistory(conversation, request.getMessage());
 
         // Save user message
@@ -71,7 +72,7 @@ public class PathwayMentorChatService {
                 .wasOutOfScope(false)
                 .build();
 
-        // Call Gemini
+        // Goi Gemini; neu loi thi tra cau fallback thay vi nem exception lam vo UI
         String replyText;
         boolean outOfScope = isClearlyOutOfScope(request.getMessage());
         if (outOfScope) {
@@ -102,6 +103,7 @@ public class PathwayMentorChatService {
 
         conversation.getMessages().add(userMessage);
         conversation.getMessages().add(assistantMessage);
+        pathwayMessageRepository.saveAll(List.of(userMessage, assistantMessage));
         conversationRepository.save(conversation);
 
         // Generate suggested follow-up questions

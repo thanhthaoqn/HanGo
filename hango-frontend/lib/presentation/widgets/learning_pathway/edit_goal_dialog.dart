@@ -31,7 +31,7 @@ class _EditGoalDialogState extends State<EditGoalDialog> {
   late Color _bgColor;
 
   // Target score options
-  static const List<double> _scoreOptions = [5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0];
+  static const List<double> _scoreOptions = [5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0];
 
   // Timeframe options (weeks)
   static const List<Map<String, dynamic>> _timeOptions = [
@@ -43,6 +43,9 @@ class _EditGoalDialogState extends State<EditGoalDialog> {
     {'weeks': 48, 'label': '1 Year'},
   ];
 
+  // Hours per week options
+  static const List<int> _hoursOptions = [5, 10, 14, 20, 30];
+
   bool _isLoadingAverage = true;
   double _averageScore = 0.0;
   String _aiFeedback = "";
@@ -51,6 +54,7 @@ class _EditGoalDialogState extends State<EditGoalDialog> {
 
   double? _selectedScore;
   int? _selectedWeeks;
+  int? _selectedHours;
 
   @override
   void initState() {
@@ -106,6 +110,12 @@ class _EditGoalDialogState extends State<EditGoalDialog> {
       }
       _selectedWeeks = closestWeeks;
     }
+
+    if (widget.pathway.hoursPerWeek != null && _hoursOptions.contains(widget.pathway.hoursPerWeek)) {
+      _selectedHours = widget.pathway.hoursPerWeek;
+    } else {
+      _selectedHours = 14; // Default
+    }
   }
 
   Future<void> _fetchAverageScore() async {
@@ -158,10 +168,17 @@ class _EditGoalDialogState extends State<EditGoalDialog> {
 
       _averageScore = double.parse(_averageScore.toStringAsFixed(1));
 
-      final weakSkill = widget.pathway.weakSkills.isNotEmpty ? widget.pathway.weakSkills.first : "General";
-      _aiFeedback =
-          "Based on your overall history, your baseline score is ${_averageScore.toStringAsFixed(1)}/10. "
-          "Adjust your target score and timeframe to let the AI Mentor reorganize your schedule for $weakSkill.";
+      if (_averageScore >= 10.0) {
+        _selectedScore = 10.0;
+        _aiFeedback =
+            "Outstanding! Your baseline score is 10.0/10. "
+            "The AI Mentor will schedule advanced practice to maintain your peak mastery.";
+      } else {
+        final weakSkill = widget.pathway.weakSkills.isNotEmpty ? widget.pathway.weakSkills.first : "General";
+        _aiFeedback =
+            "Based on your overall history, your baseline score is ${_averageScore.toStringAsFixed(1)}/10. "
+            "Adjust your target score and timeframe to let the AI Mentor reorganize your schedule for $weakSkill.";
+      }
 
       setState(() {
         _isLoadingAverage = false;
@@ -177,6 +194,7 @@ class _EditGoalDialogState extends State<EditGoalDialog> {
   }
 
   bool _isFeasible(double target, int weeks) {
+    if (target <= _averageScore) return true;
     return (target - _averageScore) <= (weeks * 0.5);
   }
 
@@ -191,6 +209,14 @@ class _EditGoalDialogState extends State<EditGoalDialog> {
   void _onTimeSelected(int weeks) {
     setState(() {
       _selectedWeeks = weeks;
+      _errorMessage = null;
+      _validateSelection();
+    });
+  }
+
+  void _onHoursSelected(int hours) {
+    setState(() {
+      _selectedHours = hours;
       _errorMessage = null;
       _validateSelection();
     });
@@ -211,6 +237,7 @@ class _EditGoalDialogState extends State<EditGoalDialog> {
   bool get _canSubmit =>
       _selectedScore != null &&
       _selectedWeeks != null &&
+      _selectedHours != null &&
       _errorMessage == null &&
       !_isCreating;
 
@@ -226,7 +253,7 @@ class _EditGoalDialogState extends State<EditGoalDialog> {
         pathwayId: widget.pathway.pathwayId,
         goalName: goalName,
         targetDate: targetDate,
-        hoursPerWeek: widget.pathway.hoursPerWeek ?? 10,
+        hoursPerWeek: _selectedHours ?? 14,
       );
       widget.onUpdated(updatedPathway);
       if (mounted) Navigator.pop(context);
@@ -352,7 +379,9 @@ class _EditGoalDialogState extends State<EditGoalDialog> {
                     runSpacing: 8,
                     children: _scoreOptions.map((score) {
                       final isSelected = _selectedScore == score;
-                      final isBelowAvg = score <= _averageScore;
+                      final isBelowAvg = _averageScore >= 10.0
+                          ? score < 10.0
+                          : (_averageScore >= 9.5 ? score < 9.5 : score <= _averageScore);
                       return GestureDetector(
                         onTap: isBelowAvg ? null : () => _onScoreSelected(score),
                         child: AnimatedContainer(
@@ -460,6 +489,58 @@ class _EditGoalDialogState extends State<EditGoalDialog> {
                                   : infeasible
                                       ? const Color(0xFFEF4444)
                                       : (widget.isDarkMode ? const Color(0xFFE2E8F0) : _primaryDark),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Hours/Week Section
+                  Text(
+                    "Study Time (Hours/Week)",
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: _textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _hoursOptions.map((hours) {
+                      final isSelected = _selectedHours == hours;
+                      
+                      return GestureDetector(
+                        onTap: () => _onHoursSelected(hours),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isSelected ? _primaryColor : (widget.isDarkMode ? _bgColor : Colors.white),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isSelected ? _primaryColor : _borderColor,
+                              width: isSelected ? 2 : 1,
+                            ),
+                            boxShadow: isSelected
+                                ? [
+                                    BoxShadow(
+                                      color: _primaryColor.withOpacity(0.25),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    )
+                                  ]
+                                : null,
+                          ),
+                          child: Text(
+                            "${hours}h",
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: isSelected ? Colors.white : (widget.isDarkMode ? const Color(0xFFE2E8F0) : _primaryDark),
                             ),
                           ),
                         ),

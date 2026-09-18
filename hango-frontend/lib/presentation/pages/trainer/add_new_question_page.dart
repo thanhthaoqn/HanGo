@@ -50,6 +50,7 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
   int _aiCategoryId = 1;
   int _aiSkillId = 1; // alias for category/skill (if you map separately later)
   String? _selectedSkillType;
+  int _usageType = 3; // 1 = Quiz Only, 2 = Exam Only, 3 = Both
 
   final TrainerAiQuestionRepository _aiRepo = TrainerAiQuestionRepository();
   bool _isGeneratingByAi = false;
@@ -271,6 +272,7 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
           'categoryId': _aiCategoryId,
           'skillParamId': _aiSkillId,
           'difficultyId': _aiDifficultyId,
+          'usageType': _usageType,
           'options': payloadOptions,
         };
 
@@ -945,6 +947,45 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
                                   if (val != null) {
                                     setState(() {
                                       _aiDifficultyId = val;
+                                    });
+                                  }
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          // Usage Type Dropdown
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: const Color(0xFFE2E8F0),
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                              color: Colors.white,
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<int>(
+                                isExpanded: true,
+                                value: _usageType,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF1E293B),
+                                  fontFamily: 'Outfit',
+                                ),
+                                icon: const Icon(
+                                  Icons.arrow_drop_down,
+                                  color: Color(0xFF64748B),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(value: 1, child: Text('Quiz Only')),
+                                  DropdownMenuItem(value: 2, child: Text('Exam Only')),
+                                  DropdownMenuItem(value: 3, child: Text('Both (Quiz & Exam)')),
+                                ],
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setState(() {
+                                      _usageType = val;
                                     });
                                   }
                                 },

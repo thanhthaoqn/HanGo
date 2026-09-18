@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../routes/app_routes.dart';
 import '../../../domain/entities/exam.dart';
 import '../../../utils/language_manager.dart';
-import '../pages/exam/exam_detail_history_page.dart';
 
 class ExamCard extends StatefulWidget {
   final Exam exam;
@@ -26,11 +27,9 @@ class _ExamCardState extends State<ExamCard> {
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ExamDetailHistoryPage(exam: widget.exam),
-            ),
+          context.go(
+            AppRoutes.examDetailRoute(widget.exam.id),
+            extra: widget.exam,
           );
         },
         child: AnimatedContainer(

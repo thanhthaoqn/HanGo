@@ -31,6 +31,31 @@
 
   <title>HanGo</title>
   <link rel="manifest" href="manifest.json">
+
+  <script>
+    // Guard against known Flutter Web DDC bootstrap issue where 'dart-app-ready'
+    // fires multiple times and causes removeChild on an already removed element.
+    (function() {
+      const origAddEventListener = EventTarget.prototype.addEventListener;
+      EventTarget.prototype.addEventListener = function(type, listener, options) {
+        if (type === 'dart-app-ready' && typeof listener === 'function') {
+          const safeListener = function(event) {
+            try {
+              return listener.apply(this, arguments);
+            } catch (e) {
+              if (e instanceof TypeError && e.message && e.message.includes('removeChild')) {
+                console.debug('Handled benign Flutter DDC bootstrap cleanup:', e.message);
+                return;
+              }
+              throw e;
+            }
+          };
+          return origAddEventListener.call(this, type, safeListener, options);
+        }
+        return origAddEventListener.call(this, type, listener, options);
+      };
+    })();
+  </script>
 </head>
 <body>
   <!--

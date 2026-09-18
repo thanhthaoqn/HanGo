@@ -1,12 +1,12 @@
 package com.hango.hango_backend.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.hango.hango_backend.config.GeminiProperties;
 import com.hango.hango_backend.dto.CreateTrainerQuestionAIRequestDTO;
 import com.hango.hango_backend.dto.CreateTrainerQuestionAIResponseDTO;
 import com.hango.hango_backend.dto.CreateTrainerExamAIResponseDTO;
 import com.hango.hango_backend.dto.TrainerExamChatRequestDTO;
 import com.hango.hango_backend.dto.GeminiGenerateRequest;
+import com.hango.hango_backend.dto.GeminiGenerateResponse;
 import com.hango.hango_backend.entity.SystemParameter;
 import com.hango.hango_backend.exception.ApiException;
 import com.hango.hango_backend.repository.SystemParameterRepository;
@@ -23,6 +23,14 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class TrainerQuestionAIService {
+
+    private static final ObjectMapper LENIENT_MAPPER = com.fasterxml.jackson.databind.json.JsonMapper.builder()
+            .enable(com.fasterxml.jackson.core.json.JsonReadFeature.ALLOW_UNQUOTED_FIELD_NAMES)
+            .enable(com.fasterxml.jackson.core.json.JsonReadFeature.ALLOW_TRAILING_COMMA)
+            .enable(com.fasterxml.jackson.core.json.JsonReadFeature.ALLOW_SINGLE_QUOTES)
+            .enable(com.fasterxml.jackson.core.json.JsonReadFeature.ALLOW_JAVA_COMMENTS)
+            .build()
+            .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     private final GeminiClientService geminiClientService;
     private final ObjectMapper objectMapper;
@@ -53,6 +61,7 @@ public class TrainerQuestionAIService {
             "    {\n" +
             "      \"isQuestionGroup\": false,\n" +
             "      \"passageText\": \"\",\n" +
+            "      \"sourceCitation\": \"\",\n" +
             "      \"categoryId\": 1,\n" +
             "      \"skillParamId\": 1,\n" +
             "      \"difficultyId\": 14,\n" +
@@ -74,7 +83,7 @@ public class TrainerQuestionAIService {
             "  ]\n" +
             "}\n" +
             "categoryId can default to 1 (General). difficultyId can be 14 (Easy), 15 (Medium), 16 (Hard). skillParamId can be null if not specified.\n" +
-            "For group questions, set isQuestionGroup = true, provide passageText, and put multiple questions in the questions array.\n" +
+            "For group questions, set isQuestionGroup = true, provide passageText containing ONLY the reading passage (do NOT put 'Adapted from...' or source headers at the beginning of passageText), put multiple questions in the questions array, and provide sourceCitation separately for reading comprehension (e.g. 'Adapted from National Geographic', 'Adapted from BBC Focus') without fabricating fake web URLs.\n" +
             "For single questions, set isQuestionGroup = false, empty passageText, and exactly 1 question in the questions array.\n" +
             "Generate the EXACT number of questions and groups as discussed in the chat.";
 
@@ -97,6 +106,8 @@ public class TrainerQuestionAIService {
         long difficultyId = req.getDifficultyId() != null ? req.getDifficultyId() : 14L;
 
         boolean isMultipleBranch = !"SINGLE".equals(mode);
+        boolean useSearchGrounding = Boolean.TRUE.equals(req.getUseSearchGrounding());
+
         List<SystemParameter> activeSkills = isMultipleBranch
                 ? systemParameterRepository.findByParamTypeAndIsActiveTrue("SKILL_TYPE")
                 : List.of();
@@ -106,21 +117,49 @@ public class TrainerQuestionAIService {
 
         String systemPrompt = buildSystemPrompt(req, mode, quantity, activeSkills, activeDifficulties);
 
-        String raw = geminiClientService.generateChatResponse(
-                systemPrompt,
-                List.of(
-                        GeminiGenerateRequest.Content.builder()
-                                .role("user")
-                                .parts(List.of(GeminiGenerateRequest.Part.builder().text(buildUserInput(req)).build()))
-                                .build()
-                )
-        );
+        String raw;
+        List<GeminiGenerateResponse.WebSource> groundingSources = List.of();
+
+        if (useSearchGrounding) {
+            GeminiClientService.GeminiChatResult chatResult = geminiClientService.generateChatResponseDetailed(
+                    systemPrompt,
+                    List.of(
+                            GeminiGenerateRequest.Content.builder()
+                                    .role("user")
+                                    .parts(List.of(GeminiGenerateRequest.Part.builder().text(buildUserInput(req)).build()))
+                                    .build()
+                    ),
+                    true
+            );
+            raw = chatResult != null ? chatResult.getText() : null;
+            if (chatResult != null && chatResult.getSources() != null) {
+                groundingSources = chatResult.getSources();
+            }
+        } else {
+            raw = geminiClientService.generateChatResponse(
+                    systemPrompt,
+                    List.of(
+                            GeminiGenerateRequest.Content.builder()
+                                    .role("user")
+                                    .parts(List.of(GeminiGenerateRequest.Part.builder().text(buildUserInput(req)).build()))
+                                    .build()
+                    )
+            );
+        }
+
+        if (raw == null || raw.isBlank()) {
+            throw new ApiException("AI returned empty response", HttpStatus.BAD_GATEWAY);
+        }
 
         // Gemini đôi khi bọc codeblock ```json ... ```
         raw = raw.replaceAll("(?s)^```json\\s*", "")
                 .replaceAll("(?s)```\\s*$", "")
                 .trim();
                 
+        // Auto-repair common LLM JSON syntax quirks (e.g. missing quote on key: `subQuestions":`)
+        raw = raw.replaceAll("(?m)^(\\s*)([a-zA-Z0-9_]+)\":", "$1\"$2\":");
+        raw = raw.replaceAll(",\\s*([}\\]])", "$1");
+
         int start = raw.indexOf('{');
         int end = raw.lastIndexOf('}');
         if (start >= 0 && end >= 0 && end > start) {
@@ -129,17 +168,148 @@ public class TrainerQuestionAIService {
 
         CreateTrainerQuestionAIResponseDTO response;
         try {
-            response = objectMapper.readValue(raw, CreateTrainerQuestionAIResponseDTO.class);
+            response = LENIENT_MAPPER.readValue(raw, CreateTrainerQuestionAIResponseDTO.class);
         } catch (Exception e) {
-            log.warn("Parse AI json failed. raw={}", raw);
+            log.warn("Parse AI json failed. raw={}", raw, e);
             throw new ApiException("AI returned invalid JSON payload", HttpStatus.BAD_GATEWAY);
         }
 
+        String searchSources = groundingSources.isEmpty() ? null : groundingSources.stream()
+                .map(s -> (s.getTitle() != null && !s.getTitle().isBlank())
+                        ? s.getTitle() + " (" + s.getUri() + ")"
+                        : s.getUri())
+                .distinct()
+                .collect(Collectors.joining(", "));
+
         if (isMultipleBranch && response.getGroup() != null) {
             fillSubQuestionSkillAndDifficulty(response.getGroup(), activeSkills, activeDifficulties);
+
+            attachCitationToPassage(
+                    response.getGroup().getPassageText(),
+                    response.getGroup().getSourceCitation(),
+                    searchSources,
+                    response.getGroup()::setPassageText,
+                    response.getGroup()::setSourceCitation
+            );
+        } else if (!isMultipleBranch && response.getQuestions() != null) {
+            for (CreateTrainerQuestionAIResponseDTO.SingleQuestionDTO q : response.getQuestions()) {
+                String finalCitation;
+                if (searchSources != null && !searchSources.isBlank()) {
+                    finalCitation = "(Source: " + searchSources + ")";
+                } else {
+                    finalCitation = formatCitation(q.getSourceCitation(), false);
+                }
+                q.setSourceCitation(finalCitation);
+            }
         }
 
         return response;
+    }
+
+    private static final java.util.regex.Pattern LEADING_CITATION_PATTERN = java.util.regex.Pattern.compile(
+            "(?i)^\\s*(?:\\((?:Adapted from|Source|From)[:\\s]+([^)]+)\\)|(?:\\[(?:Adapted from|Source|From)[:\\s]+([^\\]]+)\\])|(?:Adapted from|Source:?)\\s*([^:\n\r]+)[:\\-–])\\s*"
+    );
+
+    /**
+     * Dọn dẹp và chuẩn hóa bài đọc cùng nguồn trích dẫn:
+     * 1. Nếu AI lỡ đặt "Adapted from ...:" ở đầu bài đọc, tự động cắt bỏ khỏi đầu đoạn văn để mở bài tự nhiên.
+     * 2. Nếu AI có nguồn (hoặc lấy được từ đầu bài), chuẩn hóa thành (Adapted from: ...) và nối xuống dưới cùng bài đọc.
+     */
+    private void attachCitationToPassage(
+            String rawPassage,
+            String rawCitation,
+            String searchSources,
+            java.util.function.Consumer<String> passageSetter,
+            java.util.function.Consumer<String> citationSetter
+    ) {
+        if (rawPassage == null) {
+            rawPassage = "";
+        }
+
+        String cleanedPassage = rawPassage.trim();
+        String extractedLeadingSource = null;
+
+        java.util.regex.Matcher matcher = LEADING_CITATION_PATTERN.matcher(cleanedPassage);
+        if (matcher.find()) {
+            String g1 = matcher.group(1);
+            String g2 = matcher.group(2);
+            String g3 = matcher.group(3);
+            extractedLeadingSource = (g1 != null) ? g1 : (g2 != null ? g2 : g3);
+            if (extractedLeadingSource != null) {
+                extractedLeadingSource = extractedLeadingSource.trim();
+            }
+            cleanedPassage = cleanedPassage.substring(matcher.end()).trim();
+        }
+
+        String finalCitation;
+        if (searchSources != null && !searchSources.isBlank()) {
+            finalCitation = "(Adapted from: " + searchSources + ")";
+        } else {
+            String candidate = (rawCitation != null && !rawCitation.isBlank()) ? rawCitation : extractedLeadingSource;
+            finalCitation = formatCitation(candidate, true);
+        }
+
+        if (finalCitation != null && !finalCitation.isBlank()) {
+            if (cleanedPassage.endsWith(finalCitation)) {
+                cleanedPassage = cleanedPassage.substring(0, cleanedPassage.length() - finalCitation.length()).trim();
+            }
+            cleanedPassage = cleanedPassage + "\n\n" + finalCitation;
+        }
+
+        passageSetter.accept(cleanedPassage);
+        citationSetter.accept(finalCitation);
+    }
+
+    /**
+     * Chuẩn hóa nguồn trích dẫn văn bản (Textual Citation):
+     * - Loại bỏ hoàn toàn các đường dẫn URL (http/https/www) do AI tự bịa để tránh lỗi 404.
+     * - Giữ lại tên sách, bài báo, tác giả hợp lệ (ví dụ: "Adapted from The Psychology of Money").
+     * - Format chuẩn theo format đề thi (Adapted from: ...) hoặc (Source: ...).
+     */
+    private String formatCitation(String rawCitation, boolean isMultiple) {
+        if (rawCitation == null || rawCitation.isBlank()) {
+            return null;
+        }
+
+        String cleaned = rawCitation.trim();
+
+        if (cleaned.equalsIgnoreCase("null") || cleaned.equalsIgnoreCase("none")
+                || cleaned.equalsIgnoreCase("n/a") || cleaned.equalsIgnoreCase("unknown")
+                || cleaned.equalsIgnoreCase("undefined")) {
+            return null;
+        }
+
+        // Loại bỏ URL đặt trong ngoặc: (https://...), [https://...]
+        cleaned = cleaned.replaceAll("(?i)\\s*\\([\\s]*https?://[^)]*\\)", "");
+        cleaned = cleaned.replaceAll("(?i)\\s*\\[[\\s]*https?://[^\\]]*\\]", "");
+
+        // Loại bỏ mọi URL trần còn lại
+        cleaned = cleaned.replaceAll("(?i)https?://\\S+", "");
+        cleaned = cleaned.replaceAll("(?i)www\\.\\S+", "");
+
+        // Dọn dẹp ngoặc rỗng, ngoặc đơn lẻ loi hoặc dấu thừa ở cuối
+        cleaned = cleaned.replaceAll("\\(\\s*\\)", "");
+        cleaned = cleaned.replaceAll("\\[\\s*\\]", "");
+        cleaned = cleaned.replaceAll("[({\\[,:;\\-\\s]+$", "");
+        cleaned = cleaned.trim();
+
+        if (cleaned.isBlank()) {
+            return null;
+        }
+
+        if (cleaned.startsWith("(") && cleaned.endsWith(")")) {
+            String inner = cleaned.substring(1, cleaned.length() - 1).trim();
+            if (inner.isBlank()) return null;
+            return cleaned;
+        }
+
+        String lower = cleaned.toLowerCase();
+        if (lower.startsWith("adapted from") || lower.startsWith("source:") || lower.startsWith("from:")) {
+            return "(" + cleaned + ")";
+        }
+
+        String prefix = isMultiple ? "Adapted from: " : "Source: ";
+        return "(" + prefix + cleaned + ")";
     }
 
     /**
@@ -212,7 +382,8 @@ public class TrainerQuestionAIService {
                 "For single questions, set isQuestionGroup = false, empty passageText, and exactly 1 question in the questions array. " +
                 "For single questions, the categoryId is NOT used for GROUP TYPES, it defaults to a general category ID (like 1).\n" +
                 "For group questions (e.g. Reading, Listening), set isQuestionGroup = true, provide passageText, and put multiple questions in the questions array. " +
-                "For group questions, categoryId MUST be one of the GROUP TYPES IDs provided above.\n" +
+                "For group questions, categoryId MUST be one of the GROUP TYPES IDs provided above. " +
+                "For reading comprehension passages, passageText must contain ONLY the article/passage itself (do NOT include 'Adapted from...' or source headers at the start of passageText). Provide an authentic sourceCitation separately (e.g. 'Adapted from National Geographic', 'Adapted from BBC Science Focus') without fabricating fake web URLs.\n" +
                 "Generate the EXACT number of questions and groups as discussed in the chat.";
 
         List<GeminiGenerateRequest.Content> contents = req.getHistory().stream()
@@ -234,6 +405,9 @@ public class TrainerQuestionAIService {
                 .replaceAll("(?s)```\\s*$", "")
                 .trim();
                 
+        raw = raw.replaceAll("(?m)^(\\s*)([a-zA-Z0-9_]+)\":", "$1\"$2\":");
+        raw = raw.replaceAll(",\\s*([}\\]])", "$1");
+
         int start = raw.indexOf('{');
         int end = raw.lastIndexOf('}');
         if (start >= 0 && end >= 0 && end > start) {
@@ -241,7 +415,22 @@ public class TrainerQuestionAIService {
         }
 
         try {
-            return objectMapper.readValue(raw, CreateTrainerExamAIResponseDTO.class);
+            CreateTrainerExamAIResponseDTO examResponse = LENIENT_MAPPER.readValue(raw, CreateTrainerExamAIResponseDTO.class);
+            if (examResponse != null && examResponse.getBlocks() != null) {
+                for (CreateTrainerExamAIResponseDTO.BlockDTO block : examResponse.getBlocks()) {
+                    if (Boolean.TRUE.equals(block.getIsQuestionGroup()) && block.getPassageText() != null
+                            && !block.getPassageText().isBlank()) {
+                        attachCitationToPassage(
+                                block.getPassageText(),
+                                block.getSourceCitation(),
+                                null,
+                                block::setPassageText,
+                                block::setSourceCitation
+                        );
+                    }
+                }
+            }
+            return examResponse;
         } catch (Exception e) {
             log.error("Parse AI json failed for exam generation. Error: ", e);
             log.error("Raw JSON string: {}", raw);
@@ -262,6 +451,9 @@ public class TrainerQuestionAIService {
         if (req.getGroupType() != null && !req.getGroupType().isBlank()) {
             sb.append("\nGROUP_TYPE: ").append(req.getGroupType());
         }
+        if (Boolean.TRUE.equals(req.getUseSearchGrounding())) {
+            sb.append("\nUSE_SEARCH_GROUNDING: true");
+        }
         return sb.toString();
     }
 
@@ -275,13 +467,17 @@ public class TrainerQuestionAIService {
         // Yêu cầu JSON thuần theo schema mà FE parse
         Long difficultyId = req.getDifficultyId() != null ? req.getDifficultyId() : 14L;
         Long categoryId = req.getCategoryId() != null ? req.getCategoryId() : 1L;
+        boolean useSearchGrounding = Boolean.TRUE.equals(req.getUseSearchGrounding());
 
         if ("SINGLE".equals(mode)) {
             String skillReq = (req.getSkillType() != null && !req.getSkillType().isBlank()) 
                     ? " The question MUST specifically test the skill: " + req.getSkillType() + "." 
                     : "";
+            String groundingReq = useSearchGrounding
+                    ? " Use Google Search to retrieve authentic grammar references, dictionaries, or reputable facts."
+                    : "";
             return "You are an expert English test question generator for HanGo trainer.\n" +
-                    "Create ONLY SINGLE multiple-choice questions. 4 options per question. Exactly 1 correct option." + skillReq + "\n" +
+                    "Create ONLY SINGLE multiple-choice questions. 4 options per question. Exactly 1 correct option." + skillReq + groundingReq + "\n" +
                     "Return PURE JSON only (no markdown).\n" +
                     "Schema:\n" +
                     "{\n" +
@@ -290,6 +486,7 @@ public class TrainerQuestionAIService {
                     "    {\n" +
                     "      \"questionText\": \"...\",\n" +
                     "      \"explanation\": \"...\",\n" +
+                    "      \"sourceCitation\": \"...\",\n" +
                     "      \"categoryId\": " + categoryId + ",\n" +
                     "      \"difficultyId\": " + difficultyId + ",\n" +
                     "      \"options\": [\n" +
@@ -301,7 +498,8 @@ public class TrainerQuestionAIService {
                     "    }\n" +
                     "  ]\n" +
                     "}\n" +
-                    "Generate exactly " + quantity + " questions. Explanations should be short. Options should be plausible distractors.";
+                    "Generate exactly " + quantity + " questions. Explanations should be short. Options should be plausible distractors.\n" +
+                    "For sourceCitation: provide a brief citation of the reference book or publication if applicable (e.g. 'Source: BBC Learning English') without inventing fake URLs.";
         }
 
         // MULTIPLE
@@ -310,6 +508,9 @@ public class TrainerQuestionAIService {
                 : "";
         String groupReq = (req.getGroupType() != null && !req.getGroupType().isBlank())
                 ? " The format and passage MUST follow the structure of group type: " + req.getGroupType() + "."
+                : "";
+        String groundingReqMulti = useSearchGrounding
+                ? " Use Google Search to find an authentic, reputable English reading passage/article (e.g. from BBC, The Guardian, National Geographic, British Council). The passage must be factual and questions must test reading comprehension on the real passage."
                 : "";
 
         String skillOptionsText = activeSkills.isEmpty() ? "" : activeSkills.stream()
@@ -326,7 +527,7 @@ public class TrainerQuestionAIService {
 
         return "You are an expert English reading comprehension test question generator for HanGo trainer.\n" +
                 "Create a group question. passageText + subQuestions[]." + groupReq + "\n" +
-                "Each subQuestion is single-answer multiple-choice with 4 options and exactly 1 correct option." + skillReqMulti +
+                "Each subQuestion is single-answer multiple-choice with 4 options and exactly 1 correct option." + skillReqMulti + groundingReqMulti +
                 perSubQuestionSkillReq + perSubQuestionDifficultyReq + "\n" +
                 "Return PURE JSON only (no markdown).\n" +
                 "Schema:\n" +
@@ -336,6 +537,7 @@ public class TrainerQuestionAIService {
                 "  \"group\": {\n" +
                 "    \"passageText\": \"...\",\n" +
                 "    \"explanation\": \"...\",\n" +
+                "    \"sourceCitation\": \"...\",\n" +
                 "    \"categoryId\": " + categoryId + ",\n" +
                 "    \"difficultyId\": " + difficultyId + ",\n" +
                 "    \"subQuestions\": [\n" +
@@ -354,6 +556,8 @@ public class TrainerQuestionAIService {
                 "    ]\n" +
                 "  }\n" +
                 "}\n" +
-                "Generate at least 2 subQuestions. Here quantity=" + quantity + ". Generate exactly " + quantity + " subQuestions. Explanations should be short. Options should be plausible distractors.";
+                "Generate at least 2 subQuestions. Here quantity=" + quantity + ". Generate exactly " + quantity + " subQuestions. Explanations should be short. Options should be plausible distractors.\n" +
+                "passageText must contain ONLY the article/passage itself (do NOT write 'Adapted from...' or source headers at the start of passageText). Provide the citation in the sourceCitation field instead.\n" +
+                "For sourceCitation: provide an authentic citation of the work, book, magazine, or article adapted for this passage (e.g. 'Adapted from The Psychology of Money', 'Adapted from National Geographic'). Do NOT invent fake web URLs (no http/https links).";
     }
 }

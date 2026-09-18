@@ -150,6 +150,8 @@ public class AdminController {
             if (userOpt.isPresent()) {
                 User user = userOpt.get();
 
+                // Chan Admin tu khoa (INACTIVE) chinh tai khoan dang dang nhap cua minh
+                // -> tranh truong hop tu khoa quyen truy cap cua chinh minh khong ai mo lai duoc.
                 if (currentAdmin != null && currentAdmin.getUsername().equalsIgnoreCase(user.getEmail())) {
                     return ResponseEntity.badRequest().body("Error: Admin cannot change the status of their own account");
                 }
@@ -247,6 +249,19 @@ public class AdminController {
                     if (roleObj == null) {
                         throw new IllegalArgumentException("Error: Role not found!");
                     }
+
+                    // Cung chan Admin tu doi ROLE cua chinh minh nhu da chan doi STATUS
+                    // o tren - neu khong, Admin (nhat la khi la Admin duy nhat) co the
+                    // vo tinh tu ha cap minh xuong LEARNER va mat quyen truy cap ngay
+                    // lap tuc, khong ai (ke ca chinh ho) mo lai duoc.
+                    boolean isSelf = currentAdmin != null && currentAdmin.getUsername() != null
+                            && currentAdmin.getUsername().equalsIgnoreCase(user.getEmail());
+                    boolean roleActuallyChanging = user.getRoles() == null || user.getRoles().stream()
+                            .noneMatch(r -> r.getRoleName().equalsIgnoreCase(roleObj.getRoleName()));
+                    if (isSelf && roleActuallyChanging) {
+                        return ResponseEntity.badRequest().body("Error: Admin cannot change the role of their own account");
+                    }
+
                     Set<Role> roles = new HashSet<>();
                     roles.add(roleObj);
                     user.setRoles(roles);
@@ -401,6 +416,10 @@ public class AdminController {
         }
     }
 
+    // Day la API cho phep Admin BAT/TAT dong loat permission cua 1 Role
+    // (vd: TRAINER, COURSE_MANAGER...). Chi user co quyen MANAGE_ACCOUNTS_ROLES
+    // hoac role ADMINISTRATOR moi goi duoc (@PreAuthorize chan tu tang Security,
+    // truoc khi vao toi than method).
     @PutMapping("/roles/{roleName}/permissions")
     @PreAuthorize("hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<?> updateRolePermissions(
@@ -418,6 +437,9 @@ public class AdminController {
                 for (String code : request.getPermissionCodes()) {
                     Optional<Permission> pOpt = permissionRepository.findByCode(code);
                     pOpt.ifPresent(p -> {
+                        // "restrictedForRoles": neu permission nay bi cam voi role
+                        // dang sua (vd chi danh cho TRAINER, khong duoc gan cho LEARNER)
+                        // thi BO QUA du Admin co gui code do len tu Frontend.
                         String restricted = p.getRestrictedForRoles();
                         if (restricted == null || !restricted.contains(role.getRoleName())) {
                             newPermissions.add(p);
@@ -425,8 +447,12 @@ public class AdminController {
                     });
                 }
             }
-            
+
             // Enforce Core permissions (must have)
+            // "coreForRoles": nhung permission bat buoc phai co voi role nay
+            // (vd LEARNER luon phai co ENROLL_AND_LEARN_COURSES) se duoc TU DONG
+            // them lai du Admin co bo chon o Frontend hay khong -> tranh Admin
+            // vo tinh khoa mat 1 role khoi chuc nang co ban cua no.
             List<Permission> allPermissions = permissionRepository.findAll();
             for (Permission p : allPermissions) {
                 String core = p.getCoreForRoles();

@@ -57,40 +57,46 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Cho phép tất cả request OPTIONS (Preflight) đi qua tự do
+                        // Allow all OPTIONS requests (Preflight)
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // Các endpoint công khai của hệ thống
+                        // Public endpoints
+                        .requestMatchers("/api/health").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/v1/exams", "/api/v1/exams/**").permitAll()
                         .requestMatchers("/api/v1/courses", "/api/v1/courses/**").permitAll()
                         .requestMatchers("/api/v1/metadata/**").permitAll()
-                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/lessons/**", "/api/v1/comments/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/lessons/**",
+                                "/api/v1/comments/**")
+                        .permitAll()
 
-                        // 🔥 ĐÃ SỬA: Chuyển sang permitAll() giúp cô lập lỗi, tránh bị JwtAuthFilter
-                        // chặn nhầm 403
+                        // Fixed: Changed to permitAll() to isolate errors, avoiding incorrect 403
+                        // blocking by JwtAuthFilter
                         .requestMatchers("/api/v1/ai-assistant/**").permitAll()
                         .requestMatchers("/api/v1/ai-assistant/messages", "/api/v1/ai-assistant/conversations")
-                        .authenticated() // Gửi tin nhắn & lịch sử: Phải có Token
-                        // 🎯 THÊM DÒNG NÀY: Cho phép các response báo lỗi hệ thống đi qua để hiển thị
-                        // đúng bản chất
+                        .authenticated() // Send messages & history: Must have Token
+                        // Add this line: Allow system error responses to pass through for correct
+                        // display
                         .requestMatchers("/error").permitAll()
 
-                        // 💳 Payment & Course Manager endpoints: permitAll to delegate to controller security
+                        // Payment & Course Manager endpoints: permitAll to delegate to controller
+                        // security
                         .requestMatchers("/api/v1/payment/payos-webhook", "/api/v1/payment/vnpay-return").permitAll()
                         .requestMatchers("/api/v1/course-manager/**").permitAll()
                         .requestMatchers("/api/v1/payment/**").permitAll()
-                        .requestMatchers("/api/v1/trainer/statements/**", "/api/v1/trainer/revenue-summary").permitAll()
+                        .requestMatchers("/api/v1/trainer/statements/**", "/api/v1/trainer/revenue-summary",
+                                "/api/v1/trainer/dashboard/seed")
+                        .permitAll()
 
                         .anyRequest().authenticated());
 
         http.authenticationProvider(authenticationProvider());
         http.addFilterBefore(authenticationJwtTokenFilter(), UsernamePasswordAuthenticationFilter.class);
 
-        // Add exception handling to ensure 403 AccessDeniedException is returned as JSON
+        // Add exception handling to ensure 403 AccessDeniedException is returned as
+        // JSON
         http.exceptionHandling(exception -> exception
-                .accessDeniedHandler(new CustomAccessDeniedHandler())
-        );
+                .accessDeniedHandler(new CustomAccessDeniedHandler()));
 
         return http.build();
     }
@@ -99,16 +105,15 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // 🔥 ĐÃ SỬA: Thay vì dùng "*" gây lỗi khi kết hợp với AllowCredentials, ta chỉ
-        // định đích danh cổng Flutter Web
+        // Fixed: Instead of using "*" which causes errors when combined with
+        // AllowCredentials, we only specify the Flutter Web port
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:3000",
                 "https://hangog92.online",
                 "https://www.hangog92.online"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 
-        // Đảm bảo trình duyệt chấp nhận các Header truyền từ Flutter lên (kể cả Bearer
-        // Token)
+        // Ensure the browser accepts headers sent from Flutter (including Bearer Token)
         configuration.setAllowedHeaders(Arrays.asList(
                 "Authorization",
                 "Content-Type",

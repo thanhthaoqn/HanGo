@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../routes/app_routes.dart';
 import '../../../data/repositories/course_repository.dart';
 import '../../../domain/model/course_detail.dart';
 import '../../../domain/model/course.dart';
@@ -6,17 +8,15 @@ import '../../../domain/model/course_review_summary.dart';
 import '../../../data/services/auth_service.dart';
 import '../../widgets/shared_header.dart';
 import '../../widgets/shared_footer.dart';
-import '../learner/learner_home_page.dart';
-import '../login_page.dart';
+import '../learner/learner_shell_page.dart';
 import 'review_tab.dart';
-import 'lesson_detail_page.dart';
 import 'course_completion_page.dart';
-import 'cart_page.dart';
 import '../../../utils/cart_manager.dart';
 import '../../../utils/language_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../data/repositories/payment_repository.dart';
 import '../../../utils/toast_helper.dart';
-import '../../widgets/payment_qr_dialog.dart';
 
 class CourseDetailPage extends StatefulWidget {
   final int courseId;
@@ -37,6 +37,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   late ScrollController _scrollController;
   late Future<CourseReviewSummary> _reviewsFuture;
   bool _isEnrolling = false;
+  bool _isBuying = false;
   bool _isSwitchingVersion = false;
   bool _isInCart = false;
   bool _dismissedVersionBanner = false;
@@ -44,6 +45,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   int _currentUserId = 1;
   bool _canEnroll = true;
   bool _canRateAndComment = true;
+  List<String> _userRoles = [];
 
   @override
   void initState() {
@@ -91,9 +93,12 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     if (mounted) {
       setState(() {
         _currentUserId = prefs.getInt('user_id') ?? 1;
+        _userRoles = roles;
         _canEnroll =
             roles.contains('ENROLL_AND_LEARN_COURSES') ||
-            roles.contains('ROLE_ADMINISTRATOR');
+            roles.contains('ROLE_ADMINISTRATOR') ||
+            roles.contains('ROLE_TRAINER') ||
+            roles.contains('TRAINER');
         _canRateAndComment =
             roles.contains('RATE_AND_COMMENT') ||
             roles.contains('ROLE_ADMINISTRATOR');
@@ -555,6 +560,15 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   }
 
   void _enroll(CourseDetail course) async {
+    final isOwner = course.isCreator ||
+        (course.creatorId != null && course.creatorId == _currentUserId);
+    if (isOwner) {
+      _showNotification(
+        'You are the author of this course!',
+        isError: true,
+      );
+      return;
+    }
     if (!_canEnroll) {
       _showNotification(
         'Enrollment is not available for your role.',
@@ -566,10 +580,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     final isLoggedIn = await authService.isLoggedIn();
     if (!isLoggedIn) {
       if (!mounted) return;
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-      );
+      context.go(AppRoutes.login);
       return;
     }
     _showEnrollConfirmDialog(course);
@@ -737,14 +748,17 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width > 900;
+    final isInShell = LearnerShellPage.of(context) != null;
 
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: SharedHeader(
-        isDesktop: isDesktop,
-        activeTab: 'Courses',
-        showBackButton: Navigator.canPop(context),
-      ),
+      appBar: isInShell
+          ? null
+          : SharedHeader(
+              isDesktop: isDesktop,
+              activeTab: 'Courses',
+              showBackButton: true,
+            ),
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(color: Color(0xFF28B79B)),
@@ -859,14 +873,19 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                     onTap: () {
                       if (Navigator.canPop(context)) {
                         Navigator.pop(context);
+                        return;
+                      }
+                      final isTrainer = _userRoles.contains('ROLE_TRAINER') ||
+                          _userRoles.contains('TRAINER');
+                      final isCourseManager =
+                          _userRoles.contains('ROLE_COURSE_MANAGER') ||
+                          _userRoles.contains('COURSE_MANAGER');
+                      if (isTrainer) {
+                        context.go(AppRoutes.trainer);
+                      } else if (isCourseManager) {
+                        context.go(AppRoutes.courseManager);
                       } else {
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const LearnerHomePage(),
-                          ),
-                          (route) => false,
-                        );
+                        context.go(AppRoutes.courses);
                       }
                     },
                     hoverColor: Colors.transparent,
@@ -1306,18 +1325,15 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                   final itemType = lesson.itemType?.toLowerCase();
                   final isExercise =
                       itemType == 'quiz' || itemType == 'practice';
+                  final isOwner = course.isCreator ||
+                      (course.creatorId != null &&
+                          course.creatorId == _currentUserId);
+                  final hasAccess = course.isEnrolled || isOwner;
                   return InkWell(
-                    onTap: course.isEnrolled
+                    onTap: hasAccess
                         ? () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => LessonDetailPage(
-                                  courseId: course.id,
-                                  lessonId: lesson.id,
-                                  cameFromCourseDetail: true,
-                                ),
-                              ),
+                            context.push(
+                              '/courses/${course.id}/lessons/${lesson.id}',
                             );
                           }
                         : () {
@@ -1337,7 +1353,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                           Icon(
                             _getLessonIcon(lesson.itemType),
                             size: 18,
-                            color: course.isEnrolled
+                            color: hasAccess
                                 ? const Color(0xFF28B79B)
                                 : Colors.grey,
                           ),
@@ -1347,7 +1363,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                               lesson.title,
                               style: TextStyle(
                                 fontSize: 14,
-                                color: course.isEnrolled
+                                color: hasAccess
                                     ? const Color(0xFF4B5563)
                                     : Colors.grey.shade500,
                               ),
@@ -1366,26 +1382,17 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                           ],
                           if (isExercise)
                             TextButton(
-                              onPressed: course.isEnrolled
+                              onPressed: hasAccess
                                   ? () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              LessonDetailPage(
-                                                courseId: course.id,
-                                                lessonId: lesson.id,
-                                                startQuizImmediately: true,
-                                                cameFromCourseDetail: true,
-                                              ),
-                                        ),
+                                      context.push(
+                                        '/courses/${course.id}/lessons/${lesson.id}?startQuiz=true',
                                       );
                                     }
                                   : null,
                               child: Text(
                                 'Try Now',
                                 style: TextStyle(
-                                  color: course.isEnrolled
+                                  color: hasAccess
                                       ? const Color(0xFF28B79B)
                                       : Colors.grey,
                                   fontSize: 13,
@@ -1428,6 +1435,16 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   Future<void> _addToCart() async {
     final isVi = LanguageManager.isVi;
     if (_courseDetail == null) return;
+    final isOwner = _courseDetail!.isCreator ||
+        (_courseDetail!.creatorId != null &&
+            _courseDetail!.creatorId == _currentUserId);
+    if (isOwner) {
+      _showNotification(
+        'You are the author of this course!',
+        isError: true,
+      );
+      return;
+    }
 
     // 1. Optimistic UI update (0ms lag)
     setState(() {
@@ -1458,7 +1475,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
 
   String _getCoursePrice(CourseDetail course) {
     if (course.price <= 0) {
-      return 'Miễn phí';
+      return 'Free';
     }
     final formatted = course.price
         .toStringAsFixed(0)
@@ -1469,29 +1486,8 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     return '$formattedđ';
   }
 
-  String _getOriginalPrice(String currentPrice) {
-    if (currentPrice == 'Miễn phí') return '';
-    try {
-      final clean = currentPrice.replaceAll(RegExp(r'[^0-9]'), '');
-      if (clean.isEmpty) return '';
-      final val = double.parse(clean);
-      final original = val * 1.3;
-      final formatted = original
-          .toStringAsFixed(0)
-          .replaceAllMapped(
-            RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-            (m) => '${m[1]}.',
-          );
-      return '$formattedđ';
-    } catch (_) {
-      return '';
-    }
-  }
 
-  /// Trả về giá số (VND) để truyền vào PaymentQrDialog
-  double _getCourseNumericPrice(CourseDetail course) {
-    return course.price;
-  }
+
 
   Widget _buildTrainerTab(CourseDetail course) {
     final isVi = LanguageManager.isVi;
@@ -1668,8 +1664,10 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     }
 
     final priceStr = _getCoursePrice(course);
-    final isFree = priceStr == 'Miễn phí';
-    final originalPriceStr = _getOriginalPrice(priceStr);
+    final isFree = priceStr == 'Free' || course.price <= 0;
+    final isOwner = course.isCreator ||
+        (course.creatorId != null && course.creatorId == _currentUserId);
+    final hasAccess = course.isEnrolled || isOwner;
 
     return Container(
       padding: const EdgeInsets.all(28),
@@ -1689,67 +1687,41 @@ class _CourseDetailPageState extends State<CourseDetailPage>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Price Display Section
-          if (isFree)
-            const Text(
-              'Free',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF28B79B),
-                fontFamily: 'Outfit',
-              ),
-            )
-          else
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(
-                      priceStr,
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF0F172A),
-                        fontFamily: 'Outfit',
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      originalPriceStr,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF94A3B8),
-                        decoration: TextDecoration.lineThrough,
-                        fontFamily: 'Outfit',
-                      ),
-                    ),
-                  ],
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                isFree ? 'Free' : priceStr,
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  color:
+                      isFree ? const Color(0xFF28B79B) : const Color(0xFF0F172A),
+                  fontFamily: 'Outfit',
                 ),
-                const SizedBox(height: 4),
+              ),
+              if (isOwner)
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFEE2E2),
-                    borderRadius: BorderRadius.circular(6),
+                    color: const Color(0xFFE6F4EA),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF28B79B)),
                   ),
                   child: const Text(
-                    'Save 30%',
+                    'Your Course',
                     style: TextStyle(
-                      color: Color(0xFFEF4444),
-                      fontSize: 10,
+                      fontSize: 12,
                       fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F9D58),
                       fontFamily: 'Outfit',
                     ),
                   ),
                 ),
-              ],
-            ),
+            ],
+          ),
 
           const SizedBox(height: 24),
           const Divider(color: Color(0xFFF1F5F9)),
@@ -1777,7 +1749,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
 
           const SizedBox(height: 28),
 
-          if (course.isEnrolled) ...[
+          if (hasAccess) ...[
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -1786,14 +1758,8 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                       course.sessions.first.lessons.isNotEmpty) {
                     final firstLessonId =
                         course.sessions.first.lessons.first.id;
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => LessonDetailPage(
-                          courseId: course.id,
-                          lessonId: firstLessonId,
-                        ),
-                      ),
+                    context.push(
+                      '/courses/${course.id}/lessons/$firstLessonId',
                     );
                   } else {
                     _showNotification(
@@ -1810,9 +1776,9 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                   ),
                   elevation: 0,
                 ),
-                child: const Text(
-                  'Study Now',
-                  style: TextStyle(
+                child: Text(
+                  isOwner ? 'View Course Content' : 'Study Now',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -1926,42 +1892,56 @@ class _CourseDetailPageState extends State<CourseDetailPage>
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () async {
-                    final authService = AuthService();
-                    final isLoggedIn = await authService.isLoggedIn();
-                    if (!isLoggedIn) {
-                      if (!mounted) return;
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const LoginPage(),
-                        ),
-                      );
-                      return;
-                    }
-                    // Mở dialog thanh toán VNPay QR
-                    if (!mounted) return;
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (context) => PaymentQrDialog(
-                        courseId: course.id,
-                        courseTitle: course.title,
-                        price: _getCourseNumericPrice(course),
-                        onPaymentSuccess: () {
-                          setState(() {
-                            _courseDetail = _courseDetail!.copyWith(
-                              isEnrolled: true,
+                  onPressed: _isBuying
+                      ? null
+                      : () async {
+                          final authService = AuthService();
+                          final isLoggedIn = await authService.isLoggedIn();
+                          if (!isLoggedIn) {
+                            if (!mounted) return;
+                            context.go(AppRoutes.login);
+                            return;
+                          }
+
+                          setState(() => _isBuying = true);
+                          try {
+                            final res = await PaymentRepository().createPayment(
+                              courseId: course.id,
                             );
-                          });
-                          _showNotification(
-                            '🎉 Payment successful! Course unlocked.',
-                          );
-                          _loadCourseDetail();
+                            final paymentUrl = res['paymentUrl'] as String?;
+
+                            if (paymentUrl == 'FREE_SUCCESS') {
+                              setState(() {
+                                _courseDetail = _courseDetail!.copyWith(
+                                  isEnrolled: true,
+                                );
+                              });
+                              _showNotification(
+                                '🎉 Enrolled in course successfully!',
+                              );
+                              _loadCourseDetail();
+                              return;
+                            }
+
+                            if (paymentUrl != null && paymentUrl.isNotEmpty) {
+                              final uri = Uri.parse(paymentUrl);
+                              await launchUrl(uri, webOnlyWindowName: '_self');
+                            } else {
+                              throw Exception('Could not generate payment link.');
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ToastHelper.showError(
+                                context,
+                                e.toString().replaceAll('Exception: ', ''),
+                              );
+                            }
+                          } finally {
+                            if (mounted) {
+                              setState(() => _isBuying = false);
+                            }
+                          }
                         },
-                      ),
-                    );
-                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFF05A22),
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -1970,15 +1950,24 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                     ),
                     elevation: 0,
                   ),
-                  child: const Text(
-                    'Buy Now',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Outfit',
-                    ),
-                  ),
+                  child: _isBuying
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Text(
+                          'Buy Now',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -1987,12 +1976,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                 child: OutlinedButton(
                   onPressed: _isInCart
                       ? () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const CartPage(),
-                            ),
-                          );
+                          context.go(AppRoutes.cart);
                         }
                       : _addToCart,
                   style: OutlinedButton.styleFrom(

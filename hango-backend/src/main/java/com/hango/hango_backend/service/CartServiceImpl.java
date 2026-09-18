@@ -92,9 +92,13 @@ public class CartServiceImpl implements CartService {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new RuntimeException("Course not found"));
 
+        if (course.getCreator() != null && course.getCreator().getId().equals(userId)) {
+            throw new RuntimeException("You are the author of this course and cannot add it to the cart.");
+        }
+
         boolean isEnrolled = enrollmentRepository.existsByUserIdAndCourseId(userId, courseId);
         if (isEnrolled) {
-            throw new RuntimeException("Bạn đã sở hữu khóa học này.");
+            throw new RuntimeException("You already own this course.");
         }
 
         boolean existsInCart = cartItemRepository.existsByUserIdAndCourseId(userId, courseId);

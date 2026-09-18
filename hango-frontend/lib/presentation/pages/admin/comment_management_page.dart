@@ -447,7 +447,7 @@ class _CommentManagementPageState extends State<CommentManagementPage> {
                           });
                         },
                         decoration: const InputDecoration(
-                          hintText: 'Search by reporter name or reason...',
+                          hintText: 'Search by commenter name or content...',
                           hintStyle: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
                           border: InputBorder.none,
                           isDense: true,

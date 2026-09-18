@@ -1,24 +1,29 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../routes/app_routes.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../domain/entities/exam.dart';
 import '../../../data/repositories/exam_repository.dart';
 import '../../widgets/shared_footer.dart';
 import '../../widgets/shared_header.dart';
 import '../login_page.dart';
-import 'take_exam_page.dart';
 import 'exam_review_page.dart';
 
 class ExamDetailHistoryPage extends StatefulWidget {
-  final Exam exam;
+  final Exam? exam;
+  final String? examId;
 
-  const ExamDetailHistoryPage({Key? key, required this.exam}) : super(key: key);
+  const ExamDetailHistoryPage({Key? key, this.exam, this.examId}) : super(key: key);
 
   @override
   State<ExamDetailHistoryPage> createState() => _ExamDetailHistoryPageState();
 }
 
 class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
+  Exam? _exam;
+  bool _isLoadingExam = false;
+  String? _examError;
   List<Map<String, dynamic>> _attempts = [];
   bool _isLoadingAttempts = true;
   bool _canAttemptExam = true;
@@ -26,8 +31,37 @@ class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
   @override
   void initState() {
     super.initState();
-    _loadAttempts();
+    if (widget.exam != null) {
+      _exam = widget.exam;
+      _loadAttempts();
+    } else if (widget.examId != null) {
+      _fetchExam();
+    }
     _loadRoles();
+  }
+
+  Future<void> _fetchExam() async {
+    setState(() {
+      _isLoadingExam = true;
+      _examError = null;
+    });
+    try {
+      final fetched = await ExamRepository().fetchExamById(widget.examId!);
+      if (mounted) {
+        setState(() {
+          _exam = fetched;
+          _isLoadingExam = false;
+        });
+        _loadAttempts();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingExam = false;
+          _examError = e.toString();
+        });
+      }
+    }
   }
 
   Future<void> _loadRoles() async {
@@ -42,9 +76,11 @@ class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
 
   // Load attempt history from Backend API
   Future<void> _loadAttempts() async {
+    final examId = _exam?.id ?? widget.examId;
+    if (examId == null || examId.isEmpty) return;
     try {
       final repository = ExamRepository();
-      final loadedAttempts = await repository.fetchExamAttempts(widget.exam.id);
+      final loadedAttempts = await repository.fetchExamAttempts(examId);
 
       setState(() {
         _attempts = loadedAttempts;
@@ -59,15 +95,47 @@ class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
     }
   }
 
-  // Trigger when returning from TakeExamPage to refresh attempt list
-  void _onExamCompleted() {
-    _loadAttempts();
-  }
-
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final isDesktop = size.width > 900;
+
+    if (_isLoadingExam) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF9FAFB),
+        appBar: SharedHeader(isDesktop: isDesktop, activeTab: 'Exams'),
+        body: const Center(
+          child: CircularProgressIndicator(color: Color(0xFF28B79B)),
+        ),
+      );
+    }
+
+    if (_exam == null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF9FAFB),
+        appBar: SharedHeader(isDesktop: isDesktop, activeTab: 'Exams'),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _examError ?? 'Exam not found.',
+                style: const TextStyle(fontSize: 16, color: Color(0xFF64748B)),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => context.go(AppRoutes.exams),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF28B79B),
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Back to Exams'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
@@ -87,7 +155,13 @@ class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
                   children: [
                     // Back button
                     InkWell(
-                      onTap: () => Navigator.pop(context),
+                      onTap: () {
+                        if (Navigator.of(context).canPop()) {
+                          Navigator.of(context).pop();
+                        } else {
+                          context.go(AppRoutes.exams);
+                        }
+                      },
                       hoverColor: Colors.transparent,
                       splashColor: Colors.transparent,
                       child: Row(
@@ -195,7 +269,7 @@ class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
                   const Icon(Icons.people_alt_outlined, color: Color(0xFF94A3B8), size: 16),
                   const SizedBox(width: 4),
                   Text(
-                    widget.exam.learnerCountFormatted,
+                    _exam!.learnerCountFormatted,
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF64748B)),
                   ),
                 ],
@@ -206,7 +280,7 @@ class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
 
           // Title
           Text(
-            widget.exam.title,
+            _exam!.title,
             style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
@@ -218,7 +292,7 @@ class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
 
           // Creator
           Text(
-            'Created by: ${widget.exam.creatorName}',
+            'Created by: ${_exam!.creatorName}',
             style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
           ),
           const SizedBox(height: 24),
@@ -231,7 +305,7 @@ class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
               Expanded(
                 child: _buildStatItem(
                   Icons.assignment_outlined,
-                  '${widget.exam.questionCount} Questions',
+                  '${_exam!.questionCount} Questions',
                   'Sentences total',
                   const Color(0xFF3B82F6),
                   const Color(0xFFEFF6FF),
@@ -241,7 +315,7 @@ class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
               Expanded(
                 child: _buildStatItem(
                   Icons.access_time_outlined,
-                  '${widget.exam.durationMinutes} Minutes',
+                  '${_exam!.durationMinutes} Minutes',
                   'Time limit limit',
                   const Color(0xFFD97706),
                   const Color(0xFFFFFDF0),
@@ -252,14 +326,14 @@ class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
           const SizedBox(height: 24),
 
           // Description
-          if (widget.exam.description.isNotEmpty) ...[
+          if (_exam!.description.isNotEmpty) ...[
             const Text(
               'About this exam',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1F2937)),
             ),
             const SizedBox(height: 8),
             Text(
-              widget.exam.description,
+              _exam!.description,
               style: TextStyle(color: Colors.grey.shade600, fontSize: 14, height: 1.5),
             ),
           ],
@@ -374,21 +448,14 @@ class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
                   final token = prefs.getString('auth_token');
                   if (token == null || token.isEmpty) {
                     if (context.mounted) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const LoginPage(),
-                        ),
-                      );
+                      context.go(AppRoutes.login);
                     }
                   } else {
-                    if (context.mounted) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => TakeExamPage(exam: widget.exam),
-                        ),
-                      ).then((_) => _onExamCompleted());
+                    if (context.mounted && _exam != null) {
+                      context.go(
+                        AppRoutes.takeExamRoute(_exam!.id),
+                        extra: _exam,
+                      );
                     }
                   }
                 },
@@ -545,7 +612,7 @@ class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
                                   context,
                                   MaterialPageRoute(
                                     builder: (context) => ExamReviewPage(
-                                      exam: widget.exam,
+                                      exam: _exam!,
                                       attempt: attempt,
                                     ),
                                   ),

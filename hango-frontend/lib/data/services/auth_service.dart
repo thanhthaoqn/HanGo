@@ -11,11 +11,20 @@ import '../../utils/web_session_helper.dart';
 import '../../domain/model/auth_session.dart';
 
 class AuthService {
-  // 🚀 DÒNG THÊM MỚI: Cổng phát tín hiệu (Callback static) để AppState đứng từ xa lắng nghe
+  // Static callback signals allowing external listeners like AppState to react to auth events
   static Function(Map<String, dynamic>)? onLoginSuccess;
+  static VoidCallback? onLogout;
 
   // Use dynamic baseUrl configuration
   static String get baseUrl => EnvConfig.authBaseUrl;
+
+  static final GoogleSignIn googleSignIn = GoogleSignIn(
+    serverClientId: kIsWeb
+        ? null
+        : '471566696084-ugjjgk7vdtplhbgqkd1g1hi9piltd0ol.apps.googleusercontent.com',
+    clientId:
+        '471566696084-ugjjgk7vdtplhbgqkd1g1hi9piltd0ol.apps.googleusercontent.com',
+  );
 
   static const String _tokenKey = 'auth_token';
   static const String _refreshTokenKey = 'refresh_token';
@@ -66,7 +75,10 @@ class AuthService {
     return text;
   }
 
-  // Perform login request
+  // Call API POST /api/auth/login. This is the entry point for the frontend login flow:
+  // sends email and password (without token) -> receives
+  // JSON { token, refreshToken, id, email, fullName, roles, avatarUrl } from
+  // AuthController.authenticateUser (backend) on success.
   Future<Map<String, dynamic>> login(
     String email,
     String password, {
@@ -82,16 +94,20 @@ class AuthService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setRememberMe(rememberMe);
+        // Save token and user information to SharedPreferences (device local storage)
         await saveSession(data);
 
-        // 🔥 PHÁT TÍN HIỆU NGẦM: Báo cho AppState biết để cập nhật UI ngay lập tức
+        // Trigger callback to notify AppState to update UI immediately
         if (onLoginSuccess != null) {
           onLoginSuccess!(data);
         }
 
         return {'success': true, 'data': data};
       } else {
-        return {'success': false, 'message': _extractErrorMessage(response.body)};
+        return {
+          'success': false,
+          'message': _extractErrorMessage(response.body),
+        };
       }
     } catch (e) {
       return {'success': false, 'message': _networkErrorMessage(e)};
@@ -101,6 +117,7 @@ class AuthService {
   static String? cachedFullName;
   static String? cachedEmail;
   static String? cachedAvatarUrl;
+  static List<String>? cachedRoles;
   static bool? cachedIsLoggedIn;
   static final ValueNotifier<int> userChangeNotifier = ValueNotifier<int>(0);
 
@@ -108,7 +125,10 @@ class AuthService {
     userChangeNotifier.value++;
   }
 
-  // Save session details
+  // Persist the entire session into SharedPreferences (Flutter key-value storage,
+  // equivalent to localStorage on web). Every subsequent protected API request
+  // retrieves the token from here (see getToken()) and attaches it to the
+  // "Authorization: Bearer <token>" header without needing a separate global store.
   Future<void> saveSession(Map<String, dynamic> data) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, data['token']);
@@ -116,9 +136,13 @@ class AuthService {
       await prefs.setString(_refreshTokenKey, data['refreshToken']);
     }
     await prefs.setInt(_userIdKey, data['id']);
+    // Dismissing the entry exam popup only holds for the session it was
+    // dismissed in - each fresh login should offer it again if still unfinished.
+    await prefs.remove('dismissed_entry_exam_${data['id']}');
     await prefs.setString(_userEmailKey, data['email']);
     await prefs.setString(_userFullNameKey, data['fullName']);
-    await prefs.setStringList(_userRolesKey, List<String>.from(data['roles']));
+    final roles = List<String>.from(data['roles']);
+    await prefs.setStringList(_userRolesKey, roles);
     if (data['avatarUrl'] != null) {
       await prefs.setString(_userAvatarUrlKey, data['avatarUrl']);
       cachedAvatarUrl = data['avatarUrl'];
@@ -129,6 +153,7 @@ class AuthService {
 
     cachedFullName = data['fullName'];
     cachedEmail = data['email'];
+    cachedRoles = roles;
     cachedIsLoggedIn = true;
     notifyUserChanged();
 
@@ -139,7 +164,11 @@ class AuthService {
       final userKey = 'cart_course_ids_user_${data['id']}';
       final userItems = prefs.getStringList(userKey) ?? [];
 
-      final merged = <String>{...userItems, ...guestItems, ...legacyItems}.toList();
+      final merged = <String>{
+        ...userItems,
+        ...guestItems,
+        ...legacyItems,
+      }.toList();
       await prefs.setStringList(userKey, merged);
       await prefs.remove('guest_cart_course_ids');
       await prefs.remove('cart_course_ids');
@@ -161,21 +190,43 @@ class AuthService {
   Future<AuthSession?> getStoredSession() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString(_tokenKey);
-    if (token == null || token.isEmpty) return null;
+    if (token == null || token.isEmpty) {
+      cachedFullName = null;
+      cachedEmail = null;
+      cachedAvatarUrl = null;
+      cachedRoles = null;
+      cachedIsLoggedIn = false;
+      return null;
+    }
 
     final roles = prefs.getStringList(_userRolesKey) ?? [];
+    final fullName = prefs.getString(_userFullNameKey) ?? 'Learner';
+    final email = prefs.getString(_userEmailKey) ?? '';
+    final avatarUrl = prefs.getString(_userAvatarUrlKey);
     final isAdmin = roles.any((r) => r.toUpperCase().contains('ADMIN'));
-    final isCourseManager = roles.any((r) => r.toUpperCase().contains('COURSE_MANAGER'));
-    final isTrainer = roles.any((r) => r.toUpperCase().contains('TRAINER')) && !isCourseManager;
+    final isCourseManager = roles.any(
+      (r) => r.toUpperCase().contains('COURSE_MANAGER'),
+    );
+    final isTrainer =
+        roles.any((r) => r.toUpperCase().contains('TRAINER')) &&
+        !isCourseManager;
     final primaryRole = isAdmin
         ? 'ADMIN'
-        : (isCourseManager ? 'COURSE_MANAGER' : (isTrainer ? 'TRAINER' : 'LEARNER'));
+        : (isCourseManager
+              ? 'COURSE_MANAGER'
+              : (isTrainer ? 'TRAINER' : 'LEARNER'));
+
+    cachedFullName = fullName;
+    cachedEmail = email;
+    cachedAvatarUrl = avatarUrl;
+    cachedRoles = List<String>.from(roles);
+    cachedIsLoggedIn = true;
 
     return AuthSession(
       token: token,
       userId: prefs.getInt(_userIdKey) ?? 0,
-      fullName: prefs.getString(_userFullNameKey) ?? 'Learner',
-      email: prefs.getString(_userEmailKey) ?? '',
+      fullName: fullName,
+      email: email,
       role: primaryRole,
     );
   }
@@ -206,10 +257,9 @@ class AuthService {
         await prefs.setString(_tokenKey, data['token']);
         await prefs.setString(_refreshTokenKey, data['refreshToken']);
         if (data['roles'] != null) {
-          await prefs.setStringList(
-            _userRolesKey,
-            List<String>.from(data['roles']),
-          );
+          final roles = List<String>.from(data['roles']);
+          await prefs.setStringList(_userRolesKey, roles);
+          cachedRoles = roles;
           notifyUserChanged();
         }
         return true;
@@ -245,6 +295,13 @@ class AuthService {
 
     setRememberMe(false);
     final prefs = await SharedPreferences.getInstance();
+    
+    // Reset the dismissed entry exam popup flag for this user so it appears on next login
+    final currentUserId = prefs.getInt(_userIdKey) ?? 0;
+    if (currentUserId != 0) {
+      await prefs.remove('dismissed_entry_exam_$currentUserId');
+    }
+
     await prefs.remove(_tokenKey);
     await prefs.remove(_refreshTokenKey);
     await prefs.remove(_userIdKey);
@@ -259,14 +316,12 @@ class AuthService {
     cachedFullName = null;
     cachedEmail = null;
     cachedAvatarUrl = null;
+    cachedRoles = null;
     cachedIsLoggedIn = false;
     notifyUserChanged();
+    onLogout?.call();
 
     try {
-      final googleSignIn = GoogleSignIn(
-        serverClientId: kIsWeb ? null : '471566696084-ugjjgk7vdtplhbgqkd1g1hi9piltd0ol.apps.googleusercontent.com',
-        clientId: '471566696084-ugjjgk7vdtplhbgqkd1g1hi9piltd0ol.apps.googleusercontent.com',
-      );
       if (await googleSignIn.isSignedIn()) {
         await googleSignIn.disconnect();
       }
@@ -302,7 +357,10 @@ class AuthService {
         final data = jsonDecode(response.body);
         return {'success': true, 'data': data};
       } else {
-        return {'success': false, 'message': _extractErrorMessage(response.body)};
+        return {
+          'success': false,
+          'message': _extractErrorMessage(response.body),
+        };
       }
     } catch (e) {
       return {'success': false, 'message': _networkErrorMessage(e)};
@@ -324,14 +382,17 @@ class AuthService {
         final data = jsonDecode(response.body);
         await saveSession(data);
 
-        // 🔥 PHÁT TÍN HIỆU NGẦM: Áp dụng tương tự cho đăng nhập Google
+        // Trigger callback to notify AppState upon Google login success
         if (onLoginSuccess != null) {
           onLoginSuccess!(data);
         }
 
         return {'success': true, 'data': data};
       } else {
-        return {'success': false, 'message': _extractErrorMessage(response.body)};
+        return {
+          'success': false,
+          'message': _extractErrorMessage(response.body),
+        };
       }
     } catch (e) {
       return {'success': false, 'message': _networkErrorMessage(e)};
@@ -350,7 +411,10 @@ class AuthService {
       if (response.statusCode == 200) {
         return {'success': true, 'message': response.body};
       } else {
-        return {'success': false, 'message': _extractErrorMessage(response.body)};
+        return {
+          'success': false,
+          'message': _extractErrorMessage(response.body),
+        };
       }
     } catch (e) {
       return {'success': false, 'message': _networkErrorMessage(e)};
@@ -369,7 +433,10 @@ class AuthService {
       if (response.statusCode == 200) {
         return {'success': true, 'message': response.body};
       } else {
-        return {'success': false, 'message': _extractErrorMessage(response.body)};
+        return {
+          'success': false,
+          'message': _extractErrorMessage(response.body),
+        };
       }
     } catch (e) {
       return {'success': false, 'message': _networkErrorMessage(e)};
@@ -386,13 +453,20 @@ class AuthService {
       final response = await http.post(
         Uri.parse('$baseUrl/reset-password'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'otpCode': otpCode, 'newPassword': newPassword}),
+        body: jsonEncode({
+          'email': email,
+          'otpCode': otpCode,
+          'newPassword': newPassword,
+        }),
       );
 
       if (response.statusCode == 200) {
         return {'success': true, 'message': response.body};
       } else {
-        return {'success': false, 'message': _extractErrorMessage(response.body)};
+        return {
+          'success': false,
+          'message': _extractErrorMessage(response.body),
+        };
       }
     } catch (e) {
       return {'success': false, 'message': _networkErrorMessage(e)};
@@ -429,7 +503,10 @@ class AuthService {
       if (response.statusCode == 200) {
         return {'success': true, 'message': response.body};
       } else {
-        return {'success': false, 'message': _extractErrorMessage(response.body)};
+        return {
+          'success': false,
+          'message': _extractErrorMessage(response.body),
+        };
       }
     } catch (e) {
       return {'success': false, 'message': _networkErrorMessage(e)};
@@ -470,7 +547,10 @@ class AuthService {
         }
         return {'success': true, 'data': data};
       } else {
-        return {'success': false, 'message': _extractErrorMessage(response.body)};
+        return {
+          'success': false,
+          'message': _extractErrorMessage(response.body),
+        };
       }
     } catch (e) {
       return {'success': false, 'message': _networkErrorMessage(e)};
@@ -512,7 +592,10 @@ class AuthService {
         }
         return {'success': true, 'data': updatedData};
       } else {
-        return {'success': false, 'message': _extractErrorMessage(response.body)};
+        return {
+          'success': false,
+          'message': _extractErrorMessage(response.body),
+        };
       }
     } catch (e) {
       return {'success': false, 'message': _networkErrorMessage(e)};
@@ -520,7 +603,10 @@ class AuthService {
   }
 
   // Change password for logged-in user
-  Future<Map<String, dynamic>> changePassword(String currentPassword, String newPassword) async {
+  Future<Map<String, dynamic>> changePassword(
+    String currentPassword,
+    String newPassword,
+  ) async {
     try {
       final token = await getToken();
       if (token == null) {
@@ -543,7 +629,10 @@ class AuthService {
       if (response.statusCode == 200) {
         return {'success': true, 'message': 'Password updated successfully!'};
       } else {
-        return {'success': false, 'message': _extractErrorMessage(response.body)};
+        return {
+          'success': false,
+          'message': _extractErrorMessage(response.body),
+        };
       }
     } catch (e) {
       return {'success': false, 'message': _networkErrorMessage(e)};
@@ -561,11 +650,9 @@ class AuthService {
       final url = baseUrl + '/profile/avatar';
       final request = http.MultipartRequest('POST', Uri.parse(url))
         ..headers['Authorization'] = 'Bearer $token'
-        ..files.add(http.MultipartFile.fromBytes(
-          'file',
-          file.bytes,
-          filename: file.name,
-        ));
+        ..files.add(
+          http.MultipartFile.fromBytes('file', file.bytes, filename: file.name),
+        );
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
@@ -578,7 +665,10 @@ class AuthService {
         }
         return {'success': true, 'data': updatedData};
       } else {
-        return {'success': false, 'message': _extractErrorMessage(responseBody)};
+        return {
+          'success': false,
+          'message': _extractErrorMessage(responseBody),
+        };
       }
     } catch (e) {
       return {'success': false, 'message': _networkErrorMessage(e)};

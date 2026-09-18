@@ -160,6 +160,99 @@ public class SectionQuestionControllerTest {
         Assertions.assertEquals(200, response.getStatusCode().value());
     }
 
+    private void mockAuthenticatedUser(Long userId) {
+        org.springframework.security.core.Authentication auth = Mockito.mock(org.springframework.security.core.Authentication.class);
+        com.hango.hango_backend.security.UserDetailsImpl userDetails = Mockito.mock(com.hango.hango_backend.security.UserDetailsImpl.class);
+        Mockito.when(userDetails.getId()).thenReturn(userId);
+        Mockito.when(auth.getPrincipal()).thenReturn(userDetails);
+
+        org.springframework.security.core.context.SecurityContext securityContext = Mockito.mock(org.springframework.security.core.context.SecurityContext.class);
+        Mockito.when(securityContext.getAuthentication()).thenReturn(auth);
+        org.springframework.security.core.context.SecurityContextHolder.setContext(securityContext);
+    }
+
+    @Test
+    public void testUpdateQuestionUnauthorized() {
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+
+        com.hango.hango_backend.dto.CreateQuestionRequestDTO request = com.hango.hango_backend.dto.CreateQuestionRequestDTO.builder()
+                .questionText("Updated text")
+                .build();
+
+        ResponseEntity<?> response = sectionQuestionController.updateQuestion(1L, request);
+        Assertions.assertEquals(401, response.getStatusCode().value());
+    }
+
+    @Test
+    public void testUpdateQuestionNotFound() {
+        mockAuthenticatedUser(1L);
+        Mockito.when(jdbcTemplate.queryForObject(Mockito.anyString(), Mockito.eq(Integer.class), Mockito.any()))
+                .thenReturn(0);
+
+        com.hango.hango_backend.dto.CreateQuestionRequestDTO request = com.hango.hango_backend.dto.CreateQuestionRequestDTO.builder()
+                .questionText("Updated text")
+                .build();
+
+        ResponseEntity<?> response = sectionQuestionController.updateQuestion(10L, request);
+        Assertions.assertEquals(404, response.getStatusCode().value());
+    }
+
+    @Test
+    public void testUpdateQuestionSuccess() {
+        mockAuthenticatedUser(1L);
+        Mockito.when(jdbcTemplate.queryForObject(Mockito.anyString(), Mockito.eq(Integer.class), Mockito.any()))
+                .thenReturn(1);
+
+        com.hango.hango_backend.dto.CreateQuestionRequestDTO request = com.hango.hango_backend.dto.CreateQuestionRequestDTO.builder()
+                .questionText("Updated text")
+                .explanation("Updated explanation")
+                .skillParamId(2L)
+                .difficultyId(3L)
+                .options(Arrays.asList(com.hango.hango_backend.dto.CreateOptionDTO.builder().optionText("A").isCorrect(true).build()))
+                .build();
+
+        ResponseEntity<?> response = sectionQuestionController.updateQuestion(10L, request);
+        Assertions.assertEquals(200, response.getStatusCode().value());
+    }
+
+    @Test
+    public void testUpdateQuestionUpdatesGroupPassageAndTypeWhenGroupIdProvided() {
+        mockAuthenticatedUser(1L);
+        Mockito.when(jdbcTemplate.queryForObject(Mockito.anyString(), Mockito.eq(Integer.class), Mockito.any()))
+                .thenReturn(1);
+
+        com.hango.hango_backend.dto.CreateQuestionRequestDTO request = com.hango.hango_backend.dto.CreateQuestionRequestDTO.builder()
+                .questionText("Updated text")
+                .groupId(500L)
+                .passageText("Updated passage")
+                .groupTypeParamId(7L)
+                .build();
+
+        ResponseEntity<?> response = sectionQuestionController.updateQuestion(10L, request);
+
+        Assertions.assertEquals(200, response.getStatusCode().value());
+        Mockito.verify(jdbcTemplate).update(
+                Mockito.eq("UPDATE question_groups SET context_text = ? WHERE id = ?"),
+                Mockito.eq("Updated passage"), Mockito.eq(500L));
+        Mockito.verify(jdbcTemplate).update(
+                Mockito.eq("UPDATE question_groups SET group_type_param_id = ? WHERE id = ?"),
+                Mockito.eq(7L), Mockito.eq(500L));
+    }
+
+    @Test
+    public void testUpdateQuestionBadRequestWhenExceptionThrown() {
+        mockAuthenticatedUser(1L);
+        Mockito.when(jdbcTemplate.update(Mockito.anyString(), Mockito.any(Object[].class)))
+                .thenThrow(new RuntimeException("DB error"));
+
+        com.hango.hango_backend.dto.CreateQuestionRequestDTO request = com.hango.hango_backend.dto.CreateQuestionRequestDTO.builder()
+                .questionText("Updated text")
+                .build();
+
+        ResponseEntity<?> response = sectionQuestionController.updateQuestion(10L, request);
+        Assertions.assertEquals(400, response.getStatusCode().value());
+    }
+
     @Test
     public void testGetLessonQuestions() {
         Mockito.when(jdbcTemplate.queryForObject(Mockito.anyString(), Mockito.eq(Integer.class), Mockito.any(Object[].class)))

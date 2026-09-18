@@ -95,15 +95,21 @@ public class EntryExamDataInitializer implements CommandLineRunner {
     Long diffId = difficulties.isEmpty() ? null : difficulties.get(0);
 
     if (examExists) {
+      // Deliberately does NOT touch is_entry_exam here: a Course Manager may
+      // have since un-flagged this seeded exam (or flagged others instead) via
+      // the Exam Management UI, and that choice must survive app restarts.
       log.info("Updating existing Entry Exam (id=1035)...");
       jdbcTemplate.update(
           "UPDATE exams SET title = 'Global Entry Placement Test', description = 'A comprehensive exam to assess all 25 skill domains and provide a personalized learning pathway.', duration_minutes = 50, status = 'PUBLISHED', expected_question_count = 40, visibility = 'PUBLIC', passing_score = 5.0, thumbnail_url = 'https://res.cloudinary.com/diqekap4o/image/upload/v1714578160/hango-assets/exam-banner.png' WHERE id = 1035");
     } else {
+      // First-time creation only: seed it as an entry exam so the feature has
+      // at least one working candidate out of the box; Course Managers can
+      // add more (or unflag this one) afterwards via the Exam Management UI.
       log.info("Inserting Entry Exam (id=1035)...");
       jdbcTemplate.update(
-          "INSERT INTO exams (id, title, description, duration_minutes, status, expected_question_count, visibility, created_by, created_at, version, passing_score, thumbnail_url) "
+          "INSERT INTO exams (id, title, description, duration_minutes, status, expected_question_count, visibility, created_by, created_at, version, passing_score, thumbnail_url, is_entry_exam) "
               +
-              "VALUES (1035, 'Global Entry Placement Test', 'A comprehensive exam to assess all 25 skill domains and provide a personalized learning pathway.', 50, 'PUBLISHED', 40, 'PUBLIC', ?, NOW(), 'v1.0', 5.0, 'https://res.cloudinary.com/diqekap4o/image/upload/v1714578160/hango-assets/exam-banner.png')",
+              "VALUES (1035, 'Global Entry Placement Test', 'A comprehensive exam to assess all 25 skill domains and provide a personalized learning pathway.', 50, 'PUBLISHED', 40, 'PUBLIC', ?, NOW(), 'v1.0', 5.0, 'https://res.cloudinary.com/diqekap4o/image/upload/v1714578160/hango-assets/exam-banner.png', TRUE)",
           userId);
     }
 

@@ -12,4 +12,5 @@ import java.util.List;
 @AllArgsConstructor
 public class QuizQuestionSelectionRequestDTO {
     private List<Long> questionIds;
+    private List<Long> groupIds;
 }

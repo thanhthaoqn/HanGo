@@ -22,8 +22,8 @@
 
 | File | Purpose |
 |---|---|
-| [`itc-function-index.csv`](itc-function-index.csv) | One row per distinct function across the whole backend (109 originally scoped down to the 104 that actually exist as live HTTP surface in this codebase), mapping `Function Name → Sheet Name (module) → Description → Pre-Condition`. Use this to find which `itc-sheet-*.csv` covers a given feature. |
-| [`itc-summary.csv`](itc-summary.csv) | One row per module: `Passed / Failed / Pending / N/A / Number of test cases`, plus a Sub-total row (368 test cases across 17 modules). Update this after each execution round — it's the at-a-glance rollup for reporting. |
+| [`itc-function-index.csv`](itc-function-index.csv) | One row per distinct function across the whole backend (108 as of the 2026-08-18 verification round — 4 added: Node Mastery submission, Certificate issue/view, Entry Placement Exam, Excel-import history), mapping `Function Name → Sheet Name (module) → Description → Pre-Condition`. Use this to find which `itc-sheet-*.csv` covers a given feature. |
+| [`itc-summary.csv`](itc-summary.csv) | One row per module: `Passed / Failed / Pending / N/A / Number of test cases`, plus a Sub-total row (390 test cases across 17 modules as of 2026-08-18). Update this after each execution round — it's the at-a-glance rollup for reporting. |
 
 ## 2. What changed vs. the previous version of this plan
 
@@ -37,6 +37,18 @@ The previous Integration Test layer (built 2026-07-25, 14 sheets) used a differe
 6. **Drops the `DevTools Evidence` and `Case Type` (N/A/B) columns.** Every sheet now uses exactly: `Test Case ID, Test Case Description, Test Case Procedure, Expected Results, Pre-conditions` — matching the reference format this rebuild follows. Where a case specifically needs a DevTools/Network-tab check (raw JSON inspection, Content-Type verification, etc.), that instruction is now written directly into the Procedure/Expected Results text instead of being flagged by a separate column.
 7. **Adds a per-sheet header block** (`Feature`, `Test requirement`, `Number of TCs`, and a `Testing Round` Passed/Failed/Pending/N-A rollup table for Round 1/2/3) at the top of every CSV, ahead of the test-case table — this is new; the previous sheets went straight into the table.
 
+## 2b. 2026-08-18 verification round (full retest, all 17 sheets re-read against current code)
+
+Re-read every sheet against a fresh read of the current backend (and where relevant, frontend) code, in parallel across 7 workstreams (one per sheet-cluster), following the same full-retest trigger that had just been used for the unit-test layer (see `unit_test_plan.md`'s 2026-08-18 entry). Net effect: 368→390 test cases (+22). Highlights, not exhaustive (see each sheet's own footer notes for full detail):
+
+- **Roles & Permissions / Account:** already accurate as of the Aug 8-11 rebuild — the dynamic `Permission`/`Role.permissions` model (`hasAuthority(...)` checks, seeded by `RolePermissionDataInitializer`) has been live since 2026-08-01 and was already correctly documented. No changes needed.
+- **Trainer Onboarding:** real drift found — Admin approval no longer accepts a custom `revenueShare` (fixed 70/30 or 60/40 split now, per trainer type); the Agreement-signing step was moved earlier in the flow and lost its checkbox; several Vietnamese error strings were replaced with English ones. `GET /api/admin/dashboard/stats` was replaced outright by `GET /api/admin/dashboard/comprehensive-stats` (new `AdminDashboardService`, different response shape) — rewrote the Dashboard & Reports sheet's cases for it.
+- **Course / Course Content / Question Bank:** `CourseRatingServiceImpl` had been rewritten (Certificate-gated, one-review-only, delete now permanently disabled) since last documented; several `@PreAuthorize` gates were added to endpoints previously documented as open. Real bug found and fixed in-place (already fixed on the unit-test side too): `TrainerQuestionServiceImpl.createQuestionBankGroup` was silently dropping `category` on single-question creation.
+- **Exam / Recommendation:** fixed several stale claims (wrong auto-publish description, wrong error-envelope logic, a fabricated "4 candidate template paths" detail). Added coverage for the new `ExamImportController` history/audit endpoint and the seeded Entry Placement Exam (id 1035, auto-published at startup, surfaced to new Learners on the home screen).
+- **AI Assistant / Learning Pathway:** AI Assistant needed no changes. Learning Pathway gained coverage for the mastery/spaced-repetition submission endpoint and the new `CertificateService` (course-completion certificates) — both previously undocumented. Real frontend bug flagged: the "Take Mastery Quiz"/"Review Now" buttons submit a hard-coded mock score (90/100) instead of a real quiz result.
+- **Payment & Revenue:** fixed the already-known double-cart-delete bug's description (now single-call, matches the unit-test fix) and the new 5th `courseImageUrl` email parameter. **New cross-module bug found (not previously documented anywhere): `CourseServiceImpl.enrollCourse` has no server-side price check at all — a learner can enroll in a paid course for free by calling the enroll endpoint directly, completely bypassing PaymentService/PayOS.** Flagged, not fixed (outside this pass' scope — lives in the Course module).
+- **Comment / Notification / Ticket:** `TicketServiceImpl` had been substantially reworked with zero record anywhere — real ownership-or-staff authorization now exists on `addMessage`/`getTicketDetail` (previously an IDOR), but the `PAYOUT_INFO_UPDATE`/`REFUND_REQUEST` category authorization check has been **removed entirely** (not merely masked, as previously assumed) — any staff can now approve/reject those ticket categories. Comment write endpoints are now gated by a `RATE_AND_COMMENT` permission (seeded to LEARNER only) — previously undocumented.
+
 ## 3. Sheet index
 
 | # | File | Module | TCs |
@@ -45,20 +57,20 @@ The previous Integration Test layer (built 2026-07-25, 14 sheets) used a differe
 | 2 | `itc-sheet-roles-permissions.csv` | Roles & Permissions Management | 10 |
 | 3 | `itc-sheet-account.csv` | Account Management | 20 |
 | 4 | `itc-sheet-profile.csv` | Profile Management | 14 |
-| 5 | `itc-sheet-trainer-onboarding.csv` | Trainer Onboarding | 17 |
-| 6 | `itc-sheet-course.csv` | Course Management | 58 |
-| 7 | `itc-sheet-course-content.csv` | Course Content Management | 19 |
+| 5 | `itc-sheet-trainer-onboarding.csv` | Trainer Onboarding | 18 |
+| 6 | `itc-sheet-course.csv` | Course Management | 59 |
+| 7 | `itc-sheet-course-content.csv` | Course Content Management | 20 |
 | 8 | `itc-sheet-question-bank.csv` | Question Bank Management | 20 |
-| 9 | `itc-sheet-exam.csv` | Exam Management | 41 |
+| 9 | `itc-sheet-exam.csv` | Exam Management | 46 |
 | 10 | `itc-sheet-ai-assistant.csv` | AI Assistant | 10 |
-| 11 | `itc-sheet-learning-pathway.csv` | Learning Pathway | 31 |
-| 12 | `itc-sheet-recommendation.csv` | Recommendation | 8 |
-| 13 | `itc-sheet-payment.csv` | Payment & Revenue | 26 |
-| 14 | `itc-sheet-comment.csv` | Comment Management | 15 |
+| 11 | `itc-sheet-learning-pathway.csv` | Learning Pathway | 35 |
+| 12 | `itc-sheet-recommendation.csv` | Recommendation | 9 |
+| 13 | `itc-sheet-payment.csv` | Payment & Revenue | 32 |
+| 14 | `itc-sheet-comment.csv` | Comment Management | 16 |
 | 15 | `itc-sheet-notification.csv` | Notification Management | 10 |
-| 16 | `itc-sheet-ticket.csv` | Ticket Management | 16 |
+| 16 | `itc-sheet-ticket.csv` | Ticket Management | 18 |
 | 17 | `itc-sheet-dashboard-reports.csv` | Dashboard & Reports | 11 |
-| | | **Sub total** | **368** |
+| | | **Sub total** | **390** |
 
 **Excluded on purpose:** `TestDBController` (`/api/test-db/**`) is **not** in this plan — it is a known, unauthenticated credential-reset security hole slated for removal from the deploy build, not a feature to validate.
 

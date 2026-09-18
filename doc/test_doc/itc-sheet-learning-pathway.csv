@@ -1,10 +1,10 @@
 Feature,Learning Pathway
-Test requirement,Functional integration tests for the AI-generated adaptive learning pathway (LearningPathwayController) — roadmap generation, scheduling, reroute/detour, mentor chat
-Number of TCs,31
+Test requirement,Functional integration tests for the AI-generated adaptive learning pathway (LearningPathwayController) — roadmap generation, scheduling, reroute/detour, mentor chat, node mastery/spaced repetition
+Number of TCs,35
 Testing Round,Passed,Failed,Pending,N/A
-Round 1,0,0,31,0
-Round 2,0,0,31,0
-Round 3,0,0,31,0
+Round 1,0,0,35,0
+Round 2,0,0,35,0
+Round 3,0,0,35,0
 
 Test Case ID,Test Case Description,Test Case Procedure,Expected Results,Pre-conditions
 Generate Learning Pathway,,,,
@@ -135,3 +135,17 @@ PATHWAY_FT31,"The multi-goal merge-preview/merge-confirm endpoints referenced by
 2. Prepare and send POST /api/v1/pathways/merge-preview with any body.
 3. Prepare and send POST /api/v1/pathways/{id}/merge-confirm with any body.
 4. Inspect both responses' status codes.","1. Both: 404 Not Found (no controller route is mapped to either path) — this is a documentation/reality gap to flag to the dev team, not a bug to work around in testing.","- None."
+Node Mastery (Spaced Repetition),,,,
+PATHWAY_FT32,"Submitting a mastery score of 80 or above marks the node mastered and starts the spaced-repetition schedule at a 1-day review interval.","1. Log in with an own pathway containing a node that has never had a mastery score submitted (fresh node, reviewIntervalDays still at its built-in default).
+2. Prepare POST /api/v1/pathways/{id}/nodes/{nodeId}/mastery body {""score"":85}.
+3. Send the request.
+4. Inspect the node's masteryScore/isMastered/reviewIntervalDays/nextReviewDate fields and the mentor_summary text.","1. 200 OK; node masteryScore=85, isMastered=true, reviewIntervalDays=1 (PathwayNode.reviewIntervalDays already defaults to 1 via @Builder.Default, so the service's ""if null then set to 1"" branch never actually fires on a freshly-built node — the observable value is still 1, just not by the code path the comment implies), nextReviewDate = now + reviewIntervalDays days; mentor_summary is a congratulatory ""Mastery achieved"" message referencing the interval.","- Own pathway with a node that has no prior mastery submission."
+PATHWAY_FT33,"Repeated mastery submissions (each scoring ≥80) escalate the spaced-repetition interval 1→3→7→14→30, then stay capped at 30 since no further branch exists.","1. Log in with a node whose reviewIntervalDays is currently 1 (per PATHWAY_FT32).
+2. Submit POST /api/v1/pathways/{id}/nodes/{nodeId}/mastery with score≥80 four more times in sequence, inspecting reviewIntervalDays after each call.","1. Successive calls escalate reviewIntervalDays 1→3, 3→7, 7→14, 14→30. A 5th call (current value 30) matches none of the hardcoded branches in LearningPathwayService.submitNodeMastery, so reviewIntervalDays stays at 30 — confirm this cap is real, not a crash.","- Node already at reviewIntervalDays=1 from a prior mastery submission."
+PATHWAY_FT34,"Submitting a mastery score below 80 marks the node NOT mastered and leaves reviewIntervalDays/nextReviewDate untouched.","1. Log in with an own pathway node.
+2. Prepare and send POST /api/v1/pathways/{id}/nodes/{nodeId}/mastery body {""score"":50}.
+3. Inspect the response.","1. 200 OK; isMastered=false, masteryScore=50; mentor_summary reads ""Your score is 50. You need 80 points to Master the course. Keep reviewing!""; reviewIntervalDays/nextReviewDate are NOT modified by this branch (they retain whatever value they had before, including the default of 1 if never mastered).","- Own pathway node exists."
+PATHWAY_FT35,"Mastery submission is rejected for a non-owned pathway, and for a nodeId that doesn't belong to the given pathway.","1. Log in and identify another student's pathway id and any nodeId on it.
+2. Prepare and send POST /api/v1/pathways/{anotherStudentsPathwayId}/nodes/{nodeId}/mastery body {""score"":90}; inspect the response.
+3. Prepare and send POST /api/v1/pathways/{ownPathwayId}/nodes/999999/mastery body {""score"":90} (a nodeId not in the caller's own pathway).
+4. Inspect both responses' status codes/messages.","1. Step 2: 403 Forbidden, ""Access denied"". Step 3: 404 Not Found, ""Node not found in pathway"".","- Another student's pathway exists; caller has an own pathway; nodeId 999999 unused."

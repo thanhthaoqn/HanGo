@@ -9,7 +9,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 @RestController
 @RequestMapping("/api/v1/courses")
@@ -20,12 +23,15 @@ public class CourseController {
     private final CourseRatingService courseRatingService;
 
     @GetMapping
-    public ResponseEntity<List<CourseSummaryDTO>> getCourses(
+    public ResponseEntity<Page<CourseSummaryDTO>> getCourses(
             @RequestParam(required = false) String search,
             @RequestParam(required = false, defaultValue = "ALL") String filterType,
-            @RequestParam(required = false, defaultValue = "ALL") String difficulty) {
+            @RequestParam(required = false, defaultValue = "ALL") String difficulty,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "8") int size) {
         
-        List<CourseSummaryDTO> courses = courseService.getCourses(search, filterType, difficulty);
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<CourseSummaryDTO> courses = courseService.getCourses(search, filterType, difficulty, pageable);
         return ResponseEntity.ok(courses);
     }
 
@@ -49,7 +55,7 @@ public class CourseController {
     }
 
     @PostMapping("/{id}/enroll")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
     public ResponseEntity<?> enrollCourse(@PathVariable Long id) {
         try {
             Long currentUserId = getCurrentUserId();
@@ -66,7 +72,7 @@ public class CourseController {
 
 
     @DeleteMapping("/{id}/enroll")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
     public ResponseEntity<?> unenrollCourse(@PathVariable Long id) {
         try {
             Long currentUserId = getCurrentUserId();
@@ -82,7 +88,7 @@ public class CourseController {
     }
 
     @PostMapping("/{id}/switch-version")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
     public ResponseEntity<?> switchCourseVersion(@PathVariable Long id) {
         try {
             Long currentUserId = getCurrentUserId();
