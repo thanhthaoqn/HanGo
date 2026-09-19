@@ -76,7 +76,16 @@ class PathwayRepository {
     if (response.statusCode != 200) {
       // Backend tra ve loi (404 attempt khong ton tai, 500 AI loi...) -> nem Exception
       final resBody = utf8.decode(response.bodyBytes);
-      throw Exception('Unable to generate pathway: ${response.statusCode}. $resBody');
+      String errorMsg = 'Unable to generate pathway: ${response.statusCode}';
+      try {
+        final parsed = jsonDecode(resBody);
+        if (parsed is Map && parsed['message'] != null) {
+          errorMsg = parsed['message'].toString();
+        }
+      } catch (_) {
+        errorMsg = '$errorMsg. $resBody';
+      }
+      throw Exception(errorMsg);
     }
 
     final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;

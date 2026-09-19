@@ -290,6 +290,10 @@ class _TakeExamPageState extends State<TakeExamPage>
       }
 
       int correctCount = (score * _examQuestions.length / 10).round();
+      if (attemptMap != null && attemptMap['correctness'] is Map) {
+        final correctness = attemptMap['correctness'] as Map;
+        correctCount = correctness.values.where((v) => v == true).length;
+      }
 
       final currentExam = _exam ?? widget.exam;
       final resultExtra = {
@@ -322,27 +326,31 @@ class _TakeExamPageState extends State<TakeExamPage>
         );
       } catch (e) {
         debugPrint("GoRouter navigation to examResult failed, fallback: $e");
-        if (currentExam != null) {
-          Navigator.of(context, rootNavigator: true).pushReplacement(
-            MaterialPageRoute(
-              builder: (context) => ExamResultPage(
-                exam: currentExam,
-                score: score,
-                correctCount: correctCount,
-                examQuestions: _examQuestions,
-                userAnswers: _userAnswers,
-                attempt: resultExtra['attempt'] as Map<String, dynamic>,
-              ),
+      }
+      if (mounted && currentExam != null) {
+        Navigator.of(context, rootNavigator: true).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => ExamResultPage(
+              exam: currentExam,
+              score: score,
+              correctCount: correctCount,
+              examQuestions: _examQuestions,
+              userAnswers: _userAnswers,
+              attempt: resultExtra['attempt'] as Map<String, dynamic>,
             ),
-          );
-        }
+          ),
+        );
       }
     } catch (e) {
       debugPrint("Error during exam submit: $e");
       if (mounted) {
         setState(() {
           _isSubmitting = false;
+          _isSubmitted = false;
         });
+        if (_timeLeft > 0) {
+          _startTimer();
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to submit exam: $e'),

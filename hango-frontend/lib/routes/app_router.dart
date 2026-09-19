@@ -7,6 +7,7 @@ import '../presentation/pages/learner/learner_shell_page.dart';
 import '../presentation/pages/learner/learner_home_page.dart';
 import '../presentation/pages/course/list_courses_page.dart';
 import '../presentation/pages/course/course_detail_page.dart';
+import '../presentation/pages/course/course_completion_page.dart';
 import '../presentation/pages/course/lesson_detail_page.dart';
 import '../presentation/pages/course/cart_page.dart';
 import '../presentation/pages/exam/list_exams_page.dart';
@@ -173,6 +174,15 @@ class AppRouter {
             final idStr = state.pathParameters['id'];
             final id = int.tryParse(idStr ?? '') ?? 0;
             return CourseDetailPage(courseId: id);
+          },
+        ),
+        GoRoute(
+          path: AppRoutes.courseCompletion,
+          parentNavigatorKey: rootNavigatorKey,
+          builder: (context, state) {
+            final idStr = state.pathParameters['id'];
+            final id = int.tryParse(idStr ?? '') ?? 0;
+            return CourseCompletionPage(courseId: id);
           },
         ),
         GoRoute(

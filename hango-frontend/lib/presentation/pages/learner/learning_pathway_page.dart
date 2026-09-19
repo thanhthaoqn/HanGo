@@ -479,9 +479,11 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _errorMessage = e.toString();
-      });
+      final cleanMsg = e.toString().replaceFirst('Exception: ', '');
+      ToastHelper.showError(
+        context,
+        'Unable to regenerate pathway: $cleanMsg',
+      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -529,7 +531,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
             ),
             child: _isLoading
                 ? _buildLoading()
-                : _errorMessage != null
+                : (_errorMessage != null && _pathway == null)
                     ? _buildErrorBody()
                     : _pathway == null
                         ? _buildErrorBody()

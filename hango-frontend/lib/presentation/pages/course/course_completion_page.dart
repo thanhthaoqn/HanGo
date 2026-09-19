@@ -216,7 +216,11 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
             icon: const Icon(Icons.close_rounded, color: Color(0xFF1E293B)),
             tooltip: isVi ? 'Đóng' : 'Close',
             onPressed: () {
-              context.go(AppRoutes.myLearning);
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              } else {
+                context.go(AppRoutes.myLearning);
+              }
             },
           ),
         ),
