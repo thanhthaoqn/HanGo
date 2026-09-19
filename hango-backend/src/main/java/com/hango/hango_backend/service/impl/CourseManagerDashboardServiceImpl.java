@@ -326,10 +326,9 @@ public class CourseManagerDashboardServiceImpl implements CourseManagerDashboard
                     + "\": the course must contain at least one quiz with questions before publishing.");
         }
 
-        // Khoa hoc DAU TIEN cua Trainer luon mien phi khi publish, bat ke gia
-        // Trainer da tu chon la bao nhieu - chi ep GIA BAN (price) ve 0, GIU
-        // NGUYEN suggestedPrice de biet khoa hoc nay "dang" tri gia bao nhieu
-        // tren thi truong.
+        // the first course of a trainer is always free when published, regardless of
+        // the price the Trainer chose - only force the selling PRICE to 0, KEEP the
+        // suggestedPrice to know how much this course "is" worth on the market.
         if (courseRepository.isEligibleForFirstCoursePromotion(course.getCreator().getId(), course.getCode())) {
             course.setPrice(java.math.BigDecimal.ZERO);
         }

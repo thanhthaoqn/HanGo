@@ -540,12 +540,13 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .orElse(null);
         int durationMinutes = request.getEstimatedDuration() != null ? request.getEstimatedDuration() : 0;
         java.math.BigDecimal suggestedPrice = calculateSuggestedPrice(profile, difficulty, 0, durationMinutes);
-        // Trainer tu chon gia ban that su qua request.getPrice(); neu vi ly do
-        // gi request khong kem gia (vd goi truc tiep bo qua validation Controller),
-        // mac dinh ve dung gia tham khao thay vi de trong/null.
+        // Trainer choose real price through request.getPrice(); if for some reason
+        // request does not contain price (eg direct call skipping controller
+        // validation),
+        // default to suggested price instead of leaving it empty/null.
         java.math.BigDecimal trainerPrice = request.getPrice() != null ? request.getPrice() : suggestedPrice;
 
-        // Tao ban ghi Course moi, LUON o trang thai DRAFT va version "v1".
+        // Create a new course record, ALWAYS in DRAFT status and version "v1".
         com.hango.hango_backend.entity.Course course = com.hango.hango_backend.entity.Course.builder()
                 .title(request.getTitle())
                 .code(generatedCode)
@@ -579,10 +580,11 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         com.hango.hango_backend.entity.Course course = courseRepository.findById(id)
                 .orElseThrow(() -> new ApiException("Course not found with ID: " + id, HttpStatus.NOT_FOUND));
 
-        // Kiem tra QUYEN SO HUU: chi chinh nguoi tao (Trainer) khoa hoc nay moi
-        // duoc sua no. Day la kiem tra o TANG NGHIEP VU (business-level), khac voi
-        // @PreAuthorize o Controller (chi kiem tra co ROLE Trainer hay khong).
-        // hasRole('ADMINISTRATOR') o Controller khong bypass duoc check nay.
+        // Check ownership: only the creator of this course (Trainer) is allowed to edit
+        // it.
+        // This is a check at the BUSINESS level, different from @PreAuthorize at the
+        // Controller level (which only checks if the user has the Trainer role).
+        // hasRole('ADMINISTRATOR') at the Controller level does not bypass this check.
         if (!course.getCreator().getEmail().equalsIgnoreCase(email)) {
             throw new ApiException("You are not authorized to edit this course", HttpStatus.FORBIDDEN);
         }
@@ -630,15 +632,19 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         }
         java.math.BigDecimal suggestedPrice = calculateSuggestedPrice(profile, difficulty, lessonCount,
                 durationMinutes);
-        // Trainer tu chon gia qua request.getPrice() (mac dinh ve gia tham
-        // khao neu request khong kem gia).
+        // Trainer choose real price through request.getPrice(); if for some reason
+        // request does not contain price (eg direct call skipping controller
+        // validation),
+        // default to suggested price instead of leaving it empty/null.
         java.math.BigDecimal trainerPrice = request.getPrice() != null ? request.getPrice() : suggestedPrice;
         String trainerPriceNote = request.getPriceNote() != null ? request.getPriceNote() : "";
 
-        // needsNewDraftVersion = true khi khoa hoc dang sua da o trang thai PUBLISHED
-        // (co the da co hoc vien dang hoc). Thay vi ghi de truc tiep, he thong
-        // TAO 1 BAN GHI COURSE MOI (version V2) de khoa hoc dang PUBLISHED (V1)
-        // khong bi thay doi giua chung - hoc vien cu van thay noi dung cu binh thuong.
+        // needsNewDraftVersion = true when the course being edited is already in
+        // PUBLISHED
+        // status (may already have students learning). Instead of directly overwriting,
+        // the system creates a NEW COURSE RECORD (version V2) so that the course in
+        // PUBLISHED status (V1) is not changed in the middle - old students continue to
+        // see the old content normally.
         if (needsNewDraftVersion) {
             // Clone V1 → V2: Create a new DRAFT version preserving the original published
             // course (V1).
@@ -903,18 +909,18 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                     HttpStatus.BAD_REQUEST);
         }
 
-        // Neu chinh nguoi tao khoa hoc da la COURSE_MANAGER/ADMINISTRATOR thi
-        // khong can quy trinh duyet (ho tu la nguoi duyet) -> bo qua PENDING_APPROVAL.
+        // If the creator is a COURSE_MANAGER, then skip the approval process
         boolean isManager = course.getCreator().getRoles().stream()
                 .anyMatch(r -> r.getRoleName().equalsIgnoreCase("COURSE_MANAGER")
                         || r.getRoleName().equalsIgnoreCase("COURSE_MANAGER")
                         || r.getRoleName().equalsIgnoreCase("ADMINISTRATOR")
                         || r.getRoleName().equalsIgnoreCase("ADMIN"));
 
-        // Chinh sach tang truong: khoa hoc DAU TIEN cua 1 Trainer luon mien phi,
-        // BAT KE gia Trainer da tu chon la bao nhieu - chi ep GIA BAN (price) ve 0,
-        // KHONG dong cham toi suggestedPrice (van giu nguyen gia tham khao 300k-700k
-        // de Course Manager biet khoa hoc nay "dang" dang gia bao nhieu).
+        // Growth policy: The first course of a Trainer is always free,
+        // regardless of the price the Trainer has chosen - only set the selling price
+        // to 0,
+        // do not touch the suggested price (keep the suggested price at 300k-700k
+        // to let the Course Manager know how much the course is "worth").
         if (courseRepository.countDistinctCourseCodesByCreatorId(course.getCreator().getId()) <= 1) {
             course.setPrice(java.math.BigDecimal.ZERO);
         }
@@ -1344,7 +1350,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         String status = course.getStatus() != null ? course.getStatus().toUpperCase() : "";
         if (!"DRAFT".equals(status) && !"REJECTED".equals(status)) {
             throw new ApiException(
-                    "Chỉ có thể xoá khóa học ở trạng thái Nháp (Draft) hoặc Bị từ chối (Rejected).",
+                    "just can delete course in Draf or Rejected status.",
                     HttpStatus.BAD_REQUEST);
         }
 
