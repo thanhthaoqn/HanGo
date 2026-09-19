@@ -96,7 +96,9 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
           });
           ToastHelper.showSuccess(
             context,
-            'Pathway goals updated successfully!',
+            LanguageManager.isVi
+                ? 'Đã cập nhật mục tiêu và lộ trình học!'
+                : 'Pathway goals updated successfully!',
           );
         },
       ),
@@ -192,7 +194,9 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
       if (mounted) {
         ToastHelper.showError(
           context,
-          'Course information is not available.',
+          LanguageManager.isVi
+              ? 'Không có thông tin khóa học.'
+              : 'Course information is not available.',
         );
       }
       return;
@@ -408,14 +412,13 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
       });
       ToastHelper.showSuccess(
         context,
-        'Course skipped successfully.',
+        LanguageManager.isVi
+            ? 'Bỏ qua khóa học thành công.'
+            : 'Course skipped successfully.',
       );
     } catch (e) {
       if (!mounted) return;
-      ToastHelper.showError(
-        context,
-        'Error: $e',
-      );
+      ToastHelper.showError(context, 'Error: $e');
     }
   }
 
@@ -424,7 +427,9 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
     if (pathway == null || pathway.examAttemptId == null) {
       ToastHelper.showError(
         context,
-        'Cannot regenerate: Missing Exam Attempt ID.',
+        LanguageManager.isVi
+            ? 'Không thể tạo lại: Thiếu mã lượt thi.'
+            : 'Cannot regenerate: Missing Exam Attempt ID.',
       );
       return;
     }
@@ -468,7 +473,9 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
       });
       ToastHelper.showSuccess(
         context,
-        'New pathway generated with free courses only!',
+        LanguageManager.isVi
+            ? 'Đã tạo lộ trình mới chỉ với các khóa học miễn phí!'
+            : 'New pathway generated with free courses!',
       );
     } catch (e) {
       if (!mounted) return;

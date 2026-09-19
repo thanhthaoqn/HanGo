@@ -41,7 +41,7 @@ public class LearningPathwayController {
     private final CourseRepository courseRepository;
 
     @PostMapping("/generate")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('ADMINISTRATOR', 'COURSE_MANAGER', 'TRAINER')")
     public ResponseEntity<LearningPathwayResponseDTO> generatePathway(
             @AuthenticationPrincipal UserDetailsImpl userDetails,
             @Valid @RequestBody PathwayGenerateRequestDTO requestDTO) {
@@ -59,7 +59,7 @@ public class LearningPathwayController {
 
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('ADMINISTRATOR', 'COURSE_MANAGER', 'TRAINER')")
     public ResponseEntity<LearningPathwayResponseDTO> getPathwayById(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
@@ -69,7 +69,7 @@ public class LearningPathwayController {
     }
 
     @GetMapping("/me")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('ADMINISTRATOR', 'COURSE_MANAGER', 'TRAINER')")
     public ResponseEntity<LearningPathwayResponseDTO> getMyPathway(
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
         
@@ -78,7 +78,7 @@ public class LearningPathwayController {
     }
 
     @PutMapping("/{id}/reroute")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('ADMINISTRATOR', 'COURSE_MANAGER', 'TRAINER')")
     public ResponseEntity<LearningPathwayResponseDTO> reroutePathway(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
@@ -89,7 +89,7 @@ public class LearningPathwayController {
 
     // Feature B: Smart Time-boxing
     @PutMapping("/{id}/schedule")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('ADMINISTRATOR', 'COURSE_MANAGER', 'TRAINER')")
     public ResponseEntity<LearningPathwayResponseDTO> applySchedule(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails,
@@ -100,7 +100,7 @@ public class LearningPathwayController {
 
     // Feature Phase 2: Mastery
     @PostMapping("/{id}/nodes/{nodeId}/mastery")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('ADMINISTRATOR', 'COURSE_MANAGER', 'TRAINER')")
     public ResponseEntity<com.hango.hango_backend.dto.LearningPathwayResponseDTO> submitMastery(
             @PathVariable Long id,
             @PathVariable Long nodeId,
@@ -112,7 +112,7 @@ public class LearningPathwayController {
 
     // Spec 20 - B1: lay de Mastery Quiz cho node (khong kem dap an)
     @GetMapping("/{id}/nodes/{nodeId}/mastery/questions")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('ADMINISTRATOR', 'COURSE_MANAGER', 'TRAINER')")
     public ResponseEntity<java.util.List<com.hango.hango_backend.dto.MasteryQuestionDTO>> getMasteryQuestions(
             @PathVariable Long id,
             @PathVariable Long nodeId,
@@ -123,7 +123,7 @@ public class LearningPathwayController {
 
     // Spec 20 - B2: nop bai mastery - server tu cham diem
     @PostMapping("/{id}/nodes/{nodeId}/mastery/submit")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('ADMINISTRATOR', 'COURSE_MANAGER', 'TRAINER')")
     public ResponseEntity<com.hango.hango_backend.dto.MasterySubmitResponseDTO> submitMasteryAnswers(
             @PathVariable Long id,
             @PathVariable Long nodeId,
@@ -135,7 +135,7 @@ public class LearningPathwayController {
 
     // API to Skip a node (e.g. for premium courses)
     @PostMapping("/{id}/nodes/{nodeId}/skip")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('ADMINISTRATOR', 'COURSE_MANAGER', 'TRAINER')")
     public ResponseEntity<com.hango.hango_backend.dto.LearningPathwayResponseDTO> skipNode(
             @PathVariable Long id,
             @PathVariable Long nodeId,
@@ -149,7 +149,7 @@ public class LearningPathwayController {
      */
     @Deprecated
     @GetMapping("/{id}/schedule-status")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('ADMINISTRATOR', 'COURSE_MANAGER', 'TRAINER')")
     public ResponseEntity<String> getScheduleStatus(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
@@ -159,7 +159,7 @@ public class LearningPathwayController {
 
     // FE-11 agentic reroute contract (Feature A)
     @GetMapping("/{id}/progress-snapshot")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('ADMINISTRATOR', 'COURSE_MANAGER', 'TRAINER')")
     public ResponseEntity<ProgressSnapshotDTO> progressSnapshot(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
@@ -167,7 +167,7 @@ public class LearningPathwayController {
     }
 
     @PostMapping("/{id}/reroute/suggestions")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('ADMINISTRATOR', 'COURSE_MANAGER', 'TRAINER')")
     public ResponseEntity<LearningPathwayResponseDTO> rerouteSuggestions(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
@@ -201,7 +201,7 @@ public class LearningPathwayController {
     }
 
     @PostMapping("/{id}/reroute/accept")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('ADMINISTRATOR', 'COURSE_MANAGER', 'TRAINER')")
     @org.springframework.transaction.annotation.Transactional
     public ResponseEntity<LearningPathwayResponseDTO> rerouteAccept(
             @PathVariable Long id,
@@ -257,7 +257,7 @@ public class LearningPathwayController {
     }
 
     @PostMapping("/{id}/reroute/decline")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('ADMINISTRATOR', 'COURSE_MANAGER', 'TRAINER')")
     @org.springframework.transaction.annotation.Transactional
     public ResponseEntity<LearningPathwayResponseDTO> rerouteDecline(
             @PathVariable Long id,
@@ -267,7 +267,7 @@ public class LearningPathwayController {
     }
 
     @PostMapping("/{id}/mentor-action")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('ADMINISTRATOR', 'COURSE_MANAGER', 'TRAINER')")
     public ResponseEntity<LearningPathwayResponseDTO> mentorAction(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails,
@@ -280,7 +280,7 @@ public class LearningPathwayController {
     // ===================== FREE-FORM AI CHAT =====================
 
     @PostMapping("/{id}/chat")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('ADMINISTRATOR', 'COURSE_MANAGER', 'TRAINER')")
     public ResponseEntity<PathwayChatResponseDTO> chat(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails,
@@ -291,7 +291,7 @@ public class LearningPathwayController {
     }
 
     @GetMapping("/{id}/chat/history")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('ADMINISTRATOR', 'COURSE_MANAGER', 'TRAINER')")
     public ResponseEntity<java.util.List<PathwayChatResponseDTO>> getChatHistory(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
@@ -300,7 +300,7 @@ public class LearningPathwayController {
     }
 
     @DeleteMapping("/{id}/chat/history")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('ADMINISTRATOR', 'COURSE_MANAGER', 'TRAINER')")
     public ResponseEntity<Void> clearChatHistory(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {

@@ -248,7 +248,7 @@ public class CourseServiceImpl implements CourseService {
             completedLessonIds
                     .addAll(lessonProgressRepository.findCompletedLessonIdsByUserIdAndCourseId(currentUserId, id));
 
-            if (isEnrolled) {
+            if (isEnrolled && enrollmentOpt.isPresent()) {
                 Enrollment enrollment = enrollmentOpt.get();
                 Long enrolledVerId = enrollment.getEnrolledVersionId() != null ? enrollment.getEnrolledVersionId()
                         : course.getId();

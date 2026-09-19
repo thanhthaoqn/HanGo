@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../domain/entities/learning_pathway.dart';
+import '../../../utils/language_manager.dart';
 
 class InteractiveNodeTree extends StatelessWidget {
   final List<PathwayNode> nodes;
@@ -703,78 +704,81 @@ class _StepBadge extends StatelessWidget {
 
   const _StepBadge({required this.node, required this.isDarkMode});
 
-  String _nodeTypeLabel(NodeType type) {
-    switch (type) {
-      case NodeType.fastTrackSkipped:
-        return 'Fast-track';
-      case NodeType.skipped:
-        return 'Skipped';
-      case NodeType.detourRemedial:
-        return 'Detour';
-      case NodeType.merged:
-        return 'Merged';
-      case NodeType.normal:
-        return '';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final isSkipped = node.nodeType == NodeType.skipped;
-    final nodeTypeLabel = _nodeTypeLabel(node.nodeType);
-    final color = isSkipped
-        ? (isDarkMode ? const Color(0xFF475569) : const Color(0xFF94A3B8))
-        : switch (node.status) {
-            NodeStatus.completed => const Color(0xFF10B981),
-            NodeStatus.inProgress => const Color(0xFF28B79B),
-            NodeStatus.locked =>
-              isDarkMode ? const Color(0xFF30363D) : const Color(0xFFCBD5E1),
-          };
-    final icon = isSkipped
-        ? Icons.skip_next_rounded
-        : switch (node.status) {
-            NodeStatus.completed => Icons.check_rounded,
-            NodeStatus.inProgress => Icons.play_arrow_rounded,
-            NodeStatus.locked => Icons.lock_rounded,
-          };
+    final isVi = LanguageManager.isVi;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: isDarkMode ? const Color(0xFF0D1117) : Colors.white,
-          width: 4,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.28),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+    Color color;
+    IconData icon;
+    String tooltip;
+
+    switch (node.nodeType) {
+      case NodeType.skipped:
+        color = isDarkMode ? const Color(0xFF475569) : const Color(0xFF94A3B8);
+        icon = Icons.skip_next_rounded;
+        tooltip = isVi ? 'Khóa học đã bỏ qua (Skipped)' : 'Skipped Course';
+        break;
+      case NodeType.fastTrackSkipped:
+        color = isDarkMode ? const Color(0xFF7C3AED) : const Color(0xFF8B5CF6);
+        icon = Icons.bolt_rounded;
+        tooltip = isVi ? 'Vượt cấp (Fast-track)' : 'Fast-track';
+        break;
+      case NodeType.detourRemedial:
+        color = isDarkMode ? const Color(0xFFD97706) : const Color(0xFFF59E0B);
+        icon = Icons.alt_route_rounded;
+        tooltip = isVi ? 'Lộ trình học bổ trợ (Detour)' : 'Detour (Remedial)';
+        break;
+      case NodeType.merged:
+        color = isDarkMode ? const Color(0xFF0F766E) : const Color(0xFF0D9488);
+        icon = Icons.call_merge_rounded;
+        tooltip = isVi ? 'Nhánh hợp nhất (Merged)' : 'Merged Route';
+        break;
+      case NodeType.normal:
+        switch (node.status) {
+          case NodeStatus.completed:
+            color = const Color(0xFF10B981);
+            icon = Icons.check_rounded;
+            tooltip = isVi ? 'Đã hoàn thành' : 'Completed';
+            break;
+          case NodeStatus.inProgress:
+            color = const Color(0xFF28B79B);
+            icon = Icons.play_arrow_rounded;
+            tooltip = isVi ? 'Đang học' : 'In Progress';
+            break;
+          case NodeStatus.locked:
+            color = isDarkMode ? const Color(0xFF30363D) : const Color(0xFFCBD5E1);
+            icon = Icons.lock_rounded;
+            tooltip = isVi ? 'Đang khóa' : 'Locked';
+            break;
+        }
+        break;
+    }
+
+    return Tooltip(
+      message: tooltip,
+      waitDuration: const Duration(milliseconds: 200),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: isDarkMode ? const Color(0xFF0D1117) : Colors.white,
+            width: 4,
           ),
-        ],
-      ),
-      child: nodeTypeLabel.isEmpty
-          ? Icon(icon, color: Colors.white, size: 22)
-          : Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 3),
-                Text(
-                  nodeTypeLabel,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w900,
-                    height: 1.1,
-                  ),
-                ),
-              ],
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.28),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
             ),
+          ],
+        ),
+        alignment: Alignment.center,
+        child: Icon(icon, color: Colors.white, size: 22),
+      ),
     );
   }
 }
@@ -799,6 +803,18 @@ class _StatusPill extends StatelessWidget {
       label = 'Skipped';
       icon = Icons.skip_next_rounded;
       color = isDarkMode ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    } else if (nodeType == NodeType.fastTrackSkipped) {
+      label = 'Fast-track';
+      icon = Icons.bolt_rounded;
+      color = isDarkMode ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED);
+    } else if (nodeType == NodeType.detourRemedial) {
+      label = 'Detour';
+      icon = Icons.alt_route_rounded;
+      color = isDarkMode ? const Color(0xFFFBBF24) : const Color(0xFFD97706);
+    } else if (nodeType == NodeType.merged) {
+      label = 'Merged';
+      icon = Icons.call_merge_rounded;
+      color = isDarkMode ? const Color(0xFF2DD4BF) : const Color(0xFF0D9488);
     } else {
       switch (status) {
         case NodeStatus.completed:

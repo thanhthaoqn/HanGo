@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../utils/toast_helper.dart';
+import '../../../utils/language_manager.dart';
 
 class PathwaySetupDialog extends StatefulWidget {
   final int? examAttemptId;
@@ -49,20 +51,29 @@ class _PathwaySetupDialogState extends State<PathwaySetupDialog> {
     final hours = int.tryParse(_hoursController.text.trim()) ?? 0;
 
     if (goal.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a goal name')),
+      ToastHelper.showError(
+        context,
+        LanguageManager.isVi
+            ? 'Vui lòng nhập tên mục tiêu'
+            : 'Please enter a goal name',
       );
       return;
     }
     if (_targetDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a target date')),
+      ToastHelper.showError(
+        context,
+        LanguageManager.isVi
+            ? 'Vui lòng chọn ngày mục tiêu'
+            : 'Please select a target date',
       );
       return;
     }
     if (hours <= 0 || hours > 168) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter valid hours per week (1-168)')),
+      ToastHelper.showError(
+        context,
+        LanguageManager.isVi
+            ? 'Vui lòng nhập số giờ học mỗi tuần hợp lệ (1-168)'
+            : 'Please enter valid hours per week (1-168)',
       );
       return;
     }

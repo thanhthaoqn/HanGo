@@ -35,7 +35,7 @@ public class AIAssistantController {
      * UC-31: gửi câu hỏi tới AI Assistant, giới hạn trong phạm vi 1 bài học cụ thể.
      */
     // Kiem tra Security: Phai co quyen AI_LEARNING_ASSISTANT moi duoc dung tinh nang nay
-    @PreAuthorize("hasAuthority('AI_LEARNING_ASSISTANT')")
+    @PreAuthorize("hasAuthority('AI_LEARNING_ASSISTANT') or hasRole('ADMINISTRATOR')")
     @PostMapping("/messages")
     public ResponseEntity<SendMessageResponse> sendMessage(@Valid @RequestBody SendMessageRequest request) {
         // Lay ID cua Learner dang dang nhap tu SecurityContext, tranh loi Exception
@@ -44,7 +44,7 @@ public class AIAssistantController {
     }
 
     /** Xem lại lịch sử các cuộc hội thoại với AI Assistant. */
-    @PreAuthorize("hasAuthority('AI_LEARNING_ASSISTANT')")
+    @PreAuthorize("hasAuthority('AI_LEARNING_ASSISTANT') or hasRole('ADMINISTRATOR')")
     @GetMapping("/conversations")
     public ResponseEntity<List<AIConversation>> getConversations() {
         Long learnerId = getSafeUserId();

@@ -3,6 +3,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../../data/repositories/pathway_repository.dart';
 import '../../../domain/entities/learning_pathway.dart';
 import '../../../utils/language_manager.dart';
+import '../../../utils/toast_helper.dart';
 import 'package:go_router/go_router.dart';
 import '../../../routes/app_routes.dart';
 
@@ -158,8 +159,9 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
     } catch (e) {
       if (!mounted) return;
       final isVi = LanguageManager.isVi;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(isVi ? 'Không thể xóa lịch sử chat: $e' : 'Cannot clear chat history: $e')),
+      ToastHelper.showError(
+        context,
+        isVi ? 'Không thể xóa lịch sử chat: $e' : 'Cannot clear chat history: $e',
       );
     } finally {
       if (mounted) setState(() => _isSending = false);
@@ -649,8 +651,9 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
                       });
                       _scrollToBottom();
                     } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Failed to accept: $e')),
+                      ToastHelper.showError(
+                        context,
+                        LanguageManager.isVi ? 'Chấp nhận thất bại: $e' : 'Failed to accept: $e',
                       );
                     } finally {
                       if (mounted) setState(() => _isRerouting = false);
@@ -697,8 +700,9 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
                       });
                       _scrollToBottom();
                     } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Failed to decline: $e')),
+                      ToastHelper.showError(
+                        context,
+                        LanguageManager.isVi ? 'Từ chối thất bại: $e' : 'Failed to decline: $e',
                       );
                     } finally {
                       if (mounted) setState(() => _isRerouting = false);
@@ -767,14 +771,11 @@ class _AIMentorSidePanelState extends State<AIMentorSidePanel> {
                 if (widget.onOpenCourse != null) {
                   widget.onOpenCourse!(targetNode);
                 } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        isVi
-                            ? 'Đang mở chi tiết khóa học ${targetNode.courseTitle}...'
-                            : 'Opening details for ${targetNode.courseTitle}...',
-                      ),
-                    ),
+                  ToastHelper.showInfo(
+                    context,
+                    isVi
+                        ? 'Đang mở chi tiết khóa học ${targetNode.courseTitle}...'
+                        : 'Opening details for ${targetNode.courseTitle}...',
                   );
                 }
               },

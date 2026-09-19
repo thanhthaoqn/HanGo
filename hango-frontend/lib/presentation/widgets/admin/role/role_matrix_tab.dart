@@ -164,10 +164,29 @@ class _RoleMatrixTabState extends State<RoleMatrixTab> {
                                     textAlign: TextAlign.center,
                                   ),
                                   const SizedBox(height: 4),
-                                  if (r != 'ADMINISTRATOR')
+                                  if (r == 'ADMINISTRATOR')
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF3F4F6),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: const Text(
+                                        'System Admin',
+                                        style: TextStyle(
+                                          color: Color(0xFF4B5563),
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    )
+                                  else
                                     InkWell(
                                       onTap: () {
-                                        final roleObj = widget.rolesWithPermissions.firstWhere((element) => element['roleName'] == r);
+                                        final roleObj = widget.rolesWithPermissions.firstWhere(
+                                          (element) => element['roleName'] == r,
+                                          orElse: () => {'roleName': r, 'permissions': []},
+                                        );
                                         final perms = roleObj['permissions'] as List? ?? [];
                                         final currentCodes = perms.map((p) => p['code'] as String).toList();
                                         widget.onEditRole(r, currentCodes);
@@ -179,14 +198,6 @@ class _RoleMatrixTabState extends State<RoleMatrixTab> {
                                           fontSize: 12,
                                           fontWeight: FontWeight.w500,
                                         ),
-                                      ),
-                                    )
-                                  else
-                                    const Text(
-                                      'System Default',
-                                      style: TextStyle(
-                                        color: Color(0xFF9CA3AF),
-                                        fontSize: 12,
                                       ),
                                     ),
                                 ],
@@ -262,7 +273,7 @@ class _RoleMatrixTabState extends State<RoleMatrixTab> {
                                       final restrictedRoles = perm['restrictedForRoles'] as String? ?? '';
                                       
                                       final isCore = coreRoles.contains(roleName);
-                                      final isRestricted = restrictedRoles.contains(roleName);
+                                      final isRestricted = restrictedRoles.contains(roleName) || (roleName == 'ADMINISTRATOR' && !isCore);
                                       
                                       Widget icon;
                                       if (isCore) {

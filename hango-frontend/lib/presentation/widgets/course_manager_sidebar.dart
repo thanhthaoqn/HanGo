@@ -7,6 +7,9 @@ import '../pages/course_manager/question_bank/course_manager_question_bank_page.
 import '../pages/course_manager/course_manager_settlement_page.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:go_router/go_router.dart';
+import '../../routes/app_routes.dart';
+import '../../utils/language_manager.dart';
 
 class CourseManagerSidebar extends StatefulWidget {
   final String currentRoute;
@@ -156,6 +159,40 @@ class _CourseManagerSidebarState extends State<CourseManagerSidebar> {
             ),
           ],
           const Spacer(),
+          const Divider(color: Color(0xFFE2E8F0)),
+          Padding(
+            padding: const EdgeInsets.only(top: 6.0),
+            child: InkWell(
+              onTap: () => context.go(AppRoutes.home),
+              borderRadius: BorderRadius.circular(8),
+              hoverColor: const Color(0xFF20B486).withValues(alpha: 0.08),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.school_outlined,
+                      color: Color(0xFF20B486),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 14),
+                    Text(
+                      LanguageManager.isVi ? 'Giao diện Học viên' : 'Learner View',
+                      style: const TextStyle(
+                        color: Color(0xFF20B486),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
