@@ -105,9 +105,14 @@ class _ListExamsPageState extends State<ListExamsPage> {
         size: 8,
       );
 
-      final attemptsList = token != null
-        ? await _repository.fetchMyExamAttempts()
-        : <Map<String, dynamic>>[];
+      List<Map<String, dynamic>> attemptsList = [];
+      if (token != null) {
+        try {
+          attemptsList = await _repository.fetchMyExamAttempts();
+        } catch (e) {
+          debugPrint('Notice: unable to load user attempts: $e');
+        }
+      }
 
       if (mounted) {
         setState(() {
@@ -118,6 +123,7 @@ class _ListExamsPageState extends State<ListExamsPage> {
         });
       }
     } catch (e) {
+      debugPrint('Error loading exams: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;

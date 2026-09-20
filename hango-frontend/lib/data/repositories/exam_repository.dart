@@ -256,10 +256,10 @@ class ExamRepository {
         final List<dynamic> data = json.decode(utf8.decode(response.bodyBytes));
         return data.map((e) => Map<String, dynamic>.from(e)).toList();
       } else {
-        throw Exception('Failed to load my attempts: ${response.statusCode}');
+        return <Map<String, dynamic>>[];
       }
     } catch (e) {
-      throw Exception('Error fetching my attempts: $e');
+      return <Map<String, dynamic>>[];
     }
   }
 }

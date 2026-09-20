@@ -73,7 +73,7 @@ public class ExamController {
     }
 
     @GetMapping("/entry/status")
-    @PreAuthorize("hasAuthority('ATTEMPT_QUIZ_AND_EXAM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('ATTEMPT_QUIZ_AND_EXAM') or hasAnyRole('TRAINER', 'COURSE_MANAGER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
     public ResponseEntity<Map<String, Object>> getEntryExamStatus() {
         Long currentUserId = getCurrentUserId();
         if (currentUserId == null) {
@@ -83,7 +83,7 @@ public class ExamController {
     }
 
     @GetMapping("/my-attempts")
-    @PreAuthorize("hasAuthority('ATTEMPT_QUIZ_AND_EXAM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('ATTEMPT_QUIZ_AND_EXAM') or hasAnyRole('TRAINER', 'COURSE_MANAGER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
     public ResponseEntity<List<ExamAttemptResponseDTO>> getMyExamAttempts() {
         Long currentUserId = getCurrentUserId();
         if (currentUserId == null) {
@@ -94,7 +94,7 @@ public class ExamController {
     }
 
     @GetMapping("/{id}/attempts")
-    @PreAuthorize("hasAuthority('ATTEMPT_QUIZ_AND_EXAM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('ATTEMPT_QUIZ_AND_EXAM') or hasAnyRole('TRAINER', 'COURSE_MANAGER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
     public ResponseEntity<List<ExamAttemptResponseDTO>> getExamAttempts(@PathVariable Long id) {
         Long currentUserId = getCurrentUserId();
         if (currentUserId == null) {
@@ -105,7 +105,7 @@ public class ExamController {
     }
 
     @PostMapping("/{id}/submit")
-    @PreAuthorize("hasAuthority('ATTEMPT_QUIZ_AND_EXAM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('ATTEMPT_QUIZ_AND_EXAM') or hasAnyRole('TRAINER', 'COURSE_MANAGER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
     public ResponseEntity<ExamAttemptResponseDTO> submitExam(
             @PathVariable Long id,
             @RequestBody ExamAttemptRequestDTO request) {
@@ -118,7 +118,7 @@ public class ExamController {
     }
 
     @GetMapping("/users/me/analytics/skills")
-    @PreAuthorize("hasAuthority('ATTEMPT_QUIZ_AND_EXAM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('ATTEMPT_QUIZ_AND_EXAM') or hasAnyRole('TRAINER', 'COURSE_MANAGER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
     public ResponseEntity<Map<String, Double>> getMySkillAnalytics() {
         Long currentUserId = getCurrentUserId();
         if (currentUserId == null) {

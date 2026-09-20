@@ -31,7 +31,7 @@ public class PaymentController {
      * POST /api/v1/payment/create
      */
     @PostMapping("/create")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'COURSE_MANAGER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
     public ResponseEntity<?> createPayment(
             @RequestBody PaymentRequestDTO request,
             @AuthenticationPrincipal UserDetailsImpl currentUser,
@@ -77,7 +77,7 @@ public class PaymentController {
      * GET /api/v1/payment/my-history?page=0&size=10&status=ALL
      */
     @GetMapping("/my-history")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'COURSE_MANAGER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
     public ResponseEntity<?> getMyPaymentHistory(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -101,7 +101,7 @@ public class PaymentController {
      * GET /api/v1/payment/status/{txnRef}
      */
     @GetMapping("/status/{txnRef}")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'COURSE_MANAGER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
     public ResponseEntity<?> getPaymentStatus(
             @PathVariable String txnRef,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {

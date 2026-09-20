@@ -55,7 +55,7 @@ public class CourseController {
     }
 
     @PostMapping("/{id}/enroll")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'COURSE_MANAGER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
     public ResponseEntity<?> enrollCourse(@PathVariable Long id) {
         try {
             Long currentUserId = getCurrentUserId();
@@ -72,7 +72,7 @@ public class CourseController {
 
 
     @DeleteMapping("/{id}/enroll")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'COURSE_MANAGER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
     public ResponseEntity<?> unenrollCourse(@PathVariable Long id) {
         try {
             Long currentUserId = getCurrentUserId();
@@ -88,7 +88,7 @@ public class CourseController {
     }
 
     @PostMapping("/{id}/switch-version")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'COURSE_MANAGER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
     public ResponseEntity<?> switchCourseVersion(@PathVariable Long id) {
         try {
             Long currentUserId = getCurrentUserId();
