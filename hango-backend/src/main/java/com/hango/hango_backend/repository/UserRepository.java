@@ -28,7 +28,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u FROM User u JOIN u.roles r WHERE r.roleName = :roleName")
     List<User> findByRoleName(@Param("roleName") String roleName);
 
-    @Query("SELECT COUNT(u) FROM User u JOIN u.roles r WHERE r.roleName = :roleName")
+    @Query("SELECT COUNT(DISTINCT u) FROM User u JOIN u.roles r WHERE r.roleName = :roleName OR r.roleName = CONCAT('ROLE_', :roleName)")
     long countByRoleName(@Param("roleName") String roleName);
 
     @Query(value = "SELECT COUNT(DISTINCT ur.user_id) FROM user_roles ur JOIN roles r ON ur.role_id = r.id WHERE r.id = 4 OR LOWER(r.role_name) LIKE '%learner%'", nativeQuery = true)
