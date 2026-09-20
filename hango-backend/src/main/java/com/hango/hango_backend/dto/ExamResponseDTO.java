@@ -7,6 +7,7 @@ import lombok.Data;
 @Builder
 public class ExamResponseDTO {
     private Long id;
+    private String uuid;
     private String title;
     private String description;
     private String status;

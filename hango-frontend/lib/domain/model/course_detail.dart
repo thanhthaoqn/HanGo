@@ -12,6 +12,7 @@ class CourseLesson {
   final int? mediaSizeBytes;
   final int? estimatedTimeMinutes;
   final String? learningObjectives;
+  final String? uuid;
 
   CourseLesson({
     required this.id,
@@ -27,6 +28,7 @@ class CourseLesson {
     this.mediaSizeBytes,
     this.estimatedTimeMinutes,
     this.learningObjectives,
+    this.uuid,
   });
 
   factory CourseLesson.fromJson(Map<String, dynamic> json) {
@@ -44,6 +46,7 @@ class CourseLesson {
       mediaSizeBytes: json['mediaSizeBytes'] as int?,
       estimatedTimeMinutes: json['estimatedTimeMinutes'] as int?,
       learningObjectives: json['learningObjectives'] as String?,
+      uuid: json['uuid'] as String?,
     );
   }
 }
@@ -98,6 +101,7 @@ class CourseDetail {
   final String? trainerBio;
   final List<String> trainerCertificates;
   final List<CourseSession> sessions;
+  final String? uuid;
 
   CourseDetail({
     required this.id,
@@ -121,6 +125,7 @@ class CourseDetail {
     this.trainerBio,
     this.trainerCertificates = const [],
     required this.sessions,
+    this.uuid,
   });
 
   factory CourseDetail.fromJson(Map<String, dynamic> json) {
@@ -157,6 +162,7 @@ class CourseDetail {
       trainerBio: json['trainerBio'] as String?,
       trainerCertificates: certs,
       sessions: sessionsList,
+      uuid: json['uuid'] as String?,
     );
   }
 

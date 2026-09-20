@@ -12,6 +12,7 @@ class Course {
   final double progressPercentage;
   final double price;
   final String? version;
+  final String? uuid;
 
   const Course({
     required this.id,
@@ -27,6 +28,7 @@ class Course {
     required this.progressPercentage,
     required this.price,
     this.version,
+    this.uuid,
   });
 
   factory Course.fromJson(Map<String, dynamic> json) {
@@ -57,6 +59,7 @@ class Course {
       progressPercentage: (json['progressPercentage'] ?? 0.0).toDouble(),
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
       version: json['version'] as String?,
+      uuid: json['uuid'] as String?,
     );
   }
 }

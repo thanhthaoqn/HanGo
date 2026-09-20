@@ -100,6 +100,16 @@ public class Lesson {
         return this.content;
     }
 
+    @Column(length = 36, unique = true)
+    private String uuid;
+
+    @PrePersist
+    public void ensureUuid() {
+        if (this.uuid == null || this.uuid.isBlank()) {
+            this.uuid = java.util.UUID.randomUUID().toString();
+        }
+    }
+
     /**
      * Chuan hoa lesson_type thanh itemType de FE hien thi (spec 20).
      * FINAL_QUIZ la bai danh gia cuoi khoa nhung van phai duoc FE coi nhu 'quiz'

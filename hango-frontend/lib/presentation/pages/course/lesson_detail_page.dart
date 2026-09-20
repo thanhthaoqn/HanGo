@@ -24,8 +24,8 @@ import '../../../utils/language_manager.dart';
 import '../../../utils/permission_utils.dart';
 
 class LessonDetailPage extends StatefulWidget {
-  final int courseId;
-  final int lessonId;
+  final dynamic courseId;
+  final dynamic lessonId;
   final bool startQuizImmediately;
   final bool cameFromCourseDetail;
 
@@ -94,8 +94,9 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       await _loadCurrentUserId();
       final course = await _courseRepository.fetchCourseDetail(widget.courseId);
       final lesson = await _lessonRepository.fetchLessonDetail(
-        _currentLessonId,
+        widget.lessonId,
       );
+      _currentLessonId = lesson.id;
       
       final List<dynamic> attemptsData = await _lessonRepository.fetchQuizAttempts(_currentLessonId, _currentUserId);
       final List<QuizAttempt> parsedAttempts = [];
@@ -131,7 +132,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       String? foundItemType;
       for (final s in course.sessions) {
         for (final l in s.lessons) {
-          if (l.id == _currentLessonId) {
+          if (l.id == _currentLessonId || (l.uuid != null && l.uuid == widget.lessonId.toString())) {
             foundItemType = l.itemType;
             break;
           }
@@ -152,7 +153,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         _initializePlayer(lesson.content);
       }
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('last_lesson_id_for_${widget.courseId}', _currentLessonId);
+      await prefs.setInt('last_lesson_id_for_${course.id}', _currentLessonId);
       _saveLastVisitedSession(_currentLessonId, _isDoingQuiz);
     } catch (e) {
       setState(() {
@@ -162,8 +163,8 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     }
   }
 
-  Future<void> _navigateToLesson(int lessonId, {bool startQuiz = false}) async {
-    if (lessonId == _currentLessonId) return;
+  Future<void> _navigateToLesson(dynamic lessonId, {bool startQuiz = false}) async {
+    if (lessonId == _currentLessonId || (_lessonDetail?.uuid != null && lessonId == _lessonDetail!.uuid)) return;
     _disposePlayers();
     setState(() {
       _isNavigatingLesson = true;
@@ -175,7 +176,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     });
     try {
       final newLesson = await _lessonRepository.fetchLessonDetail(lessonId);
-      final attemptsData = await _lessonRepository.fetchQuizAttempts(lessonId, _currentUserId);
+      final attemptsData = await _lessonRepository.fetchQuizAttempts(newLesson.id, _currentUserId);
       final List<QuizAttempt> parsedAttempts = [];
       final List<Map<int, int>> parsedAnswers = [];
       
@@ -210,7 +211,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       if (_courseDetail != null) {
         for (final s in _courseDetail!.sessions) {
           for (final l in s.lessons) {
-            if (l.id == lessonId) {
+            if (l.id == newLesson.id || (l.uuid != null && l.uuid == newLesson.uuid)) {
               foundItemType = l.itemType;
               break;
             }
@@ -220,7 +221,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       }
 
       setState(() {
-        _currentLessonId = lessonId;
+        _currentLessonId = newLesson.id;
         _lessonDetail = newLesson;
         _itemType = newLesson.itemType ?? foundItemType;
         _mockAttempts = parsedAttempts;
@@ -232,8 +233,8 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         _initializePlayer(newLesson.content);
       }
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('last_lesson_id_for_${widget.courseId}', lessonId);
-      _saveLastVisitedSession(lessonId, startQuiz);
+      await prefs.setInt('last_lesson_id_for_${_courseDetail?.id ?? widget.courseId}', newLesson.id);
+      _saveLastVisitedSession(newLesson.id, startQuiz);
       if (startQuiz) {
         toggleFullscreen(true);
       } else {
@@ -241,7 +242,9 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
       }
       if (!mounted) return;
       final query = startQuiz ? '?startQuiz=true' : '';
-      context.go('/courses/${widget.courseId}/lessons/$lessonId$query');
+      final courseSlug = _courseDetail?.uuid ?? widget.courseId;
+      final lessonSlug = newLesson.uuid ?? newLesson.id;
+      context.go('/courses/$courseSlug/lessons/$lessonSlug$query');
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -254,7 +257,9 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
   @override
   void didUpdateWidget(covariant LessonDetailPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.lessonId != oldWidget.lessonId && widget.lessonId != _currentLessonId) {
+    if (widget.lessonId != oldWidget.lessonId && 
+        widget.lessonId != _currentLessonId &&
+        widget.lessonId != _lessonDetail?.uuid) {
       _navigateToLesson(widget.lessonId, startQuiz: widget.startQuizImmediately);
     }
   }
@@ -262,7 +267,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
   @override
   void initState() {
     super.initState();
-    _currentLessonId = widget.lessonId;
+    _currentLessonId = int.tryParse(widget.lessonId.toString()) ?? 0;
     _isDoingQuiz = widget.startQuizImmediately;
     _isQuizMaximized = true;
 
@@ -276,7 +281,6 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
     });
 
     _loadData();
-    _saveLastVisitedSession(widget.lessonId, widget.startQuizImmediately);
     if (widget.startQuizImmediately) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         toggleFullscreen(true);
@@ -286,7 +290,10 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
 
   Future<void> _saveLastVisitedSession(int lessonId, bool isDoingQuiz) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('last_visited_course_id', widget.courseId);
+    final cId = _courseDetail?.id ?? int.tryParse(widget.courseId.toString()) ?? 0;
+    if (cId > 0) {
+      await prefs.setInt('last_visited_course_id', cId);
+    }
     await prefs.setInt('last_visited_lesson_id', lessonId);
     await prefs.setBool('last_visited_quiz_immediately', isDoingQuiz);
   }
@@ -1162,7 +1169,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                         if (context.canPop()) {
                           context.pop();
                         } else {
-                          context.go('/courses/${widget.courseId}');
+                          context.go('/courses/${_courseDetail?.uuid ?? widget.courseId}');
                         }
                       },
                       borderRadius: BorderRadius.circular(20),
@@ -1475,7 +1482,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                               )
                             : null,
                         onTap: () {
-                          _navigateToLesson(l.id);
+                          _navigateToLesson(l.uuid ?? l.id);
                         },
                       ),
                     ),
@@ -3463,7 +3470,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                         Navigator.of(context).pushReplacement(
                           MaterialPageRoute(
                             builder: (context) => CourseCompletionPage(
-                              courseId: widget.courseId,
+                              courseId: _courseDetail?.uuid ?? widget.courseId,
                               courseDetail: _courseDetail,
                             ),
                           ),
@@ -3683,7 +3690,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (context) => CourseCompletionPage(
-                courseId: widget.courseId,
+                courseId: _courseDetail?.uuid ?? widget.courseId,
                 courseDetail: _courseDetail,
               ),
             ),
@@ -5129,7 +5136,7 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
                         Navigator.of(context).pushReplacement(
                           MaterialPageRoute(
                             builder: (context) => CourseCompletionPage(
-                              courseId: widget.courseId,
+                              courseId: _courseDetail?.uuid ?? widget.courseId,
                               courseDetail: _courseDetail,
                             ),
                           ),

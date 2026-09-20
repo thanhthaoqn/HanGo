@@ -24,6 +24,42 @@ public class SchemaFixRunner implements CommandLineRunner {
         fixSystemParametersColumn();
         fixExamMatrixDetailsCategoryNullable();
         fixOrphanedData();
+        initUuids();
+    }
+
+    private void initUuids() {
+        try {
+            // Courses
+            try {
+                jdbcTemplate.execute("ALTER TABLE courses ADD COLUMN uuid VARCHAR(36) NULL");
+            } catch (Exception ignored) {}
+            jdbcTemplate.update("UPDATE courses SET uuid = (UUID()) WHERE uuid IS NULL OR uuid = ''");
+            try {
+                jdbcTemplate.execute("ALTER TABLE courses ADD UNIQUE INDEX idx_courses_uuid (uuid)");
+            } catch (Exception ignored) {}
+
+            // Lessons
+            try {
+                jdbcTemplate.execute("ALTER TABLE lessons ADD COLUMN uuid VARCHAR(36) NULL");
+            } catch (Exception ignored) {}
+            jdbcTemplate.update("UPDATE lessons SET uuid = (UUID()) WHERE uuid IS NULL OR uuid = ''");
+            try {
+                jdbcTemplate.execute("ALTER TABLE lessons ADD UNIQUE INDEX idx_lessons_uuid (uuid)");
+            } catch (Exception ignored) {}
+
+            // Exams
+            try {
+                jdbcTemplate.execute("ALTER TABLE exams ADD COLUMN uuid VARCHAR(36) NULL");
+            } catch (Exception ignored) {}
+            jdbcTemplate.update("UPDATE exams SET uuid = (UUID()) WHERE uuid IS NULL OR uuid = ''");
+            try {
+                jdbcTemplate.execute("ALTER TABLE exams ADD UNIQUE INDEX idx_exams_uuid (uuid)");
+            } catch (Exception ignored) {}
+
+            log.info("[SchemaFix] Initialized UUIDs for courses, lessons, and exams successfully.");
+        } catch (Exception e) {
+            log.warn("[SchemaFix] Error initializing UUIDs: {}", e.getMessage());
+        }
     }
 
     private void fixSystemParametersColumn() {

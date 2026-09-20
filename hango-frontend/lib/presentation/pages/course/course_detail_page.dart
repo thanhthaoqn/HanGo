@@ -19,7 +19,7 @@ import '../../../data/repositories/payment_repository.dart';
 import '../../../utils/toast_helper.dart';
 
 class CourseDetailPage extends StatefulWidget {
-  final int courseId;
+  final dynamic courseId;
 
   const CourseDetailPage({Key? key, required this.courseId}) : super(key: key);
 
@@ -54,7 +54,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     _loadCourseDetail();
     _checkCartStatus();
     _isInCart = CartManager.cartCoursesNotifier.value.any(
-      (c) => c.id == widget.courseId,
+      (c) => c.id.toString() == widget.courseId.toString() || (c.uuid != null && c.uuid == widget.courseId.toString()),
     );
     CartManager.cartCoursesNotifier.addListener(_onCartChanged);
     _tabController = TabController(length: 4, vsync: this);
@@ -70,7 +70,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
   void _onCartChanged() {
     if (!mounted) return;
     final isNowInCart = CartManager.cartCoursesNotifier.value.any(
-      (c) => c.id == widget.courseId,
+      (c) => c.id.toString() == widget.courseId.toString() || (c.uuid != null && c.uuid == widget.courseId.toString()),
     );
     if (isNowInCart != _isInCart) {
       setState(() {
@@ -117,6 +117,13 @@ class _CourseDetailPageState extends State<CourseDetailPage>
         _courseDetail = course;
         _isLoading = false;
       });
+      if (course.uuid != null &&
+          course.uuid!.isNotEmpty &&
+          widget.courseId.toString() != course.uuid) {
+        if (mounted) {
+          context.go('/courses/${course.uuid}');
+        }
+      }
     } catch (e) {
       setState(() {
         _errorMessage = e.toString();
@@ -1073,13 +1080,14 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                 ),
                 ElevatedButton.icon(
                   onPressed: () {
+                    final courseSlug = course.uuid ?? course.id;
                     try {
-                      context.push('/courses/${course.id}/completion');
+                      context.push('/courses/$courseSlug/completion');
                     } catch (_) {
                       Navigator.of(context, rootNavigator: true).push(
                         MaterialPageRoute(
                           builder: (context) => CourseCompletionPage(
-                            courseId: course.id,
+                            courseId: courseSlug,
                             courseDetail: course,
                           ),
                         ),
@@ -1337,7 +1345,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                     onTap: hasAccess
                         ? () {
                             context.push(
-                              '/courses/${course.id}/lessons/${lesson.id}',
+                              '/courses/${course.uuid ?? course.id}/lessons/${lesson.uuid ?? lesson.id}',
                             );
                           }
                         : () {
@@ -1389,7 +1397,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                               onPressed: hasAccess
                                   ? () {
                                       context.push(
-                                        '/courses/${course.id}/lessons/${lesson.id}?startQuiz=true',
+                                        '/courses/${course.uuid ?? course.id}/lessons/${lesson.uuid ?? lesson.id}?startQuiz=true',
                                       );
                                     }
                                   : null,
@@ -1418,7 +1426,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
 
   Future<void> _checkCartStatus() async {
     final inMemory = CartManager.cartCoursesNotifier.value.any(
-      (c) => c.id == widget.courseId,
+      (c) => c.id.toString() == widget.courseId.toString() || (c.uuid != null && c.uuid == widget.courseId.toString()),
     );
     if (inMemory) {
       if (mounted) {
@@ -1431,7 +1439,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     final cart = await CartManager.getCartIds();
     if (mounted) {
       setState(() {
-        _isInCart = cart.contains(widget.courseId.toString());
+        _isInCart = cart.contains(widget.courseId.toString()) || (_courseDetail != null && cart.contains(_courseDetail!.id.toString()));
       });
     }
   }
@@ -1777,10 +1785,10 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                 onPressed: () {
                   if (course.sessions.isNotEmpty &&
                       course.sessions.first.lessons.isNotEmpty) {
-                    final firstLessonId =
-                        course.sessions.first.lessons.first.id;
+                    final firstLesson = course.sessions.first.lessons.first;
+                    final firstLessonSlug = firstLesson.uuid ?? firstLesson.id;
                     context.push(
-                      '/courses/${course.id}/lessons/$firstLessonId',
+                      '/courses/${course.uuid ?? course.id}/lessons/$firstLessonSlug',
                     );
                   } else {
                     _showNotification(
@@ -1814,13 +1822,14 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () {
+                    final courseSlug = course.uuid ?? course.id;
                     try {
-                      context.push('/courses/${course.id}/completion');
+                      context.push('/courses/$courseSlug/completion');
                     } catch (_) {
                       Navigator.of(context, rootNavigator: true).push(
                         MaterialPageRoute(
                           builder: (context) => CourseCompletionPage(
-                            courseId: course.id,
+                            courseId: courseSlug,
                             courseDetail: course,
                           ),
                         ),

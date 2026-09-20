@@ -31,12 +31,12 @@ public class LessonController {
     // Endpoint nay KHONG bat buoc dang nhap (xem SecurityConfig: GET
     // /api/v1/lessons/** la permitAll) - neu currentUser null (khach chua login)
     // van tra ve noi dung, chi rieng "isCompleted" se luon la false.
-    @GetMapping("/{id}")
+    @GetMapping("/{identifier}")
     public ResponseEntity<LessonDetailDTO> getLessonDetail(
-            @PathVariable Long id,
+            @PathVariable String identifier,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
         Long currentUserId = currentUser != null ? currentUser.getId() : null;
-        return ResponseEntity.ok(lessonService.getLessonDetail(id, currentUserId));
+        return ResponseEntity.ok(lessonService.getLessonDetailByIdentifier(identifier, currentUserId));
     }
 
     // Danh dau bai hoc (khong phai quiz) la da hoc xong. Dung cho bai video/text -

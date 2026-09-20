@@ -8,6 +8,7 @@ class Exam {
     this.thumbnailUrl = '',
     this.creatorId,
     this.visibility = 'PRIVATE',
+    this.uuid,
   });
 
   final int id;
@@ -18,6 +19,7 @@ class Exam {
   final String thumbnailUrl;
   final int? creatorId;
   final String visibility;
+  final String? uuid;
 
   factory Exam.fromJson(Map<String, dynamic> json) {
     return Exam(
@@ -32,6 +34,7 @@ class Exam {
       thumbnailUrl: json['thumbnailUrl'] as String? ?? '',
       creatorId: (json['creatorId'] as num?)?.toInt(),
       visibility: json['visibility'] as String? ?? 'PRIVATE',
+      uuid: json['uuid'] as String?,
     );
   }
 }

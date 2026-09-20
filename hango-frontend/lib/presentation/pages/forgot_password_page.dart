@@ -314,7 +314,13 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
                         // Back to Sign In Link
                         GestureDetector(
-                          onTap: () => context.go(AppRoutes.login),
+                          onTap: () {
+                            if (context.canPop()) {
+                              context.pop();
+                            } else {
+                              context.go(AppRoutes.login);
+                            }
+                          },
                           child: MouseRegion(
                             cursor: SystemMouseCursors.click,
                             child: Row(

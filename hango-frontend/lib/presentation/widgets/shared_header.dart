@@ -443,11 +443,12 @@ class _SharedHeaderState extends State<SharedHeader> {
     return InkWell(
       onTap: () {
         _hideCartOverlay();
+        final courseSlug = course.uuid ?? course.id;
         try {
-          context.push('/courses/${course.id}');
+          context.push('/courses/$courseSlug');
         } catch (_) {
-          Navigator.of(context, rootNavigator: true).push(
-            MaterialPageRoute(builder: (context) => CourseDetailPage(courseId: course.id)),
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (context) => CourseDetailPage(courseId: courseSlug)),
           );
         }
       },
@@ -790,20 +791,20 @@ class _SharedHeaderState extends State<SharedHeader> {
     // When outside any shell (e.g. on CourseDetailPage, LessonDetailPage, TakeExamPage, ExamResultPage),
     // navigate via GoRouter so the active route and browser address bar update cleanly.
     final targetRoute = _getLearnerRoute(tabIndex, subTab: subTab);
-    final nav = Navigator.of(context, rootNavigator: true);
-    while (nav.canPop()) {
-      nav.pop();
-    }
+    final routerContext = AppRouter.rootNavigatorKey.currentContext ?? context;
     try {
-      (AppRouter.rootNavigatorKey.currentContext ?? context).go(targetRoute);
+      routerContext.go(targetRoute);
     } catch (_) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(
-          builder: (context) => LearnerShellPage(initialIndex: tabIndex, initialSubTab: subTab),
-        ),
-        (route) => false,
-      );
+      try {
+        context.go(targetRoute);
+      } catch (_) {
+        Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (context) => LearnerShellPage(initialIndex: tabIndex, initialSubTab: subTab),
+          ),
+          (route) => false,
+        );
+      }
     }
   }
 

@@ -161,11 +161,15 @@ public class LessonServiceImpl implements LessonService {
 
         return LessonDetailDTO.builder()
                 .id(lesson.getId())
+                .uuid(lesson.getUuid())
                 .title(lesson.getTitle())
                 .content(lesson.getContent())
                 .sectionId(lesson.getSection() != null ? lesson.getSection().getId() : null)
                 .courseId(lesson.getSection() != null && lesson.getSection().getCourse() != null
                         ? lesson.getSection().getCourse().getId()
+                        : null)
+                .courseUuid(lesson.getSection() != null && lesson.getSection().getCourse() != null
+                        ? lesson.getSection().getCourse().getUuid()
                         : null)
                 .comments(comments)
                 .questions(questions)
@@ -182,6 +186,25 @@ public class LessonServiceImpl implements LessonService {
                 .videoTranscript(lesson.getVideoTranscript())
                 .passingScore(passingScore)
                 .build();
+    }
+
+    @Override
+    public LessonDetailDTO getLessonDetailByIdentifier(String identifier, Long userId) {
+        if (identifier == null || identifier.isBlank()) {
+            throw new ApiException("Lesson identifier cannot be blank", HttpStatus.BAD_REQUEST);
+        }
+        Long lessonId = null;
+        try {
+            lessonId = Long.parseLong(identifier);
+        } catch (NumberFormatException ignored) {}
+
+        if (lessonId != null) {
+            return getLessonDetail(lessonId, userId);
+        } else {
+            Lesson lesson = lessonRepository.findByUuidAndDeletedAtIsNull(identifier)
+                    .orElseThrow(() -> new ApiException("Lesson not found with UUID: " + identifier, HttpStatus.NOT_FOUND));
+            return getLessonDetail(lesson.getId(), userId);
+        }
     }
 
     @Override

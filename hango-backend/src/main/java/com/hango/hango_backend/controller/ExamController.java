@@ -51,15 +51,15 @@ public class ExamController {
         return ResponseEntity.ok(exams);
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<ExamResponseDTO> getExamById(@PathVariable Long id) {
-        return ResponseEntity.ok(examService.getExamById(id));
+    @GetMapping("/{identifier}")
+    public ResponseEntity<ExamResponseDTO> getExamById(@PathVariable String identifier) {
+        return ResponseEntity.ok(examService.getExamByIdentifier(identifier));
     }
     
-    @GetMapping("/{id}/questions")
+    @GetMapping("/{identifier}/questions")
     @PreAuthorize("hasAuthority('ATTEMPT_QUIZ_AND_EXAM') or hasAuthority('CREATE_EXAMS_TRAINER') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
-    public ResponseEntity<List<LearnerExamQuestionDTO>> getExamQuestions(@PathVariable Long id) {
-        List<LearnerExamQuestionDTO> questions = examService.getExamQuestions(id);
+    public ResponseEntity<List<LearnerExamQuestionDTO>> getExamQuestions(@PathVariable String identifier) {
+        List<LearnerExamQuestionDTO> questions = examService.getExamQuestionsByIdentifier(identifier);
         return ResponseEntity.ok(questions);
     }
 
@@ -93,26 +93,36 @@ public class ExamController {
         return ResponseEntity.ok(attempts);
     }
 
-    @GetMapping("/{id}/attempts")
+    private Long resolveExamId(String identifier) {
+        try {
+            return Long.parseLong(identifier);
+        } catch (NumberFormatException e) {
+            return examService.getExamByIdentifier(identifier).getId();
+        }
+    }
+
+    @GetMapping("/{identifier}/attempts")
     @PreAuthorize("hasAuthority('ATTEMPT_QUIZ_AND_EXAM') or hasAnyRole('TRAINER', 'COURSE_MANAGER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
-    public ResponseEntity<List<ExamAttemptResponseDTO>> getExamAttempts(@PathVariable Long id) {
+    public ResponseEntity<List<ExamAttemptResponseDTO>> getExamAttempts(@PathVariable String identifier) {
         Long currentUserId = getCurrentUserId();
         if (currentUserId == null) {
             return ResponseEntity.status(401).build();
         }
+        Long id = resolveExamId(identifier);
         List<ExamAttemptResponseDTO> attempts = examService.getExamAttempts(id, currentUserId);
         return ResponseEntity.ok(attempts);
     }
 
-    @PostMapping("/{id}/submit")
+    @PostMapping("/{identifier}/submit")
     @PreAuthorize("hasAuthority('ATTEMPT_QUIZ_AND_EXAM') or hasAnyRole('TRAINER', 'COURSE_MANAGER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
     public ResponseEntity<ExamAttemptResponseDTO> submitExam(
-            @PathVariable Long id,
+            @PathVariable String identifier,
             @RequestBody ExamAttemptRequestDTO request) {
         Long currentUserId = getCurrentUserId();
         if (currentUserId == null) {
             return ResponseEntity.status(401).build();
         }
+        Long id = resolveExamId(identifier);
         ExamAttemptResponseDTO response = examService.saveExamAttempt(id, currentUserId, request);
         return ResponseEntity.ok(response);
     }

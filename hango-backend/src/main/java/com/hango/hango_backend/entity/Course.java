@@ -105,4 +105,14 @@ public class Course {
 
     @Column(name = "rejection_reason", columnDefinition = "TEXT")
     private String rejectionReason;
+
+    @Column(length = 36, unique = true)
+    private String uuid;
+
+    @PrePersist
+    public void ensureUuid() {
+        if (this.uuid == null || this.uuid.isBlank()) {
+            this.uuid = java.util.UUID.randomUUID().toString();
+        }
+    }
 }

@@ -284,12 +284,13 @@ class _CourseCardState extends State<CourseCard> {
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: () {
+          final courseSlug = widget.course.uuid ?? widget.course.id;
           try {
-            context.push('/courses/${widget.course.id}');
+            context.push('/courses/$courseSlug');
           } catch (_) {
             Navigator.of(context, rootNavigator: true).push(
               MaterialPageRoute(
-                builder: (context) => CourseDetailPage(courseId: widget.course.id),
+                builder: (context) => CourseDetailPage(courseId: courseSlug),
               ),
             );
           }
