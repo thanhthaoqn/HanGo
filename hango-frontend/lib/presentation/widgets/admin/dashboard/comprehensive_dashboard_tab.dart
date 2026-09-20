@@ -980,16 +980,21 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
   // --------------------------------------------------------------------------
   Widget _buildUserDistributionChart() {
     final overview = _stats!['overview'] ?? {};
-    final totalUsers = (overview['totalActiveUsers'] ?? 0) as int;
-    if (totalUsers == 0) return const SizedBox.shrink();
 
     final learners = (overview['totalLearners'] ?? 0) as int;
     final trainers = (overview['totalTrainers'] ?? 0) as int;
-    final others = (totalUsers - learners - trainers).clamp(0, totalUsers);
+    // Dùng giá trị chính xác từ backend, không trừ ngược từ count() dễ sai
+    final courseManagers = (overview['totalCourseManagers'] ?? 0) as int;
+    final admins = (overview['totalAdmins'] ?? 0) as int;
+    final others = courseManagers + admins;
 
-    final double learnerPct = totalUsers > 0 ? (learners / totalUsers * 100) : 0;
-    final double trainerPct = totalUsers > 0 ? (trainers / totalUsers * 100) : 0;
-    final double otherPct = totalUsers > 0 ? (others / totalUsers * 100) : 0;
+    // Tổng thực tế theo role (tránh dùng userRepository.count() đếm cả user không có role)
+    final int totalUsers = learners + trainers + others;
+    if (totalUsers == 0) return const SizedBox.shrink();
+
+    final double learnerPct = learners / totalUsers * 100;
+    final double trainerPct = trainers / totalUsers * 100;
+    final double otherPct = others / totalUsers * 100;
 
     // Dynamic center feedback
     String centerCount = '$totalUsers';
