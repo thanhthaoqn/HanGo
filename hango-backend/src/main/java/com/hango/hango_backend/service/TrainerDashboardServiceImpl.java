@@ -599,11 +599,12 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         int durationMinutes = request.getEstimatedDuration() != null ? request.getEstimatedDuration() : 0;
         java.math.BigDecimal suggestedPrice = calculateSuggestedPrice(profile, difficulty, 0, durationMinutes);
         // First course promotion: Trainer's first course is always free (0 VND).
+        // If not the first course, use trainer's chosen price, defaulting to suggested price.
         boolean isFirstCourse = courseRepository.isEligibleForFirstCoursePromotion(user.getId(), generatedCode);
         java.math.BigDecimal trainerPrice = isFirstCourse ? java.math.BigDecimal.ZERO
                 : (request.getPrice() != null ? request.getPrice() : suggestedPrice);
 
-        // Tao ban ghi Course moi, LUON o trang thai DRAFT va version "v1".
+        // Create a new course record, ALWAYS in DRAFT status and version "v1".
         com.hango.hango_backend.entity.Course course = com.hango.hango_backend.entity.Course.builder()
                 .title(request.getTitle())
                 .code(generatedCode)
@@ -637,10 +638,11 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         com.hango.hango_backend.entity.Course course = courseRepository.findById(id)
                 .orElseThrow(() -> new ApiException("Course not found with ID: " + id, HttpStatus.NOT_FOUND));
 
-        // Kiem tra QUYEN SO HUU: chi chinh nguoi tao (Trainer) khoa hoc nay moi
-        // duoc sua no. Day la kiem tra o TANG NGHIEP VU (business-level), khac voi
-        // @PreAuthorize o Controller (chi kiem tra co ROLE Trainer hay khong).
-        // hasRole('ADMINISTRATOR') o Controller khong bypass duoc check nay.
+        // Check ownership: only the creator of this course (Trainer) is allowed to edit
+        // it.
+        // This is a check at the BUSINESS level, different from @PreAuthorize at the
+        // Controller level (which only checks if the user has the Trainer role).
+        // hasRole('ADMINISTRATOR') at the Controller level does not bypass this check.
         if (!course.getCreator().getEmail().equalsIgnoreCase(email)) {
             throw new ApiException("You are not authorized to edit this course", HttpStatus.FORBIDDEN);
         }
@@ -689,15 +691,18 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         java.math.BigDecimal suggestedPrice = calculateSuggestedPrice(profile, difficulty, lessonCount,
                 durationMinutes);
         // First course promotion: Trainer's first course is always free (0 VND).
+        // If not the first course, use trainer's chosen price, defaulting to suggested price.
         boolean isFirstCourse = courseRepository.isEligibleForFirstCoursePromotion(course.getCreator().getId(), course.getCode());
         java.math.BigDecimal trainerPrice = isFirstCourse ? java.math.BigDecimal.ZERO
                 : (request.getPrice() != null ? request.getPrice() : suggestedPrice);
         String trainerPriceNote = request.getPriceNote() != null ? request.getPriceNote() : "";
 
-        // needsNewDraftVersion = true khi khoa hoc dang sua da o trang thai PUBLISHED
-        // (co the da co hoc vien dang hoc). Thay vi ghi de truc tiep, he thong
-        // TAO 1 BAN GHI COURSE MOI (version V2) de khoa hoc dang PUBLISHED (V1)
-        // khong bi thay doi giua chung - hoc vien cu van thay noi dung cu binh thuong.
+        // needsNewDraftVersion = true when the course being edited is already in
+        // PUBLISHED
+        // status (may already have students learning). Instead of directly overwriting,
+        // the system creates a NEW COURSE RECORD (version V2) so that the course in
+        // PUBLISHED status (V1) is not changed in the middle - old students continue to
+        // see the old content normally.
         if (needsNewDraftVersion) {
             // Clone V1 → V2: Create a new DRAFT version preserving the original published
             // course (V1).
@@ -1001,8 +1006,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                     HttpStatus.BAD_REQUEST);
         }
 
-        // Neu chinh nguoi tao khoa hoc da la COURSE_MANAGER/ADMINISTRATOR thi
-        // khong can quy trinh duyet (ho tu la nguoi duyet) -> bo qua PENDING_APPROVAL.
+        // If the creator is a COURSE_MANAGER, then skip the approval process
         boolean isManager = course.getCreator().getRoles().stream()
                 .anyMatch(r -> r.getRoleName().equalsIgnoreCase("COURSE_MANAGER")
                         || r.getRoleName().equalsIgnoreCase("COURSE_MANAGER")
@@ -1010,6 +1014,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                         || r.getRoleName().equalsIgnoreCase("ADMIN"));
 
         // First course promotion: Trainer's first course is always free (0 VND).
+        // When published or creating a new version draft, the first course family remains free.
         if (courseRepository.isEligibleForFirstCoursePromotion(course.getCreator().getId(), course.getCode())) {
             course.setPrice(java.math.BigDecimal.ZERO);
         }

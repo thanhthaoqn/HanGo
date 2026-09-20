@@ -41,5 +41,7 @@ public class CourseDetailDTO {
     private String thumbnailUrl;
     private Integer estimatedDuration;
     private String rejectionReason;
+    private String trainerBio;
+    private List<String> trainerCertificates;
     private List<CourseSessionDTO> sessions;
 }

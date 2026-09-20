@@ -615,13 +615,16 @@ class _MyLearningPageState extends State<MyLearningPage> {
           child: InkWell(
             onTap: () {
               if (isCompleted) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        CourseCompletionPage(courseId: course.id),
-                  ),
-                );
+                try {
+                  context.push('/courses/${course.id}/completion');
+                } catch (_) {
+                  Navigator.of(context, rootNavigator: true).push(
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          CourseCompletionPage(courseId: course.id),
+                    ),
+                  );
+                }
               } else {
                 try {
                   context.push('/courses/${course.id}');
@@ -702,13 +705,16 @@ class _MyLearningPageState extends State<MyLearningPage> {
                           width: double.infinity,
                           child: ElevatedButton.icon(
                             onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      CourseCompletionPage(courseId: course.id),
-                                ),
-                              );
+                              try {
+                                context.push('/courses/${course.id}/completion');
+                              } catch (_) {
+                                Navigator.of(context, rootNavigator: true).push(
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        CourseCompletionPage(courseId: course.id),
+                                  ),
+                                );
+                              }
                             },
                             icon: const Icon(
                               Icons.workspace_premium_rounded,

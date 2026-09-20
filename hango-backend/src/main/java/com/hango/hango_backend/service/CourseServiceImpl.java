@@ -20,6 +20,10 @@ import com.hango.hango_backend.repository.SectionRepository;
 import com.hango.hango_backend.repository.UserRepository;
 import com.hango.hango_backend.repository.TrainerProfileRepository;
 import com.hango.hango_backend.entity.PathwayNode;
+import com.hango.hango_backend.entity.TrainerProfile;
+import com.hango.hango_backend.dto.TrainerDocumentDTO;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -52,6 +56,7 @@ public class CourseServiceImpl implements CourseService {
     private final EmailService emailService;
     private final NotificationService notificationService;
     private final PathwayNodeRepository pathwayNodeRepository;
+    private final ObjectMapper objectMapper;
 
     @Override
     public Page<CourseSummaryDTO> getCourses(String search, String filterType, String difficulty, Pageable pageable) {
@@ -396,6 +401,17 @@ public class CourseServiceImpl implements CourseService {
                 : (course.getTotalRatings() != null ? course.getTotalRatings() : 0);
 
         int estimatedDuration = course.getEstimatedDuration() != null ? course.getEstimatedDuration() : 12;
+
+        List<String> trainerCertificates = new ArrayList<>();
+        String trainerBio = null;
+        if (course.getCreator() != null && course.getCreator().getId() != null) {
+            TrainerProfile profile = trainerProfileRepository.findById(course.getCreator().getId()).orElse(null);
+            if (profile != null) {
+                trainerBio = profile.getBio();
+                trainerCertificates = extractCertificateNames(profile);
+            }
+        }
+
         return CourseDetailDTO.builder()
                 .id(course.getId())
                 .status(course.getStatus())
@@ -404,6 +420,8 @@ public class CourseServiceImpl implements CourseService {
                 .creatorName(creatorName)
                 .creatorId(course.getCreator() != null ? course.getCreator().getId() : null)
                 .isCreator(isCreator)
+                .trainerBio(trainerBio)
+                .trainerCertificates(trainerCertificates)
                 .difficultyName(difficultyName)
                 .difficultyKey(difficultyKey)
                 .categoryKey(categoryKey)
@@ -429,6 +447,44 @@ public class CourseServiceImpl implements CourseService {
                 .price(course.getPrice())
                 .sessions(sessionDTOs)
                 .build();
+    }
+
+    private List<String> extractCertificateNames(TrainerProfile profile) {
+        List<String> names = new ArrayList<>();
+        if (profile == null) {
+            return names;
+        }
+
+        String scoreReportJson = profile.getScoreReportUrl();
+        if (scoreReportJson != null && scoreReportJson.trim().startsWith("[")) {
+            try {
+                List<TrainerDocumentDTO> docs = objectMapper.readValue(
+                        scoreReportJson,
+                        new TypeReference<List<TrainerDocumentDTO>>() {});
+                if (docs != null) {
+                    for (TrainerDocumentDTO doc : docs) {
+                        if (doc != null && doc.getName() != null && !doc.getName().isBlank()) {
+                            names.add(doc.getName().trim());
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
+        if (names.isEmpty()) {
+            if (profile.getPedagogicalDegreeUrl() != null && !profile.getPedagogicalDegreeUrl().isBlank()) {
+                names.add("Bachelor of English Pedagogy Degree");
+            }
+            if (profile.getCvUrl() != null && !profile.getCvUrl().isBlank()) {
+                names.add("Professional Teaching CV / Resume");
+            }
+            if (scoreReportJson != null && !scoreReportJson.isBlank() && !scoreReportJson.trim().startsWith("[")) {
+                names.add("IELTS / Language Proficiency Certificate");
+            }
+        }
+
+        return names;
     }
 
     private String toBaseCourseCode(String code) {

@@ -1073,14 +1073,18 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                 ),
                 ElevatedButton.icon(
                   onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => CourseCompletionPage(
-                          courseId: course.id,
-                          courseDetail: course,
+                    try {
+                      context.push('/courses/${course.id}/completion');
+                    } catch (_) {
+                      Navigator.of(context, rootNavigator: true).push(
+                        MaterialPageRoute(
+                          builder: (context) => CourseCompletionPage(
+                            courseId: course.id,
+                            courseDetail: course,
+                          ),
                         ),
-                      ),
-                    );
+                      );
+                    }
                   },
                   icon: const Icon(Icons.workspace_premium_rounded, size: 18),
                   label: Text(
@@ -1578,12 +1582,19 @@ class _CourseDetailPageState extends State<CourseDetailPage>
           ),
           const SizedBox(height: 8),
           Text(
-            isVi
-                ? 'Giáo viên ôn thi THPT Quốc Gia giàu kinh nghiệm, tốt nghiệp chuyên ngành Ngôn ngữ Anh. Với phương pháp giảng dạy hiện đại, trực quan và tập trung vào bản chất, thầy/cô đã hỗ trợ hàng ngàn học sinh cải thiện điểm số vượt bậc.'
-                : 'An experienced high school exam preparation instructor holding a degree in English Linguistics. Utilizing modern, visual, and conceptual teaching methodologies, they have successfully helped thousands of students achieve dramatic score improvements.',
-            style: const TextStyle(
+            (course.trainerBio != null && course.trainerBio!.trim().isNotEmpty)
+                ? course.trainerBio!
+                : (isVi
+                    ? 'Thông tin giới thiệu về giảng viên đang được cập nhật.'
+                    : 'Trainer biography is currently being updated.'),
+            style: TextStyle(
               fontSize: 14,
-              color: Color(0xFF4B5563),
+              color: (course.trainerBio != null && course.trainerBio!.trim().isNotEmpty)
+                  ? const Color(0xFF4B5563)
+                  : const Color(0xFF94A3B8),
+              fontStyle: (course.trainerBio != null && course.trainerBio!.trim().isNotEmpty)
+                  ? FontStyle.normal
+                  : FontStyle.italic,
               height: 1.6,
               fontFamily: 'Outfit',
             ),
@@ -1591,7 +1602,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
           const SizedBox(height: 24),
 
           Text(
-            isVi ? 'Kinh nghiệm & Bằng cấp' : 'Experience & Qualifications',
+            isVi ? 'Bằng cấp & Chứng chỉ' : 'Qualifications & Certificates',
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -1600,24 +1611,34 @@ class _CourseDetailPageState extends State<CourseDetailPage>
             ),
           ),
           const SizedBox(height: 12),
-          _buildTrainerQualificationItem(
-            Icons.school_rounded,
-            isVi
-                ? 'Cử nhân/Thạc sĩ chuyên ngành Sư phạm tiếng Anh / Ngôn ngữ Anh.'
-                : 'Bachelor/Master of English Pedagogy or English Linguistics.',
-          ),
-          _buildTrainerQualificationItem(
-            Icons.workspace_premium_rounded,
-            isVi
-                ? 'Chứng chỉ IELTS 8.0+ hoặc chứng chỉ giảng dạy tiếng Anh quốc tế (TESOL, CELTA).'
-                : 'IELTS 8.0+ score or internationally recognized English Teaching Certificates (TESOL, CELTA).',
-          ),
-          _buildTrainerQualificationItem(
-            Icons.trending_up_rounded,
-            isVi
-                ? 'Hơn 5 năm giảng dạy thực chiến và ôn luyện học sinh thi THPT Quốc Gia môn Tiếng Anh.'
-                : '5+ years of active high school English exam preparation and teaching experience.',
-          ),
+          if (course.trainerCertificates.isNotEmpty)
+            ...course.trainerCertificates.map(
+              (certName) => _buildTrainerQualificationItem(
+                Icons.workspace_premium_rounded,
+                certName,
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFF94A3B8)),
+                  const SizedBox(width: 8),
+                  Text(
+                    isVi
+                        ? 'Giảng viên chưa cập nhật thông tin chứng chỉ công khai.'
+                        : 'No public certificates uploaded yet.',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF94A3B8),
+                      fontStyle: FontStyle.italic,
+                      fontFamily: 'Outfit',
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -1793,15 +1814,18 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => CourseCompletionPage(
-                          courseId: course.id,
-                          courseDetail: course,
+                    try {
+                      context.push('/courses/${course.id}/completion');
+                    } catch (_) {
+                      Navigator.of(context, rootNavigator: true).push(
+                        MaterialPageRoute(
+                          builder: (context) => CourseCompletionPage(
+                            courseId: course.id,
+                            courseDetail: course,
+                          ),
                         ),
-                      ),
-                    );
+                      );
+                    }
                   },
                   icon: const Icon(
                     Icons.workspace_premium_rounded,

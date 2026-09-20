@@ -95,6 +95,8 @@ class CourseDetail {
   final bool hasNewVersionAvailable;
   final int? latestPublishedCourseId;
   final String? latestPublishedVersion;
+  final String? trainerBio;
+  final List<String> trainerCertificates;
   final List<CourseSession> sessions;
 
   CourseDetail({
@@ -116,6 +118,8 @@ class CourseDetail {
     this.hasNewVersionAvailable = false,
     this.latestPublishedCourseId,
     this.latestPublishedVersion,
+    this.trainerBio,
+    this.trainerCertificates = const [],
     required this.sessions,
   });
 
@@ -123,6 +127,12 @@ class CourseDetail {
     var list = json['sessions'] as List? ?? [];
     List<CourseSession> sessionsList = list
         .map((i) => CourseSession.fromJson(i))
+        .toList();
+
+    var certsList = json['trainerCertificates'] as List? ?? [];
+    List<String> certs = certsList
+        .map((e) => e.toString())
+        .where((s) => s.trim().isNotEmpty)
         .toList();
 
     return CourseDetail(
@@ -144,6 +154,8 @@ class CourseDetail {
       hasNewVersionAvailable: json['hasNewVersionAvailable'] as bool? ?? false,
       latestPublishedCourseId: json['latestPublishedCourseId'] as int?,
       latestPublishedVersion: json['latestPublishedVersion'] as String?,
+      trainerBio: json['trainerBio'] as String?,
+      trainerCertificates: certs,
       sessions: sessionsList,
     );
   }
@@ -167,6 +179,8 @@ class CourseDetail {
     bool? hasNewVersionAvailable,
     int? latestPublishedCourseId,
     String? latestPublishedVersion,
+    String? trainerBio,
+    List<String>? trainerCertificates,
     List<CourseSession>? sessions,
   }) {
     return CourseDetail(
@@ -191,6 +205,8 @@ class CourseDetail {
           latestPublishedCourseId ?? this.latestPublishedCourseId,
       latestPublishedVersion:
           latestPublishedVersion ?? this.latestPublishedVersion,
+      trainerBio: trainerBio ?? this.trainerBio,
+      trainerCertificates: trainerCertificates ?? this.trainerCertificates,
       sessions: sessions ?? this.sessions,
     );
   }
