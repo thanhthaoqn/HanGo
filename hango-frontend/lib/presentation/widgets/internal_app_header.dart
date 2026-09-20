@@ -509,9 +509,7 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
           // User Profile Pill Button
           PopupMenuButton<String>(
             onSelected: (val) {
-              if (val == 'home') {
-                context.go(AppRoutes.home);
-              } else if (val == 'profile') {
+              if (val == 'profile') {
                 _navigateToProfile();
               } else if (val == 'logout') {
                 _handleLogout();
@@ -522,24 +520,6 @@ class _InternalAppHeaderState extends State<InternalAppHeader> {
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'home',
-                child: Row(
-                  children: [
-                    const Icon(Icons.school_outlined,
-                        size: 18, color: Color(0xFF20B486)),
-                    const SizedBox(width: 10),
-                    Text(
-                      LanguageManager.isVi ? 'Giao diện Học viên' : 'Learner View',
-                      style: const TextStyle(
-                          fontFamily: 'Outfit',
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF0F172A)),
-                    ),
-                  ],
-                ),
-              ),
-              const PopupMenuDivider(),
               PopupMenuItem(
                 value: 'profile',
                 child: Row(

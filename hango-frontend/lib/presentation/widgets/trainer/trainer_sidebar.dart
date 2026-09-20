@@ -173,40 +173,6 @@ class _TrainerSidebarState extends State<TrainerSidebar> {
             'Support & Tickets',
           ),
           const Spacer(),
-          const Divider(color: Color(0xFFE2E8F0)),
-          Padding(
-            padding: const EdgeInsets.only(top: 6.0),
-            child: InkWell(
-              onTap: () => context.go(AppRoutes.home),
-              borderRadius: BorderRadius.circular(12),
-              hoverColor: const Color(0xFF20B486).withValues(alpha: 0.08),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.school_outlined,
-                      color: Color(0xFF20B486),
-                      size: 20,
-                    ),
-                    const SizedBox(width: 14),
-                    Text(
-                      LanguageManager.isVi ? 'Giao diện Học viên' : 'Learner View',
-                      style: const TextStyle(
-                        color: Color(0xFF20B486),
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                        fontFamily: 'Outfit',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );
