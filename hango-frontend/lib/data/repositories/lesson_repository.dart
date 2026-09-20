@@ -7,7 +7,7 @@ import '../../utils/config.dart';
 class LessonRepository {
   final String baseUrl = EnvConfig.v1BaseUrl;
 
-  Future<LessonDetail> fetchLessonDetail(int lessonId) async {
+  Future<LessonDetail> fetchLessonDetail(dynamic lessonId) async {
     try {
       final uri = Uri.parse('$baseUrl/lessons/$lessonId');
       

@@ -22,7 +22,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
                         "diff.paramKey, c.thumbnailUrl, c.price, " +
                         "(SELECT e2.progressPercentage FROM Enrollment e2 WHERE e2.course.id = c.id AND e2.user.id = :enrolledUserId), "
                         +
-                        "c.code) " +
+                        "c.code, c.uuid) " +
                         "FROM Course c " +
                         "LEFT JOIN c.category cat " +
                         "LEFT JOIN c.difficulty diff " +
@@ -40,6 +40,10 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
                         @Param("enrolledUserId") Long enrolledUserId,
                         @Param("enrollmentStatus") String enrollmentStatus,
                         Pageable pageable);
+
+        Optional<Course> findByUuidAndDeletedAtIsNull(String uuid);
+
+        Optional<Course> findByUuid(String uuid);
 
         @Query("SELECT c.id, cat.paramValue FROM Course c JOIN c.categories cat WHERE c.id IN :courseIds")
         List<Object[]> findCategoriesByCourseIds(@Param("courseIds") List<Long> courseIds);

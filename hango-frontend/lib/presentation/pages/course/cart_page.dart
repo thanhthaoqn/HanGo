@@ -195,12 +195,13 @@ class _CartPageState extends State<CartPage> {
 
       if (mounted) {
         ToastHelper.showSuccess(context, 'Enrolled successfully!');
+        final courseSlug = course.uuid ?? course.id;
         try {
-          context.push('/courses/${course.id}');
+          context.push('/courses/$courseSlug');
         } catch (_) {
           Navigator.of(context, rootNavigator: true).push(
             MaterialPageRoute(
-              builder: (context) => CourseDetailPage(courseId: course.id),
+              builder: (context) => CourseDetailPage(courseId: courseSlug),
             ),
           );
         }

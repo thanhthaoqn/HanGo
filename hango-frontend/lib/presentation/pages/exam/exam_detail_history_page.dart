@@ -52,6 +52,11 @@ class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
           _exam = fetched;
           _isLoadingExam = false;
         });
+        if (fetched?.uuid != null &&
+            fetched!.uuid!.isNotEmpty &&
+            widget.examId.toString() != fetched.uuid) {
+          context.go('/exams/${fetched.uuid}');
+        }
         _loadAttempts();
       }
     } catch (e) {
@@ -453,7 +458,7 @@ class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
                   } else {
                     if (context.mounted && _exam != null) {
                       context.go(
-                        AppRoutes.takeExamRoute(_exam!.id),
+                        AppRoutes.takeExamRoute(_exam!.uuid ?? _exam!.id),
                         extra: _exam,
                       );
                     }

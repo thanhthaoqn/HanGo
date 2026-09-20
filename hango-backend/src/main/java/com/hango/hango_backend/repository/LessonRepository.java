@@ -10,6 +10,10 @@ import java.util.List;
 public interface LessonRepository extends JpaRepository<Lesson, Long> {
     List<Lesson> findBySectionIdOrderByDisplayOrderAsc(Long sectionId);
 
+    java.util.Optional<Lesson> findByUuidAndDeletedAtIsNull(String uuid);
+
+    java.util.Optional<Lesson> findByUuid(String uuid);
+
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"section", "exam"})
     @org.springframework.data.jpa.repository.Query("SELECT l FROM Lesson l WHERE l.section.course.id = :courseId AND l.deletedAt IS NULL ORDER BY l.section.displayOrder ASC, l.displayOrder ASC")
     List<Lesson> findByCourseIdOrdered(@org.springframework.data.repository.query.Param("courseId") Long courseId);

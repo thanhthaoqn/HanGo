@@ -82,7 +82,7 @@ class CourseRepository {
     }
   }
 
-  Future<CourseDetail> fetchCourseDetail(int id) async {
+  Future<CourseDetail> fetchCourseDetail(dynamic id) async {
     try {
       final uri = Uri.parse('$baseUrl/courses/$id');
 
@@ -109,7 +109,7 @@ class CourseRepository {
     }
   }
 
-  Future<CourseReviewSummary> fetchCourseReviews(int id) async {
+  Future<CourseReviewSummary> fetchCourseReviews(dynamic id) async {
     try {
       final uri = Uri.parse('$baseUrl/courses/$id/reviews');
 
@@ -136,7 +136,7 @@ class CourseRepository {
     }
   }
 
-  Future<void> enrollCourse(int courseId) async {
+  Future<void> enrollCourse(dynamic courseId) async {
     try {
       final uri = Uri.parse('$baseUrl/courses/$courseId/enroll');
 
@@ -156,14 +156,14 @@ class CourseRepository {
     }
   }
 
-  Future<void> unenrollCourse(int courseId) async {
+  Future<void> unenrollCourse(dynamic courseId) async {
     try {
-      final uri = Uri.parse('$baseUrl/courses/$courseId/enroll');
+      final uri = Uri.parse('$baseUrl/courses/$courseId/unenroll');
 
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
 
-      final response = await http.delete(
+      final response = await http.post(
         uri,
         headers: {if (token != null) 'Authorization': 'Bearer $token'},
       );
@@ -177,7 +177,7 @@ class CourseRepository {
   }
 
   Future<void> submitCourseReview(
-    int courseId,
+    dynamic courseId,
     double rating,
     String content,
   ) async {
@@ -298,7 +298,7 @@ class CourseRepository {
     }
   }
 
-  Future<Map<String, dynamic>?> fetchCertificate(int courseId) async {
+  Future<Map<String, dynamic>?> fetchCertificate(dynamic courseId) async {
     try {
       final uri = Uri.parse('$baseUrl/certificates/courses/$courseId');
       final prefs = await SharedPreferences.getInstance();

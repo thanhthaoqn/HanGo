@@ -475,6 +475,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
   @override
   void initState() {
     super.initState();
+    AuthService.userChangeNotifier.addListener(_onUserChanged);
     _loadUserInfo();
     _fetchCourses();
     _fetchExams();
@@ -484,10 +485,26 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
 
   @override
   void dispose() {
+    AuthService.userChangeNotifier.removeListener(_onUserChanged);
     _bannerTimer?.cancel();
     _coursesScrollController.dispose();
     _examsScrollController.dispose();
     super.dispose();
+  }
+
+  void _onUserChanged() {
+    if (!mounted) return;
+    _loadUserInfo().then((_) {
+      if (!mounted) return;
+      setState(() {
+        if (!_isLoggedIn) {
+          _activeCourseTab = 'featured';
+          _activeExamTab = 'featured';
+        }
+      });
+      _fetchCourses();
+      _fetchExams();
+    });
   }
 
   // Fetch logged in user info from SharedPreferences
@@ -508,6 +525,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
 
     final roles = prefs.getStringList('user_roles') ?? [];
 
+    if (!mounted) return;
     setState(() {
       _isLoggedIn = token != null;
       _userFullName = fullName;
@@ -515,6 +533,10 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       _userInitials = initials;
       _canEnroll = PermissionUtils.shouldShowEnrollUi(token != null, roles);
       _canAttemptExam = PermissionUtils.shouldShowExamUi(token != null, roles);
+      if (!_isLoggedIn) {
+        _activeCourseTab = 'featured';
+        _activeExamTab = 'featured';
+      }
     });
 
     if (_isLoggedIn) {
@@ -1960,12 +1982,13 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: () {
+          final courseSlug = course.uuid ?? course.id;
           try {
-            context.push('/courses/${course.id}');
+            context.push('/courses/$courseSlug');
           } catch (_) {
             Navigator.of(context, rootNavigator: true).push(
               MaterialPageRoute(
-                builder: (context) => CourseDetailPage(courseId: course.id),
+                builder: (context) => CourseDetailPage(courseId: courseSlug),
               ),
             );
           }
@@ -2507,12 +2530,26 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
         exam.title.toLowerCase().contains('minh họa') ||
         exam.title.toLowerCase().contains('minh hoa');
 
+    final examSlug =
+        (exam.uuid != null && exam.uuid!.isNotEmpty) ? exam.uuid! : exam.id;
+
     return GestureDetector(
       onTap: () {
-        context.go(
-          AppRoutes.examDetailRoute(exam.id),
-          extra: exam,
-        );
+        try {
+          context.go(
+            AppRoutes.examDetailRoute(examSlug),
+            extra: exam,
+          );
+        } catch (_) {
+          Navigator.of(context, rootNavigator: true).push(
+            MaterialPageRoute(
+              builder: (context) => ExamDetailHistoryPage(
+                exam: exam,
+                examId: examSlug,
+              ),
+            ),
+          );
+        }
       },
       child: HoverableCard(
         child: Padding(
@@ -3240,6 +3277,7 @@ class _HoverableCardState extends State<HoverableCard> {
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
+      cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
       child: AnimatedContainer(

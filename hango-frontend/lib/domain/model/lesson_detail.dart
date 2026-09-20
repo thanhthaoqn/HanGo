@@ -89,6 +89,8 @@ class LessonDetail {
   final String? itemType;
   final String? videoTranscript;
   final double? passingScore;
+  final String? uuid;
+  final String? courseUuid;
 
   LessonDetail({
     required this.id,
@@ -110,6 +112,8 @@ class LessonDetail {
     this.itemType,
     this.videoTranscript,
     this.passingScore,
+    this.uuid,
+    this.courseUuid,
   });
 
   factory LessonDetail.fromJson(Map<String, dynamic> json) {
@@ -139,6 +143,8 @@ class LessonDetail {
       itemType: json['itemType'] as String?,
       videoTranscript: json['videoTranscript'] as String?,
       passingScore: (json['passingScore'] as num?)?.toDouble(),
+      uuid: json['uuid'] as String?,
+      courseUuid: json['courseUuid'] as String?,
     );
   }
 
@@ -162,6 +168,8 @@ class LessonDetail {
     String? itemType,
     String? videoTranscript,
     double? passingScore,
+    String? uuid,
+    String? courseUuid,
   }) {
     return LessonDetail(
       id: id ?? this.id,
@@ -183,6 +191,8 @@ class LessonDetail {
       itemType: itemType ?? this.itemType,
       videoTranscript: videoTranscript ?? this.videoTranscript,
       passingScore: passingScore ?? this.passingScore,
+      uuid: uuid ?? this.uuid,
+      courseUuid: courseUuid ?? this.courseUuid,
     );
   }
 }

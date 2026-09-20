@@ -250,8 +250,10 @@ class _EntryExamInstructionPageState extends State<EntryExamInstructionPage> {
             height: 56,
             child: ElevatedButton(
               onPressed: () {
+                final examSlug =
+                    (exam.uuid != null && exam.uuid!.isNotEmpty) ? exam.uuid! : exam.id;
                 context.go(
-                  AppRoutes.takeExamRoute(exam.id),
+                  AppRoutes.takeExamRoute(examSlug),
                   extra: exam,
                 );
               },

@@ -22,6 +22,7 @@ class ExamRepository {
             .map(
               (json) => Exam(
                 id: json['id'].toString(),
+                uuid: json['uuid']?.toString(),
                 title: json['title'] ?? '',
                 description: json['description'] ?? '',
                 status: json['status'] ?? '',
@@ -31,6 +32,7 @@ class ExamRepository {
                 rating: (json['rating'] ?? 0.0).toDouble(),
                 learnerCountFormatted:
                     json['learnerCountFormatted'] ?? '0 Learner',
+                thumbnailUrl: json['thumbnailUrl'] ?? '',
               ),
             )
             .toList();
@@ -49,6 +51,7 @@ class ExamRepository {
         final Map<String, dynamic> data = json.decode(utf8.decode(response.bodyBytes));
         return Exam(
           id: data['id'].toString(),
+          uuid: data['uuid']?.toString(),
           title: data['title'] ?? '',
           description: data['description'] ?? '',
           status: data['status'] ?? '',
@@ -79,6 +82,7 @@ class ExamRepository {
         final Map<String, dynamic> responseData = json.decode(utf8.decode(response.bodyBytes));
         return PaginatedResponse<Exam>.fromJson(responseData, (json) => Exam(
           id: json['id'].toString(),
+          uuid: json['uuid']?.toString(),
           title: json['title'] ?? '',
           description: json['description'] ?? '',
           status: json['status'] ?? '',
@@ -87,6 +91,7 @@ class ExamRepository {
           durationMinutes: json['durationMinutes'] ?? 0,
           rating: (json['rating'] ?? 0.0).toDouble(),
           learnerCountFormatted: json['learnerCountFormatted'] ?? '0 Learner',
+          thumbnailUrl: json['thumbnailUrl'] ?? '',
         ));
       } else {
         throw Exception('Failed to load paginated exams: ${response.statusCode}');
@@ -201,6 +206,7 @@ class ExamRepository {
     final json = jsonDecode(utf8.decode(response.bodyBytes));
     return Exam(
       id: json['id'].toString(),
+      uuid: json['uuid']?.toString(),
       title: json['title'] ?? '',
       description: json['description'] ?? '',
       status: json['status'] ?? '',

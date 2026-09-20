@@ -13,10 +13,12 @@ import java.util.List;
 @AllArgsConstructor
 public class LessonDetailDTO {
     private Long id;
+    private String uuid;
     private String title;
     private String content;
     private Long sectionId;
     private Long courseId;
+    private String courseUuid;
     private List<CommentDTO> comments;
     private List<QuizQuestionDTO> questions;
     private Boolean isCompleted;

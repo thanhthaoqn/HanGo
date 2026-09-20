@@ -32,6 +32,7 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
+  final _googleBtnKey = UniqueKey();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
@@ -456,6 +457,7 @@ class _LoginPageState extends State<LoginPage> {
   Widget _buildGoogleSignInButton() {
     if (kIsWeb) {
       return SizedBox(
+        key: _googleBtnKey,
         width: double.infinity,
         height: 48,
         child: web.renderButton(
@@ -848,7 +850,7 @@ class _LoginPageState extends State<LoginPage> {
                               cursor: SystemMouseCursors.click,
                               child: GestureDetector(
                                 onTap: () {
-                                  context.go(AppRoutes.forgotPassword);
+                                  context.push(AppRoutes.forgotPassword);
                                 },
                                 child: const Text(
                                   'Forgot password?',

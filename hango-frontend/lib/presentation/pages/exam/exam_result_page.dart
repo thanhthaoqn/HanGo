@@ -881,8 +881,10 @@ class _ExamResultPageState extends State<ExamResultPage> {
                                   const SizedBox(height: 12),
                                   ElevatedButton(
                                     onPressed: () {
-                                      if (courseId > 0) {
-                                        context.go('/courses/$courseId');
+                                      final courseUuid = (r['uuid'] ?? r['courseUuid'] ?? '').toString();
+                                      final courseSlug = courseUuid.isNotEmpty ? courseUuid : courseId;
+                                      if (courseId > 0 || courseUuid.isNotEmpty) {
+                                        context.go('/courses/$courseSlug');
                                       }
                                     },
                                     style: ElevatedButton.styleFrom(
@@ -1043,8 +1045,10 @@ class _ExamResultPageState extends State<ExamResultPage> {
                                 const SizedBox(height: 12),
                                 ElevatedButton(
                                   onPressed: () {
-                                    if (courseId > 0) {
-                                      context.go('/courses/$courseId');
+                                    final courseUuid = (r['uuid'] ?? r['courseUuid'] ?? '').toString();
+                                    final courseSlug = courseUuid.isNotEmpty ? courseUuid : courseId;
+                                    if (courseId > 0 || courseUuid.isNotEmpty) {
+                                      context.go('/courses/$courseSlug');
                                     }
                                   },
                                   style: ElevatedButton.styleFrom(
@@ -1190,13 +1194,14 @@ class _ExamResultPageState extends State<ExamResultPage> {
                                 const SizedBox(height: 12),
                                 ElevatedButton(
                                   onPressed: () {
+                                    final courseSlug = course.uuid ?? course.id;
                                     try {
-                                      context.push('/courses/${course.id}');
+                                      context.push('/courses/$courseSlug');
                                     } catch (_) {
                                       Navigator.of(context, rootNavigator: true).push(
                                         MaterialPageRoute(
                                           builder: (context) => CourseDetailPage(
-                                            courseId: course.id,
+                                            courseId: courseSlug,
                                           ),
                                         ),
                                       );

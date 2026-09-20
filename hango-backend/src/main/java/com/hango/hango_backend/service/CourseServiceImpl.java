@@ -309,6 +309,7 @@ public class CourseServiceImpl implements CourseService {
                 }
                 return CourseLessonDTO.builder()
                         .id(lesson.getId())
+                        .uuid(lesson.getUuid())
                         .title(lesson.getTitle())
                         .orderIndex(lesson.getDisplayOrder())
                         .itemType(Lesson.displayItemType(lesson.getLessonType()))
@@ -414,6 +415,7 @@ public class CourseServiceImpl implements CourseService {
 
         return CourseDetailDTO.builder()
                 .id(course.getId())
+                .uuid(course.getUuid())
                 .status(course.getStatus())
                 .title(course.getTitle())
                 .code(course.getCode())
@@ -447,6 +449,26 @@ public class CourseServiceImpl implements CourseService {
                 .price(course.getPrice())
                 .sessions(sessionDTOs)
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CourseDetailDTO getCourseDetailByIdentifier(String identifier, Long currentUserId) {
+        if (identifier == null || identifier.isBlank()) {
+            throw new RuntimeException("Course identifier cannot be blank");
+        }
+        Long id = null;
+        try {
+            id = Long.parseLong(identifier);
+        } catch (NumberFormatException ignored) {}
+
+        if (id != null) {
+            return getCourseDetail(id, currentUserId);
+        } else {
+            Course course = courseRepository.findByUuidAndDeletedAtIsNull(identifier)
+                    .orElseThrow(() -> new RuntimeException("Course not found with UUID: " + identifier));
+            return getCourseDetail(course.getId(), currentUserId);
+        }
     }
 
     private List<String> extractCertificateNames(TrainerProfile profile) {

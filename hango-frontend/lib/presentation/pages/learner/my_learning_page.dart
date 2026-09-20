@@ -435,12 +435,13 @@ class _MyLearningPageState extends State<MyLearningPage> {
               );
 
               try {
+                final courseSlug = course.uuid ?? course.id;
                 final lastLessonId = _lastLessonIds[course.id];
                 if (lastLessonId != null) {
                   if (!mounted) return;
                   Navigator.pop(context);
                   context.push(
-                    '/courses/${course.id}/lessons/$lastLessonId',
+                    '/courses/$courseSlug/lessons/$lastLessonId',
                   );
                   return;
                 }
@@ -470,17 +471,18 @@ class _MyLearningPageState extends State<MyLearningPage> {
                 }
 
                 if (targetLesson != null) {
+                  final lessonSlug = targetLesson.uuid ?? targetLesson.id;
                   context.push(
-                    '/courses/${course.id}/lessons/${targetLesson.id}',
+                    '/courses/$courseSlug/lessons/$lessonSlug',
                   );
                 } else {
                   try {
-                    context.push('/courses/${course.id}');
+                    context.push('/courses/$courseSlug');
                   } catch (_) {
                     Navigator.of(context, rootNavigator: true).push(
                       MaterialPageRoute(
                         builder: (context) =>
-                            CourseDetailPage(courseId: course.id),
+                            CourseDetailPage(courseId: courseSlug),
                       ),
                     );
                   }
@@ -488,12 +490,13 @@ class _MyLearningPageState extends State<MyLearningPage> {
               } catch (e) {
                 if (!mounted) return;
                 Navigator.pop(context);
+                final courseSlug = course.uuid ?? course.id;
                 try {
-                  context.push('/courses/${course.id}');
+                  context.push('/courses/$courseSlug');
                 } catch (_) {
                   Navigator.of(context, rootNavigator: true).push(
                     MaterialPageRoute(
-                      builder: (context) => CourseDetailPage(courseId: course.id),
+                      builder: (context) => CourseDetailPage(courseId: courseSlug),
                     ),
                   );
                 }
@@ -614,24 +617,25 @@ class _MyLearningPageState extends State<MyLearningPage> {
           ),
           child: InkWell(
             onTap: () {
+              final courseSlug = course.uuid ?? course.id;
               if (isCompleted) {
                 try {
-                  context.push('/courses/${course.id}/completion');
+                  context.push('/courses/$courseSlug/completion');
                 } catch (_) {
                   Navigator.of(context, rootNavigator: true).push(
                     MaterialPageRoute(
                       builder: (context) =>
-                          CourseCompletionPage(courseId: course.id),
+                          CourseCompletionPage(courseId: courseSlug),
                     ),
                   );
                 }
               } else {
                 try {
-                  context.push('/courses/${course.id}');
+                  context.push('/courses/$courseSlug');
                 } catch (_) {
                   Navigator.of(context, rootNavigator: true).push(
                     MaterialPageRoute(
-                      builder: (context) => CourseDetailPage(courseId: course.id),
+                      builder: (context) => CourseDetailPage(courseId: courseSlug),
                     ),
                   );
                 }
@@ -705,13 +709,14 @@ class _MyLearningPageState extends State<MyLearningPage> {
                           width: double.infinity,
                           child: ElevatedButton.icon(
                             onPressed: () {
+                              final courseSlug = course.uuid ?? course.id;
                               try {
-                                context.push('/courses/${course.id}/completion');
+                                context.push('/courses/$courseSlug/completion');
                               } catch (_) {
                                 Navigator.of(context, rootNavigator: true).push(
                                   MaterialPageRoute(
                                     builder: (context) =>
-                                        CourseCompletionPage(courseId: course.id),
+                                        CourseCompletionPage(courseId: courseSlug),
                                   ),
                                 );
                               }

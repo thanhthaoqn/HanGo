@@ -4,6 +4,7 @@ import com.hango.hango_backend.dto.CourseSummaryDTO;
 import com.hango.hango_backend.dto.CourseReviewRequestDTO;
 import com.hango.hango_backend.service.CourseRatingService;
 import com.hango.hango_backend.service.CourseService;
+import com.hango.hango_backend.repository.CourseRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +22,19 @@ public class CourseController {
 
     private final CourseService courseService;
     private final CourseRatingService courseRatingService;
+    private final CourseRepository courseRepository;
+
+    private Long resolveCourseId(String identifier) {
+        if (identifier == null || identifier.isBlank()) {
+            throw new RuntimeException("Course identifier cannot be blank");
+        }
+        try {
+            return Long.parseLong(identifier);
+        } catch (NumberFormatException ignored) {}
+        return courseRepository.findByUuidAndDeletedAtIsNull(identifier)
+                .map(com.hango.hango_backend.entity.Course::getId)
+                .orElseThrow(() -> new RuntimeException("Course not found with identifier: " + identifier));
+    }
 
     @GetMapping
     public ResponseEntity<Page<CourseSummaryDTO>> getCourses(
@@ -43,25 +57,26 @@ public class CourseController {
         return null;
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<?> getCourseDetail(@PathVariable Long id) {
+    @GetMapping("/{identifier}")
+    public ResponseEntity<?> getCourseDetail(@PathVariable String identifier) {
         try {
             Long currentUserId = getCurrentUserId();
-            return ResponseEntity.ok(courseService.getCourseDetail(id, currentUserId));
+            return ResponseEntity.ok(courseService.getCourseDetailByIdentifier(identifier, currentUserId));
         } catch (RuntimeException e) {
             e.printStackTrace();
             return ResponseEntity.status(404).body(e.getClass().getName() + ": " + e.getMessage());
         }
     }
 
-    @PostMapping("/{id}/enroll")
+    @PostMapping("/{identifier}/enroll")
     @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'COURSE_MANAGER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
-    public ResponseEntity<?> enrollCourse(@PathVariable Long id) {
+    public ResponseEntity<?> enrollCourse(@PathVariable String identifier) {
         try {
             Long currentUserId = getCurrentUserId();
             if (currentUserId == null) {
                 return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
             }
+            Long id = resolveCourseId(identifier);
             courseService.enrollCourse(id, currentUserId);
             return ResponseEntity.ok().body("{\"message\": \"Enrollment successful\"}");
         } catch (RuntimeException e) {
@@ -71,14 +86,15 @@ public class CourseController {
     }
 
 
-    @DeleteMapping("/{id}/enroll")
+    @DeleteMapping("/{identifier}/enroll")
     @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'COURSE_MANAGER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
-    public ResponseEntity<?> unenrollCourse(@PathVariable Long id) {
+    public ResponseEntity<?> unenrollCourse(@PathVariable String identifier) {
         try {
             Long currentUserId = getCurrentUserId();
             if (currentUserId == null) {
                 return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
             }
+            Long id = resolveCourseId(identifier);
             courseService.unenrollCourse(id, currentUserId);
             return ResponseEntity.ok().body("{\"message\": \"Unenrollment successful\"}");
         } catch (RuntimeException e) {
@@ -87,14 +103,15 @@ public class CourseController {
         }
     }
 
-    @PostMapping("/{id}/switch-version")
+    @PostMapping("/{identifier}/switch-version")
     @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'COURSE_MANAGER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
-    public ResponseEntity<?> switchCourseVersion(@PathVariable Long id) {
+    public ResponseEntity<?> switchCourseVersion(@PathVariable String identifier) {
         try {
             Long currentUserId = getCurrentUserId();
             if (currentUserId == null) {
                 return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
             }
+            Long id = resolveCourseId(identifier);
             courseService.switchCourseVersion(id, currentUserId);
             return ResponseEntity.ok().body("{\"message\": \"Course version switched successfully\"}");
         } catch (RuntimeException e) {
@@ -103,9 +120,10 @@ public class CourseController {
         }
     }
 
-    @GetMapping("/{id}/reviews")
-    public ResponseEntity<?> getCourseReviews(@PathVariable Long id) {
+    @GetMapping("/{identifier}/reviews")
+    public ResponseEntity<?> getCourseReviews(@PathVariable String identifier) {
         try {
+            Long id = resolveCourseId(identifier);
             return ResponseEntity.ok(courseRatingService.getCourseReviews(id));
         } catch (RuntimeException e) {
             e.printStackTrace();
@@ -114,14 +132,15 @@ public class CourseController {
     }
 
     @PreAuthorize("hasAuthority('RATE_AND_COMMENT') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
-    @PostMapping("/{id}/reviews")
-    public ResponseEntity<?> addCourseReview(@PathVariable Long id,
+    @PostMapping("/{identifier}/reviews")
+    public ResponseEntity<?> addCourseReview(@PathVariable String identifier,
                                              @RequestBody @jakarta.validation.Valid CourseReviewRequestDTO request) {
         try {
             Long currentUserId = getCurrentUserId();
             if (currentUserId == null) {
                 return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
             }
+            Long id = resolveCourseId(identifier);
             courseRatingService.addCourseReview(id, currentUserId, request.getRating(), request.getContent());
             return ResponseEntity.ok().body("{\"message\": \"Review posted successfully\"}");
         } catch (RuntimeException e) {
@@ -131,13 +150,14 @@ public class CourseController {
     }
 
     @PreAuthorize("hasAuthority('RATE_AND_COMMENT') or hasAuthority('MODERATE_COMMENTS') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
-    @DeleteMapping("/{id}/reviews")
-    public ResponseEntity<?> deleteCourseReview(@PathVariable Long id) {
+    @DeleteMapping("/{identifier}/reviews")
+    public ResponseEntity<?> deleteCourseReview(@PathVariable String identifier) {
         try {
             Long currentUserId = getCurrentUserId();
             if (currentUserId == null) {
                 return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
             }
+            Long id = resolveCourseId(identifier);
             courseRatingService.deleteCourseReview(id, currentUserId);
             return ResponseEntity.ok().body("{\"message\": \"Review deleted successfully\"}");
         } catch (RuntimeException e) {
