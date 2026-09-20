@@ -32,6 +32,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
   // Backend luon tu tinh gia, bo qua moi gia tri Frontend gui len).
   final TextEditingController _priceController = TextEditingController();
   bool _isSaving = false;
+  bool _isFirstCourse = false;
 
   // Dynamic dropdown lists (populated from DB with default fallbacks)
   List<Map<String, dynamic>> _dbCategories = [
@@ -149,14 +150,32 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
             }
           }
           if (_dbLevels.isNotEmpty) {
-            final hasSelectedLevel = _dbLevels.any(
+            if (!_dbLevels.any(
               (e) => e['paramKey'] == _selectedLevelKey,
-            );
-            if (!hasSelectedLevel) {
+            )) {
               _selectedLevelKey = _dbLevels.first['paramKey'] ?? 'BASIC';
             }
           }
         });
+      }
+
+      final coursesUri = Uri.parse('$apiBaseUrl/trainer/courses?status=ALL');
+      final coursesResponse = await http.get(
+        coursesUri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+      if (coursesResponse.statusCode == 200) {
+        final cData = jsonDecode(utf8.decode(coursesResponse.bodyBytes));
+        final count = cData['allCount'] ?? (cData['courses'] as List?)?.length ?? 0;
+        if (count == 0) {
+          setState(() {
+            _isFirstCourse = true;
+            _priceController.text = '0';
+          });
+        }
       }
     } catch (e) {
       debugPrint('Error loading system parameters: $e');
@@ -221,7 +240,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
     }
 
     if (_selectedCategoryKey.isEmpty) {
-      ToastHelper.showError(context, 'Vui lòng chọn thể loại cho khóa học');
+      ToastHelper.showError(context, 'Please select a category for the course');
       return;
     }
 
@@ -243,7 +262,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
         'categoryKeys': [_selectedCategoryKey],
         'difficultyKey': _selectedLevelKey,
         'thumbnailUrl': _uploadedImageUrl ?? '',
-        'price': double.tryParse(_priceController.text.trim()) ?? 0,
+        'price': _isFirstCourse ? 0 : (double.tryParse(_priceController.text.trim()) ?? 0),
       });
 
       final response = await http.post(
@@ -795,9 +814,35 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
             },
           ),
           const SizedBox(height: 20),
-          // Course Price - Trainer tu quyet dinh gia ban ngay tu buoc tao khoa
-          // hoc. Gia tham khao he thong tinh (dua tren so bai hoc/thoi luong)
-          // se hien thi sau, khi vao trang chinh sua sau khi tao xong.
+          // Course Price - First course is Free under HanGo platform promotion policy.
+          if (_isFirstCourse) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE6F4EA),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFCEEAD6)),
+              ),
+              child: Row(
+                children: const [
+                  Icon(Icons.stars_rounded, color: Color(0xFF137333), size: 24),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Congratulations! This is your first course. Under HanGo policy, your first course will be published as Free (0 VND) to help you build your learner base.',
+                      style: TextStyle(
+                        fontFamily: 'Outfit',
+                        fontSize: 13,
+                        color: Color(0xFF137333),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
           const Text(
             'Course Price (VNĐ)',
             style: TextStyle(
@@ -810,9 +855,18 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
           const SizedBox(height: 8),
           TextFormField(
             controller: _priceController,
+            readOnly: _isFirstCourse,
             keyboardType: const TextInputType.numberWithOptions(decimal: false),
             decoration: InputDecoration(
-              hintText: 'e.g. 500000',
+              hintText: _isFirstCourse ? 'Free (0 VNĐ)' : 'e.g. 500000',
+              helperText: _isFirstCourse
+                  ? 'Your first course is Free (0 VND) under platform policy'
+                  : null,
+              helperStyle: const TextStyle(
+                color: Color(0xFF137333),
+                fontSize: 12,
+                fontFamily: 'Outfit',
+              ),
               hintStyle: const TextStyle(
                 color: Color(0xFF94A3B8),
                 fontSize: 14,
@@ -837,6 +891,7 @@ class _CreateCoursePageState extends State<CreateCoursePage> {
             ),
             style: const TextStyle(fontFamily: 'Outfit', fontSize: 14),
             validator: (value) {
+              if (_isFirstCourse) return null;
               final parsed = double.tryParse((value ?? '').trim());
               if (parsed == null || parsed < 0) {
                 return 'Enter a valid, non-negative price';

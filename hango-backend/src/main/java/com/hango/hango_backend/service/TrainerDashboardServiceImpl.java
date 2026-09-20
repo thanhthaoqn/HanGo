@@ -598,10 +598,10 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .orElse(null);
         int durationMinutes = request.getEstimatedDuration() != null ? request.getEstimatedDuration() : 0;
         java.math.BigDecimal suggestedPrice = calculateSuggestedPrice(profile, difficulty, 0, durationMinutes);
-        // Trainer tu chon gia ban that su qua request.getPrice(); neu vi ly do
-        // gi request khong kem gia (vd goi truc tiep bo qua validation Controller),
-        // mac dinh ve dung gia tham khao thay vi de trong/null.
-        java.math.BigDecimal trainerPrice = request.getPrice() != null ? request.getPrice() : suggestedPrice;
+        // First course promotion: Trainer's first course is always free (0 VND).
+        boolean isFirstCourse = courseRepository.isEligibleForFirstCoursePromotion(user.getId(), generatedCode);
+        java.math.BigDecimal trainerPrice = isFirstCourse ? java.math.BigDecimal.ZERO
+                : (request.getPrice() != null ? request.getPrice() : suggestedPrice);
 
         // Tao ban ghi Course moi, LUON o trang thai DRAFT va version "v1".
         com.hango.hango_backend.entity.Course course = com.hango.hango_backend.entity.Course.builder()
@@ -688,9 +688,10 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         }
         java.math.BigDecimal suggestedPrice = calculateSuggestedPrice(profile, difficulty, lessonCount,
                 durationMinutes);
-        // Trainer tu chon gia qua request.getPrice() (mac dinh ve gia tham
-        // khao neu request khong kem gia).
-        java.math.BigDecimal trainerPrice = request.getPrice() != null ? request.getPrice() : suggestedPrice;
+        // First course promotion: Trainer's first course is always free (0 VND).
+        boolean isFirstCourse = courseRepository.isEligibleForFirstCoursePromotion(course.getCreator().getId(), course.getCode());
+        java.math.BigDecimal trainerPrice = isFirstCourse ? java.math.BigDecimal.ZERO
+                : (request.getPrice() != null ? request.getPrice() : suggestedPrice);
         String trainerPriceNote = request.getPriceNote() != null ? request.getPriceNote() : "";
 
         // needsNewDraftVersion = true khi khoa hoc dang sua da o trang thai PUBLISHED
@@ -715,6 +716,9 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
             }
             newCode = candidateCode;
 
+            boolean isFirstCourseForDraft = courseRepository.isEligibleForFirstCoursePromotion(course.getCreator().getId(), newCode);
+            java.math.BigDecimal draftPrice = isFirstCourseForDraft ? java.math.BigDecimal.ZERO : trainerPrice;
+
             com.hango.hango_backend.entity.Course draftCourse = com.hango.hango_backend.entity.Course.builder()
                     .title(request.getTitle())
                     .code(newCode)
@@ -725,7 +729,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                     .categories(categorySet)
                     .difficulty(difficulty)
                     .thumbnailUrl(request.getThumbnailUrl())
-                    .price(trainerPrice)
+                    .price(draftPrice)
                     .priceNote(trainerPriceNote)
                     .suggestedPrice(suggestedPrice)
                     .version(newVersion)
@@ -877,8 +881,27 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 lesson.setSkill(savedCourse.getCategory());
                 lesson.setDifficulty(savedCourse.getDifficulty());
 
+                Double passingScore = lDto.getPassingScore();
+                com.hango.hango_backend.entity.Exam examObj = null;
                 if (lDto.getExamId() != null) {
-                    lesson.setExam(examRepository.findById(lDto.getExamId()).orElse(null));
+                    examObj = examRepository.findById(lDto.getExamId()).orElse(null);
+                    if (passingScore == null && examObj != null && examObj.getPassingScore() != null) {
+                        passingScore = examObj.getPassingScore();
+                    }
+                }
+                if (passingScore == null && ("quiz".equalsIgnoreCase(type) || "final_quiz".equalsIgnoreCase(type))) {
+                    passingScore = 80.0;
+                }
+                lesson.setPassingScore(passingScore);
+
+                if (examObj != null) {
+                    if (passingScore != null && (examObj.getPassingScore() == null || !passingScore.equals(examObj.getPassingScore()))) {
+                        examObj.setPassingScore(passingScore);
+                        examRepository.save(examObj);
+                    }
+                    lesson.setExam(examObj);
+                } else if (lDto.getExamId() != null) {
+                    lesson.setExam(null);
                 }
                 lessonRepository.save(lesson);
             }
@@ -913,6 +936,18 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 if (lDto.getQuestionText() != null && lDto.getQuestionText().contains("youtu")) {
                     type2 = "video";
                 }
+                Double passingScore2 = lDto.getPassingScore();
+                com.hango.hango_backend.entity.Exam examObj2 = null;
+                if (lDto.getExamId() != null) {
+                    examObj2 = examRepository.findById(lDto.getExamId()).orElse(null);
+                    if (passingScore2 == null && examObj2 != null && examObj2.getPassingScore() != null) {
+                        passingScore2 = examObj2.getPassingScore();
+                    }
+                }
+                if (passingScore2 == null && ("quiz".equalsIgnoreCase(type2) || "final_quiz".equalsIgnoreCase(type2))) {
+                    passingScore2 = 80.0;
+                }
+
                 com.hango.hango_backend.entity.Lesson lesson = com.hango.hango_backend.entity.Lesson.builder()
                         .section(section)
                         .title(lDto.getTitle())
@@ -931,6 +966,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                         .version(course.getVersion())
                         .skill(category)
                         .difficulty(difficulty)
+                        .passingScore(passingScore2)
                         .build();
 
                 if (lDto.getQuestionText() != null && lDto.getQuestionText().contains("youtu")) {
@@ -938,8 +974,12 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                     lesson.setVideoTranscript(transcript);
                 }
 
-                if (lDto.getExamId() != null) {
-                    lesson.setExam(examRepository.findById(lDto.getExamId()).orElse(null));
+                if (examObj2 != null) {
+                    if (passingScore2 != null && (examObj2.getPassingScore() == null || !passingScore2.equals(examObj2.getPassingScore()))) {
+                        examObj2.setPassingScore(passingScore2);
+                        examRepository.save(examObj2);
+                    }
+                    lesson.setExam(examObj2);
                 }
                 lessonRepository.save(lesson);
             }
@@ -969,11 +1009,8 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                         || r.getRoleName().equalsIgnoreCase("ADMINISTRATOR")
                         || r.getRoleName().equalsIgnoreCase("ADMIN"));
 
-        // Chinh sach tang truong: khoa hoc DAU TIEN cua 1 Trainer luon mien phi,
-        // BAT KE gia Trainer da tu chon la bao nhieu - chi ep GIA BAN (price) ve 0,
-        // KHONG dong cham toi suggestedPrice (van giu nguyen gia tham khao 300k-700k
-        // de Course Manager biet khoa hoc nay "dang" dang gia bao nhieu).
-        if (courseRepository.countDistinctCourseCodesByCreatorId(course.getCreator().getId()) <= 1) {
+        // First course promotion: Trainer's first course is always free (0 VND).
+        if (courseRepository.isEligibleForFirstCoursePromotion(course.getCreator().getId(), course.getCode())) {
             course.setPrice(java.math.BigDecimal.ZERO);
         }
 
@@ -1402,7 +1439,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         String status = course.getStatus() != null ? course.getStatus().toUpperCase() : "";
         if (!"DRAFT".equals(status) && !"REJECTED".equals(status)) {
             throw new ApiException(
-                    "Chỉ có thể xoá khóa học ở trạng thái Nháp (Draft) hoặc Bị từ chối (Rejected).",
+                    "Only courses in Draft or Rejected status can be deleted.",
                     HttpStatus.BAD_REQUEST);
         }
 
@@ -1454,7 +1491,7 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 .findById(course.getCreator().getId()).orElse(null);
         if (profile == null || !"VERIFIED".equalsIgnoreCase(profile.getStatus())) {
             throw new IllegalStateException(
-                    "Bạn cần hoàn thiện hồ sơ và được Admin phê duyệt để bắt đầu bán khóa học.");
+                    "You need to complete your profile and be approved by an Admin to start publishing courses.");
         }
 
         // A1 (spec 20): chan publish neu course chua co it nhat 1 quiz co cau hoi

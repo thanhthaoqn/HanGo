@@ -81,6 +81,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
   String _uploadStatusText = '';
   List<dynamic> _sections = [];
   int _activeStep = 1;
+  bool _isFirstCourse = false;
 
   String get apiBaseUrl => EnvConfig.v1BaseUrl;
 
@@ -262,6 +263,50 @@ class _EditCoursePageState extends State<EditCoursePage> {
 
           _isLoadingCourse = false;
         });
+
+        // Check if this course is eligible for the First-Course Promotion policy
+        try {
+          final coursesUri = Uri.parse('$apiBaseUrl/trainer/courses?status=ALL');
+          final coursesResponse = await http.get(
+            coursesUri,
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Content-Type': 'application/json',
+            },
+          );
+          if (coursesResponse.statusCode == 200) {
+            final cData = jsonDecode(utf8.decode(coursesResponse.bodyBytes));
+            final list = (cData['courses'] as List<dynamic>?) ?? [];
+            if (list.isNotEmpty) {
+              final publishedCourses = list.where(
+                (c) => (c['status'] ?? '').toString().toUpperCase() == 'PUBLISHED',
+              ).toList();
+              dynamic targetFirst = publishedCourses.isNotEmpty ? publishedCourses.first : null;
+              if (targetFirst == null) {
+                targetFirst = list.first;
+                for (var c in list) {
+                  final cId = c['id'] is int ? c['id'] : int.tryParse(c['id'].toString()) ?? 0;
+                  final tId = targetFirst['id'] is int ? targetFirst['id'] : int.tryParse(targetFirst['id'].toString()) ?? 0;
+                  if (cId < tId) {
+                    targetFirst = c;
+                  }
+                }
+              }
+              final firstBaseCode = (targetFirst['code'] ?? '').toString().replaceAll(RegExp(r'-V\d+$'), '');
+              final currentBaseCode = _codeController.text.replaceAll(RegExp(r'-V\d+$'), '');
+              if (firstBaseCode.isNotEmpty && currentBaseCode.isNotEmpty && firstBaseCode == currentBaseCode) {
+                if (mounted) {
+                  setState(() {
+                    _isFirstCourse = true;
+                    _priceController.text = '0';
+                  });
+                }
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('Error checking first course status: $e');
+        }
       } else {
         throw Exception(
           'Failed to load course details: ${response.statusCode}',
@@ -415,7 +460,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
         'categoryKey': _selectedCategoryKey,
         'difficultyKey': _selectedLevelKey,
         'thumbnailUrl': _uploadedImageUrl ?? '',
-        'price': double.tryParse(_priceController.text.trim()) ?? 0,
+        'price': _isFirstCourse ? 0 : (double.tryParse(_priceController.text.trim()) ?? 0),
         'priceNote': _priceNoteController.text.trim(),
         'sessions': _sections,
       });
@@ -531,7 +576,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
         'categoryKey': _selectedCategoryKey,
         'difficultyKey': _selectedLevelKey,
         'thumbnailUrl': _uploadedImageUrl ?? '',
-        'price': double.tryParse(_priceController.text.trim()) ?? 0,
+        'price': _isFirstCourse ? 0 : (double.tryParse(_priceController.text.trim()) ?? 0),
         'priceNote': _priceNoteController.text.trim(),
         'sessions': _sections,
       });
@@ -1553,6 +1598,34 @@ class _EditCoursePageState extends State<EditCoursePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (_isFirstCourse) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE6F4EA),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFCEEAD6)),
+                        ),
+                        child: Row(
+                          children: const [
+                            Icon(Icons.stars_rounded, color: Color(0xFF137333), size: 24),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'This is your first course on HanGo. Under platform policy, it is published as Free (0 VND) to help build your initial learner community.',
+                                style: TextStyle(
+                                  fontFamily: 'Outfit',
+                                  fontSize: 13,
+                                  color: Color(0xFF137333),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     const Text(
                       'Course Price (VNĐ) *',
                       style: TextStyle(
@@ -1568,9 +1641,18 @@ class _EditCoursePageState extends State<EditCoursePage> {
                     // tham khao he thong tinh, khong con tu dong ghi de len day).
                     TextFormField(
                       controller: _priceController,
+                      readOnly: _isFirstCourse,
                       keyboardType: const TextInputType.numberWithOptions(decimal: false),
                       decoration: InputDecoration(
-                        hintText: 'e.g. 500000',
+                        hintText: _isFirstCourse ? 'Free (0 VNĐ)' : 'e.g. 500000',
+                        helperText: _isFirstCourse
+                            ? 'This course is Free (0 VND) under the First-Course promotion policy'
+                            : null,
+                        helperStyle: const TextStyle(
+                          color: Color(0xFF137333),
+                          fontSize: 12,
+                          fontFamily: 'Outfit',
+                        ),
                         hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         border: OutlineInputBorder(
@@ -1588,6 +1670,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
                       ),
                       style: const TextStyle(fontFamily: 'Outfit', fontSize: 14),
                       validator: (value) {
+                        if (_isFirstCourse) return null;
                         final parsed = double.tryParse((value ?? '').trim());
                         if (parsed == null || parsed < 0) {
                           return 'Enter a valid, non-negative price';
@@ -2182,6 +2265,15 @@ class _EditCoursePageState extends State<EditCoursePage> {
   // Course Manager/Admin - xem comment trong TrainerDashboardServiceImpl
   // .submitTrainerCourse ben backend).
   Future<void> _submitCourseForReview() async {
+    // Auto-save any unsaved form edits first before submitting for review
+    final saved = await _saveCourse(showToast: false);
+    if (!saved) {
+      if (mounted) {
+        ToastHelper.showError(context, 'Please fix form validation errors before submitting');
+      }
+      return;
+    }
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -2222,7 +2314,10 @@ class _EditCoursePageState extends State<EditCoursePage> {
         final data = jsonDecode(response.body);
         final errorMsg = data['error'] ?? response.body;
 
-        if (errorMsg.contains('phê duyệt') || errorMsg.contains('hoàn thiện')) {
+        if (errorMsg.contains('phê duyệt') ||
+            errorMsg.contains('hoàn thiện') ||
+            errorMsg.toLowerCase().contains('profile') ||
+            errorMsg.toLowerCase().contains('approved')) {
           _showPublishWarningPopup();
         } else {
           ToastHelper.showError(context, errorMsg);
@@ -2231,7 +2326,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
     } catch (e) {
       if (mounted) {
         Navigator.pop(context);
-        ToastHelper.showError(context, 'Lỗi kết nối máy chủ: $e');
+        ToastHelper.showError(context, 'Server connection error: $e');
       }
     }
   }
@@ -2246,7 +2341,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
             Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 28),
             SizedBox(width: 12),
             Text(
-              'Yêu cầu phê duyệt',
+              'Approval Required',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontFamily: 'Outfit',
@@ -2255,7 +2350,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
           ],
         ),
         content: const Text(
-          'Bạn cần hoàn thiện hồ sơ và được Admin phê duyệt để bắt đầu bán khóa học.',
+          'You need to complete your profile and be approved by an Admin to start submitting courses.',
           style: TextStyle(fontSize: 14, height: 1.5, fontFamily: 'Outfit'),
         ),
         actions: [
@@ -2269,7 +2364,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
               ),
             ),
             child: const Text(
-              'Đã hiểu',
+              'Understood',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontFamily: 'Outfit',
