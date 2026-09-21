@@ -1,5 +1,6 @@
 class Exam {
   final String id;
+  final String? uuid;
   final String title;
   final String description;
   final String status;
@@ -12,6 +13,7 @@ class Exam {
 
   Exam({
     required this.id,
+    this.uuid,
     required this.title,
     this.description = '',
     this.status = 'ACTIVE',

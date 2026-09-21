@@ -9,6 +9,7 @@ import 'utils/web_session_helper.dart'
     show isSessionActive, setSessionActive, isRememberMeEnabled;
 import 'services/app_state.dart';
 import 'routes/app_router.dart';
+import 'routes/app_routes.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,6 +31,57 @@ void main() async {
 
     setSessionActive();
   }
+
+  // Prevent Red Screen of Death in UI and provide a clean fallback
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return Material(
+      color: const Color(0xFFF8FAFC),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.refresh_rounded, size: 48, color: Color(0xFF28B79B)),
+              const SizedBox(height: 16),
+              const Text(
+                'Something went wrong',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'A temporary rendering or navigation synchronization issue occurred.',
+                style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF28B79B),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onPressed: () {
+                  final ctx = AppRouter.rootNavigatorKey.currentContext;
+                  if (ctx != null) {
+                    ctx.go(AppRoutes.home);
+                  }
+                },
+                child: const Text('Back to Home'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  };
 
   runApp(const MyApp());
 }

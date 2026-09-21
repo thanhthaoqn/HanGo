@@ -121,6 +121,24 @@ public class ExamService {
         return mapToDTO(exam, qCount, sCount);
     }
 
+    public ExamResponseDTO getExamByIdentifier(String identifier) {
+        if (identifier == null || identifier.isBlank()) {
+            throw new RuntimeException("Exam identifier cannot be blank");
+        }
+        Long id = null;
+        try {
+            id = Long.parseLong(identifier);
+        } catch (NumberFormatException ignored) {}
+
+        if (id != null) {
+            return getExamById(id);
+        } else {
+            Exam exam = examRepository.findByUuidAndDeletedAtIsNull(identifier)
+                    .orElseThrow(() -> new RuntimeException("Exam not found with UUID: " + identifier));
+            return getExamById(exam.getId());
+        }
+    }
+
     /**
      * Whether the given learner has already completed ANY exam currently
      * flagged as an Entry Exam - checked against the live flagged set (not a
@@ -153,6 +171,7 @@ public class ExamService {
 
         return ExamResponseDTO.builder()
                 .id(exam.getId())
+                .uuid(exam.getUuid())
                 .title(exam.getTitle())
                 .description(exam.getDescription())
                 .status(exam.getStatus())
@@ -479,5 +498,23 @@ public class ExamService {
                     .options(opts)
                     .build();
         }).collect(Collectors.toList());
+    }
+
+    public List<LearnerExamQuestionDTO> getExamQuestionsByIdentifier(String identifier) {
+        if (identifier == null || identifier.isBlank()) {
+            throw new RuntimeException("Exam identifier cannot be blank");
+        }
+        Long id = null;
+        try {
+            id = Long.parseLong(identifier);
+        } catch (NumberFormatException ignored) {}
+
+        if (id != null) {
+            return getExamQuestions(id);
+        } else {
+            Exam exam = examRepository.findByUuidAndDeletedAtIsNull(identifier)
+                    .orElseThrow(() -> new RuntimeException("Exam not found with UUID: " + identifier));
+            return getExamQuestions(exam.getId());
+        }
     }
 }

@@ -10,6 +10,7 @@ import java.util.Map;
 public interface CourseService {
     Page<CourseSummaryDTO> getCourses(String search, String filterType, String difficulty, Pageable pageable);
     CourseDetailDTO getCourseDetail(Long id, Long currentUserId);
+    CourseDetailDTO getCourseDetailByIdentifier(String identifier, Long currentUserId);
     void enrollCourse(Long courseId, Long userId);
     void unenrollCourse(Long courseId, Long userId);
     void switchCourseVersion(Long courseId, Long userId);

@@ -64,10 +64,16 @@ public class Exam {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(length = 36, unique = true)
+    private String uuid;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
+        }
+        if (this.uuid == null || this.uuid.isBlank()) {
+            this.uuid = java.util.UUID.randomUUID().toString();
         }
     }
 }

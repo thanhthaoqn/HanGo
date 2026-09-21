@@ -47,7 +47,11 @@ class AppRouter {
 
         // Redirect authenticated users away from auth pages
         if (isAuthenticated) {
-          if (path == AppRoutes.login || path == AppRoutes.register) {
+          if (path == AppRoutes.login ||
+              path == AppRoutes.register ||
+              path == AppRoutes.forgotPassword ||
+              path == '/forgot password' ||
+              path == '/forgot%20password') {
             if (role == 'ADMIN') return AppRoutes.admin;
             if (role == 'COURSE_MANAGER') return AppRoutes.courseManager;
             if (role == 'TRAINER') return AppRoutes.trainer;
@@ -171,32 +175,28 @@ class AppRouter {
           path: AppRoutes.courseDetail,
           parentNavigatorKey: rootNavigatorKey,
           builder: (context, state) {
-            final idStr = state.pathParameters['id'];
-            final id = int.tryParse(idStr ?? '') ?? 0;
-            return CourseDetailPage(courseId: id);
+            final idStr = state.pathParameters['id'] ?? '';
+            return CourseDetailPage(courseId: idStr);
           },
         ),
         GoRoute(
           path: AppRoutes.courseCompletion,
           parentNavigatorKey: rootNavigatorKey,
           builder: (context, state) {
-            final idStr = state.pathParameters['id'];
-            final id = int.tryParse(idStr ?? '') ?? 0;
-            return CourseCompletionPage(courseId: id);
+            final idStr = state.pathParameters['id'] ?? '';
+            return CourseCompletionPage(courseId: idStr);
           },
         ),
         GoRoute(
           path: AppRoutes.courseLesson,
           parentNavigatorKey: rootNavigatorKey,
           builder: (context, state) {
-            final courseIdStr = state.pathParameters['courseId'];
-            final lessonIdStr = state.pathParameters['lessonId'];
-            final courseId = int.tryParse(courseIdStr ?? '') ?? 0;
-            final lessonId = int.tryParse(lessonIdStr ?? '') ?? 0;
+            final courseIdStr = state.pathParameters['courseId'] ?? '';
+            final lessonIdStr = state.pathParameters['lessonId'] ?? '';
             final startQuiz = state.uri.queryParameters['startQuiz'] == 'true';
             return LessonDetailPage(
-              courseId: courseId,
-              lessonId: lessonId,
+              courseId: courseIdStr,
+              lessonId: lessonIdStr,
               startQuizImmediately: startQuiz,
               cameFromCourseDetail: true,
             );
@@ -260,17 +260,28 @@ class AppRouter {
         GoRoute(
           path: AppRoutes.login,
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) => const LoginPage(),
+          builder: (context, state) =>
+              LoginPage(key: ValueKey('login_${state.pageKey}')),
         ),
         GoRoute(
           path: AppRoutes.register,
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) => const RegisterPage(),
+          builder: (context, state) =>
+              RegisterPage(key: ValueKey('reg_${state.pageKey}')),
         ),
         GoRoute(
           path: AppRoutes.forgotPassword,
           parentNavigatorKey: rootNavigatorKey,
-          builder: (context, state) => const ForgotPasswordPage(),
+          builder: (context, state) =>
+              ForgotPasswordPage(key: ValueKey('forgot_${state.pageKey}')),
+        ),
+        GoRoute(
+          path: '/forgot%20password',
+          redirect: (_, __) => AppRoutes.forgotPassword,
+        ),
+        GoRoute(
+          path: '/forgot password',
+          redirect: (_, __) => AppRoutes.forgotPassword,
         ),
         GoRoute(
           path: AppRoutes.termsAndPrivacy,
@@ -312,7 +323,7 @@ class AppRouter {
               ),
               const SizedBox(height: 16),
               const Text(
-                '404 - Không tìm thấy trang',
+                '404 - Page Not Found',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -321,7 +332,7 @@ class AppRouter {
               ),
               const SizedBox(height: 8),
               Text(
-                'Đường dẫn ${state.uri.path} không tồn tại.',
+                'The requested path "${state.uri.path}" could not be found.',
                 style: const TextStyle(color: Color(0xFF64748B)),
               ),
               const SizedBox(height: 24),
@@ -339,7 +350,7 @@ class AppRouter {
                 ),
                 onPressed: () => context.go(AppRoutes.home),
                 icon: const Icon(Icons.home),
-                label: const Text('Về trang chủ'),
+                label: const Text('Back to Home'),
               ),
             ],
           ),

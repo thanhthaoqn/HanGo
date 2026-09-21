@@ -13,7 +13,7 @@ const String _hangoLogoUrl =
     'https://res.cloudinary.com/diqekap4o/image/upload/v1781621071/logo_ayqvq4.png';
 
 class CourseCompletionPage extends StatefulWidget {
-  final int courseId;
+  final dynamic courseId;
   final CourseDetail? courseDetail;
 
   const CourseCompletionPage({
@@ -221,13 +221,14 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
             cursor: SystemMouseCursors.click,
             child: TextButton.icon(
               onPressed: () {
+                final courseSlug = _courseDetail?.uuid ?? widget.courseId;
                 try {
-                  context.push('/courses/${widget.courseId}');
+                  context.push('/courses/$courseSlug');
                 } catch (_) {
                   Navigator.of(context).pushReplacement(
                     MaterialPageRoute(
                       builder: (context) =>
-                          CourseDetailPage(courseId: widget.courseId),
+                          CourseDetailPage(courseId: courseSlug),
                     ),
                   );
                 }

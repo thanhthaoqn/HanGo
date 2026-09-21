@@ -10,6 +10,7 @@ import jakarta.validation.constraints.Size;
 @AllArgsConstructor
 public class CourseLessonDTO {
     private Long id;
+    private String uuid;
 
     @NotBlank(message = "Lesson title cannot be blank")
     @Size(max = 100, message = "Lesson title cannot exceed 100 characters")

@@ -561,9 +561,9 @@ class _TakeExamPageState extends State<TakeExamPage>
                     child: ElevatedButton(
                       onPressed: () {
                         Navigator.pop(context); // Close confirm
-                        final examId = _currentExamId;
-                        if (examId.isNotEmpty) {
-                          context.go(AppRoutes.examDetailRoute(examId), extra: _exam ?? widget.exam);
+                        final examSlug = _exam?.uuid ?? widget.exam?.uuid ?? _currentExamId;
+                        if (examSlug.isNotEmpty) {
+                          context.go(AppRoutes.examDetailRoute(examSlug), extra: _exam ?? widget.exam);
                         } else {
                           context.go(AppRoutes.exams);
                         }

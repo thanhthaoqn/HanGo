@@ -2108,9 +2108,10 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                                             ElevatedButton.icon(
                                               onPressed: () {
                                                 Navigator.pop(context);
+                                                final courseSlug = course?.uuid ?? courseId;
                                                 try {
                                                   context.push(
-                                                    '/courses/$courseId',
+                                                    '/courses/$courseSlug',
                                                   );
                                                 } catch (_) {
                                                   Navigator.of(
@@ -2120,7 +2121,7 @@ class _PaymentHistoryPanelState extends State<_PaymentHistoryPanel> {
                                                     MaterialPageRoute(
                                                       builder: (context) =>
                                                           CourseDetailPage(
-                                                            courseId: courseId,
+                                                            courseId: courseSlug,
                                                           ),
                                                     ),
                                                   );

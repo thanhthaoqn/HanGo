@@ -28,7 +28,7 @@ class _ExamCardState extends State<ExamCard> {
       child: GestureDetector(
         onTap: () {
           context.go(
-            AppRoutes.examDetailRoute(widget.exam.id),
+            AppRoutes.examDetailRoute(widget.exam.uuid ?? widget.exam.id),
             extra: widget.exam,
           );
         },

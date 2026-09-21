@@ -8,6 +8,7 @@ import java.util.List;
 
 public interface LessonService {
     LessonDetailDTO getLessonDetail(Long lessonId, Long userId);
+    LessonDetailDTO getLessonDetailByIdentifier(String identifier, Long userId);
     List<LessonQuizAttemptDTO> getQuizAttempts(Long lessonId, Long userId);
     LessonQuizAttemptDTO saveQuizAttempt(Long lessonId, Long userId, LessonQuizAttemptRequestDTO request);
     void completeLesson(Long lessonId, Long userId, boolean isCompleted);

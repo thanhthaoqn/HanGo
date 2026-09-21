@@ -15,6 +15,10 @@ public interface ExamRepository extends JpaRepository<Exam, Long> {
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"createdBy"})
     List<Exam> findByDeletedAtIsNullAndStatus(String status);
 
+    java.util.Optional<Exam> findByUuidAndDeletedAtIsNull(String uuid);
+
+    java.util.Optional<Exam> findByUuid(String uuid);
+
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"createdBy"})
     Page<Exam> findByDeletedAtIsNullAndStatus(String status, Pageable pageable);
 
