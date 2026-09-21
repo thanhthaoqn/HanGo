@@ -539,14 +539,8 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
       }
     });
 
-    if (_isLoggedIn) {
-      _bannerTimer?.cancel();
-      setState(() {
-        _currentBannerIndex = 0;
-      });
-    } else {
-      _startBannerTimer();
-    }
+    // Start banner timer for all users to cycle between the 2 banners
+    _startBannerTimer();
 
     if (userId != 0 && _canAttemptExam) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -852,7 +846,9 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
           },
           child: _currentBannerIndex == 0
               ? _buildStudentHeroBanner(isDesktop, isVi)
-              : _buildTeacherHeroBanner(isDesktop, isVi),
+              : (_isLoggedIn
+                  ? _buildLearnerActionBanner(isDesktop, isVi)
+                  : _buildTeacherHeroBanner(isDesktop, isVi)),
         ),
 
         // Left Navigation Arrow Button
@@ -1184,6 +1180,191 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                             ? '$_totalExamsCount+'
                             : (_exams.isNotEmpty ? '${_exams.length}+' : '0+'),
                         isVi ? 'Đề thi miễn phí' : 'Free exams',
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLearnerActionBanner(bool isDesktop, bool isVi) {
+    return Container(
+      key: const ValueKey('learner_action_banner'),
+      width: double.infinity,
+      color: const Color(0xFF0F172A), // Slate 900
+      child: Stack(
+        children: [
+          // Layer 1: Background Image
+          Positioned.fill(
+            child: Image.network(
+              'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?q=80&w=1200',
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) =>
+                  Container(color: const Color(0xFF0F172A)),
+            ),
+          ),
+
+          // Layer 2: Dark Overlay Gradient
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.black.withOpacity(0.85),
+                    Colors.black.withOpacity(0.55),
+                    Colors.black.withOpacity(0.2),
+                  ],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+              ),
+            ),
+          ),
+
+          // Layer 3: Foreground Content
+          Center(
+            child: Container(
+              width: double.infinity,
+              constraints: const BoxConstraints(maxWidth: 1440),
+              padding: EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: isDesktop ? 60.0 : 36.0,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Tag
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF28B79B).withOpacity(0.2),
+                      border: Border.all(
+                        color: const Color(0xFF28B79B),
+                        width: 1.5,
+                      ),
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.insights_rounded,
+                          size: 14,
+                          color: Color(0xFF28B79B),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          isVi
+                              ? 'Lộ trình cá nhân hoá'
+                              : 'Personalized Pathway',
+                          style: const TextStyle(
+                            color: Color(0xFF28B79B),
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Main Title
+                  Text(
+                    isVi
+                        ? 'Đánh giá năng lực,\ntối ưu lộ trình.'
+                        : 'Assess your level,\noptimize your path.',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: isDesktop ? 42 : 28,
+                      fontWeight: FontWeight.w800,
+                      height: 1.25,
+                      fontFamily: 'Outfit',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Description
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 650),
+                    child: Text(
+                      isVi
+                          ? 'Hoàn thành bài Entry Exam để AI của hệ thống phân tích năng lực và đề xuất các khóa học phù hợp nhất với mục tiêu của bạn.'
+                          : 'Complete the Entry Exam so our AI can analyze your skills and recommend the best courses for your goals.',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: isDesktop ? 15 : 13,
+                        height: 1.5,
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Action Buttons
+                  Wrap(
+                    spacing: 16,
+                    runSpacing: 12,
+                    children: [
+                      // Teal filled button
+                      ElevatedButton(
+                        onPressed: () {
+                          context.go(AppRoutes.entryExam);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF28B79B),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 16,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          elevation: 8,
+                          shadowColor: const Color(0xFF28B79B).withOpacity(0.4),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              isVi ? 'Làm bài kiểm tra ngay' : 'Take exam now',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'Outfit',
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.arrow_forward_rounded, size: 16),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 36),
+
+                  // Stats Row
+                  Wrap(
+                    spacing: 48,
+                    runSpacing: 16,
+                    children: [
+                      _buildHeroStat(
+                        isVi ? '~50' : '~50',
+                        isVi ? 'Phút hoàn thành' : 'Minutes to finish',
+                      ),
+                      _buildHeroStat(
+                        isVi ? '100%' : '100%',
+                        isVi ? 'Miễn phí' : 'Free of charge',
                       ),
                     ],
                   ),
