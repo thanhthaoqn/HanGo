@@ -97,8 +97,12 @@ class _LessonDetailPageState extends State<LessonDetailPage> {
         widget.lessonId,
       );
       _currentLessonId = lesson.id;
-      
-      final List<dynamic> attemptsData = await _lessonRepository.fetchQuizAttempts(_currentLessonId, _currentUserId);
+      List<dynamic> attemptsData = [];
+      try {
+        attemptsData = await _lessonRepository.fetchQuizAttempts(_currentLessonId, _currentUserId);
+      } catch (_) {
+        attemptsData = [];
+      }
       final List<QuizAttempt> parsedAttempts = [];
       final List<Map<int, int>> parsedAnswers = [];
       

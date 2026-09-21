@@ -67,20 +67,26 @@ public class CourseRatingServiceImpl implements CourseRatingService {
 
         List<CourseReviewDTO> dtos = ratings.stream().map(r -> {
             String email = "unknown@domain.com";
+            Long studentId = null;
+            String avatarUrl = null;
             try {
-                if (r.getStudent() != null && r.getStudent().getEmail() != null) {
-                    email = r.getStudent().getEmail();
+                if (r.getStudent() != null) {
+                    studentId = r.getStudent().getId();
+                    if (r.getStudent().getEmail() != null) {
+                        email = r.getStudent().getEmail();
+                    }
+                    avatarUrl = r.getStudent().getAvatarUrl();
                 }
-            } catch (jakarta.persistence.EntityNotFoundException e) {
-                // Ignore
+            } catch (Exception e) {
+                // Ignore if student is missing or unresolvable
             }
 
             return CourseReviewDTO.builder()
                     .id(r.getId())
-                    .userId(r.getStudent() != null ? r.getStudent().getId() : null)
+                    .userId(studentId)
                     .userName(maskEmail(email))
                     .userInitial(email.substring(0, 1).toUpperCase())
-                    .userAvatar(r.getStudent() != null ? r.getStudent().getAvatarUrl() : null)
+                    .userAvatar(avatarUrl)
                     .rating(r.getRating())
                     .content(r.getReviewContent())
                     .createdAt(r.getCreatedAt())

@@ -28,6 +28,7 @@ public class CourseRating {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "student_id", nullable = false)
+    @NotFound(action = NotFoundAction.IGNORE)
     private User student;
 
     @Column(nullable = false)

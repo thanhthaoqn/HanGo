@@ -61,7 +61,7 @@ public class LessonController {
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
         if (currentUser == null) {
-            return ResponseEntity.status(401).body("{\"error\": \"Unauthorized\"}");
+            return ResponseEntity.ok(java.util.Collections.emptyList());
         }
         return ResponseEntity.ok(lessonService.getQuizAttempts(id, currentUser.getId()));
     }

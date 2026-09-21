@@ -946,7 +946,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
                       ),
                       _buildBannerStatItem(
                         Icons.star_rounded,
-                        '${course.rating}',
+                        course.rating.toStringAsFixed(1),
                         iconColor: Colors.amber,
                       ),
                     ],

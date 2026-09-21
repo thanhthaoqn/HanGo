@@ -117,17 +117,22 @@ class LessonRepository {
       
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
+      if (token == null || token.isEmpty) {
+        return [];
+      }
 
       final response = await http.get(
         uri,
         headers: {
-          if (token != null) 'Authorization': 'Bearer $token',
+          'Authorization': 'Bearer $token',
         },
       );
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(utf8.decode(response.bodyBytes));
         return data;
+      } else if (response.statusCode == 401 || response.statusCode == 403) {
+        return [];
       } else {
         throw Exception('Failed to load quiz attempts: ${response.statusCode}');
       }
