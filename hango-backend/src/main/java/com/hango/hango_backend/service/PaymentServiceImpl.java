@@ -181,7 +181,9 @@ public class PaymentServiceImpl implements PaymentService {
                 .build();
         payment = paymentRepository.save(payment);
 
-        long orderCode = payment.getId();
+        // Generate unique orderCode <= 9007199254740991 (PayOS requirement)
+        // Using millisecond timestamp (13 digits) + 2 digits from payment ID to guarantee uniqueness and prevent "Đơn thanh toán đã tồn tại"
+        long orderCode = Long.parseLong(String.valueOf(System.currentTimeMillis()) + String.format("%02d", (int) (payment.getId() % 100)));
         String txnRef = String.valueOf(orderCode);
         payment.setTxnRef(txnRef);
         paymentRepository.save(payment);
@@ -193,12 +195,19 @@ public class PaymentServiceImpl implements PaymentService {
             frontendBaseUrl = frontendBaseUrl.substring(0, frontendBaseUrl.length() - 1);
         }
         boolean isCartPayment = targetCourseIds.size() > 1;
+        if (primaryCourse.getUuid() == null || primaryCourse.getUuid().isBlank()) {
+            primaryCourse.ensureUuid();
+            courseRepository.save(primaryCourse);
+        }
+        String courseIdentifier = (primaryCourse.getUuid() != null && !primaryCourse.getUuid().isBlank())
+                ? primaryCourse.getUuid()
+                : String.valueOf(primaryCourse.getId());
         String cancelUrl = isCartPayment
                 ? frontendBaseUrl + "/?paymentStatus=failed&isCart=true"
-                : frontendBaseUrl + "/?paymentStatus=failed&courseId=" + primaryCourse.getId();
+                : frontendBaseUrl + "/?paymentStatus=failed&courseId=" + courseIdentifier;
         String returnUrl = isCartPayment
                 ? frontendBaseUrl + "/?paymentStatus=success&isCart=true"
-                : frontendBaseUrl + "/?paymentStatus=success&courseId=" + primaryCourse.getId();
+                : frontendBaseUrl + "/?paymentStatus=success&courseId=" + courseIdentifier;
 
         // Create signature for PayOS: amount, cancelUrl, description, orderCode,
         // returnUrl sorted alphabetically
@@ -383,35 +392,41 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     private void fulfillPaymentSuccess(Payment payment) {
-        if ("SUCCESS".equalsIgnoreCase(payment.getStatus())) {
-            return;
-        }
-        payment.setStatus("SUCCESS");
-        payment.setPaidAt(LocalDateTime.now());
+        boolean wasPending = !"SUCCESS".equalsIgnoreCase(payment.getStatus());
+        if (wasPending) {
+            payment.setStatus("SUCCESS");
+            if (payment.getPaidAt() == null) {
+                payment.setPaidAt(LocalDateTime.now());
+            }
 
-        BigDecimal amount = payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO;
-        double platformRate = 0.30;
-        if (payment.getCourse() != null && payment.getCourse().getCreator() != null) {
-            Long creatorId = payment.getCourse().getCreator().getId();
-            TrainerProfile profile = trainerProfileRepository.findById(creatorId).orElse(null);
-            if (profile != null && "PEER_TUTOR".equalsIgnoreCase(profile.getTrainerType())) {
-                platformRate = 0.40;
+            BigDecimal amount = payment.getAmount() != null ? payment.getAmount() : BigDecimal.ZERO;
+            double platformRate = 0.30;
+            if (payment.getCourse() != null && payment.getCourse().getCreator() != null) {
+                Long creatorId = payment.getCourse().getCreator().getId();
+                TrainerProfile profile = trainerProfileRepository.findById(creatorId).orElse(null);
+                if (profile != null && "PEER_TUTOR".equalsIgnoreCase(profile.getTrainerType())) {
+                    platformRate = 0.40;
+                }
+            }
+            BigDecimal platformFee = amount.multiply(BigDecimal.valueOf(platformRate)).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal trainerEarnings = amount.subtract(platformFee);
+
+            payment.setPlatformFee(platformFee);
+            payment.setTrainerEarnings(trainerEarnings);
+            payment.setSettlementStatus("PENDING");
+
+            paymentRepository.save(payment);
+
+            String formattedAmount = String.format("%,d", amount.longValue());
+            try {
+                notificationService.notifyUser(payment.getUser(), NotificationService.TYPE_PURCHASE_SUCCESS,
+                        "Payment successful",
+                        "Your payment of " + formattedAmount + " VND was successful. Enjoy your course(s)!",
+                        payment.getCourse());
+            } catch (Exception e) {
+                log.warn("Failed to notify user for payment id={}: {}", payment.getId(), e.getMessage());
             }
         }
-        BigDecimal platformFee = amount.multiply(BigDecimal.valueOf(platformRate)).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal trainerEarnings = amount.subtract(platformFee);
-
-        payment.setPlatformFee(platformFee);
-        payment.setTrainerEarnings(trainerEarnings);
-        payment.setSettlementStatus("PENDING");
-
-        paymentRepository.save(payment);
-
-        String formattedAmount = String.format("%,d", amount.longValue());
-        notificationService.notifyUser(payment.getUser(), NotificationService.TYPE_PURCHASE_SUCCESS,
-                "Payment successful",
-                "Your payment of " + formattedAmount + " VND was successful. Enjoy your course(s)!",
-                payment.getCourse());
 
         List<Long> targetIds = new ArrayList<>();
         if (payment.getCourseIds() != null && !payment.getCourseIds().trim().isEmpty()) {
@@ -427,7 +442,12 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         for (Long cId : targetIds) {
-            cartItemRepository.deleteByUserIdAndCourseId(payment.getUser().getId(), cId);
+            try {
+                cartItemRepository.deleteByUserIdAndCourseId(payment.getUser().getId(), cId);
+            } catch (Exception e) {
+                log.warn("Failed to delete cart item for userId={} courseId={}: {}",
+                        payment.getUser().getId(), cId, e.getMessage());
+            }
 
             boolean alreadyEnrolled = enrollmentRepository.existsByUserIdAndCourseId(payment.getUser().getId(), cId);
             if (!alreadyEnrolled) {
@@ -436,16 +456,24 @@ public class PaymentServiceImpl implements PaymentService {
                     Enrollment enrollment = Enrollment.builder()
                             .user(payment.getUser())
                             .course(c)
+                            .enrolledVersionId(c.getId())
                             .status("ENROLLED")
+                            .progressPercentage(BigDecimal.ZERO)
                             .build();
                     enrollmentRepository.save(enrollment);
                     log.info("Auto-enrolled userId={} into courseId={} after PayOS payment",
                             payment.getUser().getId(), cId);
 
-                    notificationService.notifyUser(c.getCreator(), NotificationService.TYPE_NEW_ENROLLMENT,
-                            "New enrollment",
-                            payment.getUser().getFullName() + " enrolled in your course \"" + c.getTitle() + "\".",
-                            c);
+                    if (c.getCreator() != null) {
+                        try {
+                            notificationService.notifyUser(c.getCreator(), NotificationService.TYPE_NEW_ENROLLMENT,
+                                    "New enrollment",
+                                    payment.getUser().getFullName() + " enrolled in your course \"" + c.getTitle() + "\".",
+                                    c);
+                        } catch (Exception e) {
+                            log.warn("Failed to notify creator for courseId={}: {}", cId, e.getMessage());
+                        }
+                    }
 
                     try {
                         String priceText = (c.getPrice() != null && c.getPrice().compareTo(BigDecimal.ZERO) > 0)
@@ -467,6 +495,7 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
+    @Transactional
     public PaymentStatusDTO getPaymentStatus(String txnRef, Long userId) {
         Payment payment = paymentRepository.findByTxnRef(txnRef)
                 .orElseThrow(() -> new RuntimeException("Payment not found"));
@@ -492,6 +521,13 @@ public class PaymentServiceImpl implements PaymentService {
                 }
             } catch (Exception e) {
                 log.warn("Failed to query PayOS API for orderCode={}: {}", txnRef, e.getMessage());
+            }
+        } else if ("SUCCESS".equalsIgnoreCase(currentStatus)) {
+            // Self-healing: Ensure any missing enrollments or cart cleanups are completed
+            try {
+                fulfillPaymentSuccess(payment);
+            } catch (Exception e) {
+                log.warn("Self-healing fulfillment failed for payment txnRef={}: {}", txnRef, e.getMessage());
             }
         }
 

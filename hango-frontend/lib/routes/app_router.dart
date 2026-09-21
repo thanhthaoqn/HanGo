@@ -176,7 +176,10 @@ class AppRouter {
           parentNavigatorKey: rootNavigatorKey,
           builder: (context, state) {
             final idStr = state.pathParameters['id'] ?? '';
-            return CourseDetailPage(courseId: idStr);
+            return CourseDetailPage(
+              key: ValueKey('course_detail_$idStr'),
+              courseId: idStr,
+            );
           },
         ),
         GoRoute(

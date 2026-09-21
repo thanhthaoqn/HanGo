@@ -80,16 +80,21 @@ class LearnerShellPageState extends State<LearnerShellPage> {
 
     if (!isSuccess && !isFailed) return;
 
-    int? courseId;
-    final match = RegExp(r'[?&]courseId=(\d+)').firstMatch(fullUrl);
+    String? courseIdentifier;
+    final match = RegExp(r'[?&](?:courseId|courseUuid)=([a-zA-Z0-9\-]+)').firstMatch(fullUrl);
     if (match != null) {
-      courseId = int.tryParse(match.group(1)!);
+      courseIdentifier = match.group(1);
     }
 
     String? txnRef;
-    final txnMatch = RegExp(r'[?&](?:orderCode|txnRef|id)=(\d+)').firstMatch(fullUrl);
-    if (txnMatch != null) {
-      txnRef = txnMatch.group(1);
+    final orderCodeMatch = RegExp(r'[?&]orderCode=(\d+)').firstMatch(fullUrl);
+    if (orderCodeMatch != null) {
+      txnRef = orderCodeMatch.group(1);
+    } else {
+      final txnMatch = RegExp(r'[?&]txnRef=(\d+)').firstMatch(fullUrl);
+      if (txnMatch != null) {
+        txnRef = txnMatch.group(1);
+      }
     }
 
     clearPaymentUrlFromAddressBar();
@@ -101,18 +106,20 @@ class LearnerShellPageState extends State<LearnerShellPage> {
         if (txnRef != null && txnRef.isNotEmpty) {
           try {
             await PaymentRepository().checkPaymentStatus(txnRef);
-          } catch (_) {}
+          } catch (e) {
+            debugPrint('Error syncing payment status for txnRef=$txnRef: $e');
+          }
         }
 
-        if (courseId != null) {
-          await CartManager.removeFromCart(courseId);
+        if (courseIdentifier != null) {
+          await CartManager.removeByIdentifier(courseIdentifier);
         } else {
           await CartManager.clearCart();
         }
         if (mounted) {
           ToastHelper.showSuccess(
             context,
-            'Payment successful! ${courseId != null ? "Course unlocked." : "Courses unlocked."}',
+            'Payment successful! ${courseIdentifier != null ? "Course unlocked." : "Courses unlocked."}',
           );
         }
       } else {
@@ -128,16 +135,16 @@ class LearnerShellPageState extends State<LearnerShellPage> {
         });
       }
 
-      if (courseId != null && mounted) {
+      if (courseIdentifier != null && mounted) {
         try {
-          context.go('/courses/$courseId');
+          context.go('/courses/$courseIdentifier');
         } catch (_) {
           try {
-            context.push('/courses/$courseId');
+            context.push('/courses/$courseIdentifier');
           } catch (_) {
             Navigator.of(context, rootNavigator: true).push(
               MaterialPageRoute(
-                builder: (context) => CourseDetailPage(courseId: courseId!),
+                builder: (context) => CourseDetailPage(courseId: courseIdentifier!),
               ),
             );
           }

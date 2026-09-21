@@ -129,6 +129,22 @@ class CartManager {
     }
   }
 
+  static Future<void> removeByIdentifier(dynamic identifier) async {
+    if (identifier == null) return;
+    final int? parsedId = identifier is int ? identifier : int.tryParse(identifier.toString());
+    if (parsedId != null) {
+      await removeFromCart(parsedId);
+      return;
+    }
+    final uuidStr = identifier.toString();
+    final course = cartCoursesNotifier.value
+        .cast<Course?>()
+        .firstWhere((c) => c?.uuid == uuidStr, orElse: () => null);
+    if (course != null) {
+      await removeFromCart(course.id);
+    }
+  }
+
   static Future<void> clearCart() async {
     _lastRemoteSyncAt = null;
     _pendingDeletedCourseIds.clear();
@@ -140,6 +156,14 @@ class CartManager {
     }
     cartCoursesNotifier.value = [];
     cartCountNotifier.value = 0;
+    try {
+      final token = prefs.getString('auth_token');
+      if (token != null && token.isNotEmpty) {
+        await _cartRepository.clearCart();
+      }
+    } catch (e) {
+      debugPrint('Error clearing remote cart in CartManager: $e');
+    }
     await updateCount(forceRefresh: true);
   }
 

@@ -88,6 +88,15 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     super.dispose();
   }
 
+  @override
+  void didUpdateWidget(covariant CourseDetailPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.courseId.toString() != widget.courseId.toString()) {
+      _loadCourseDetail();
+      _reviewsFuture = _repository.fetchCourseReviews(widget.courseId);
+    }
+  }
+
   Future<void> _loadCurrentUserId() async {
     final prefs = await SharedPreferences.getInstance();
     final roles = prefs.getStringList('user_roles') ?? [];
