@@ -2,7 +2,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../routes/app_routes.dart';
-import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/repositories/course_repository.dart';
 import '../../../domain/model/course_detail.dart';
@@ -103,23 +102,6 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
         ToastHelper.showError(context, 'Failed to load completion summary: $e');
       }
     }
-  }
-
-  void _shareAchievement() {
-    final title =
-        _certificateData?['courseTitle'] ?? _courseDetail?.title ?? 'a course';
-    final credentialId = _certificateData?['credentialId'] ?? _achievementId;
-    final shareText = LanguageManager.isVi
-        ? 'Tôi vừa hoàn thành khóa học "$title" trên HanGo. Credential ID: $credentialId'
-        : 'I just completed "$title" on HanGo. Credential ID: $credentialId';
-
-    Clipboard.setData(ClipboardData(text: shareText));
-    ToastHelper.showSuccess(
-      context,
-      LanguageManager.isVi
-          ? 'Đã sao chép thông tin thành tích vào clipboard!'
-          : 'Achievement details copied to clipboard!',
-    );
   }
 
   List<ConfettiParticle> _generateParticles(int count) {
@@ -310,36 +292,37 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
       child: Center(
         child: Container(
           constraints: const BoxConstraints(maxWidth: 1200),
-          child: Row(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Left Column: Hero Celebration & Mastery Stats
-              Expanded(
-                flex: 6,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildCelebrationHeader(isVi),
-                    const SizedBox(height: 28),
-                    _buildMasteryStatsGrid(isVi),
-                    const SizedBox(height: 28),
-                    _buildNextStepsCard(isVi),
-                    const SizedBox(height: 32),
-                  ],
-                ),
+              // Top Section: Certificate on Left & Feedback + Takeaways + Stats on Right
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 6,
+                    child: _buildCelebrationHeader(isVi),
+                  ),
+                  const SizedBox(width: 36),
+                  Expanded(
+                    flex: 5,
+                    child: Column(
+                      children: [
+                        _buildReviewSection(isVi),
+                        const SizedBox(height: 24),
+                        _buildTakeawaysCard(isVi),
+                        const SizedBox(height: 24),
+                        _buildMasteryStatsGrid(isVi),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 40),
-              // Right Column: Gamified Feedback & Takeaways Card
-              Expanded(
-                flex: 5,
-                child: Column(
-                  children: [
-                    _buildReviewSection(isVi),
-                    const SizedBox(height: 24),
-                    _buildTakeawaysCard(isVi),
-                  ],
-                ),
-              ),
+              const SizedBox(height: 36),
+
+              // Full-width Bottom Section: What's Next on Your Journey
+              _buildNextStepsCard(isVi),
+              const SizedBox(height: 32),
             ],
           ),
         ),
@@ -355,13 +338,13 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
         children: [
           _buildCelebrationHeader(isVi),
           const SizedBox(height: 24),
-          _buildMasteryStatsGrid(isVi),
-          const SizedBox(height: 24),
           _buildReviewSection(isVi),
           const SizedBox(height: 24),
-          _buildNextStepsCard(isVi),
-          const SizedBox(height: 24),
           _buildTakeawaysCard(isVi),
+          const SizedBox(height: 24),
+          _buildMasteryStatsGrid(isVi),
+          const SizedBox(height: 24),
+          _buildNextStepsCard(isVi),
           const SizedBox(height: 32),
         ],
       ),
@@ -479,7 +462,7 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
                     isCompact ? 30 : 54,
                     isCompact ? 122 : 48,
                     isCompact ? 30 : 240,
-                    isCompact ? 224 : 150,
+                    isCompact ? 90 : 70,
                   ),
                   child: Column(
                     crossAxisAlignment: isCompact
@@ -834,52 +817,6 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
     );
   }
 
-  Widget _buildCertificateActions(bool isVi) {
-    return Wrap(
-      spacing: 16,
-      runSpacing: 12,
-      alignment: WrapAlignment.center,
-      children: [
-        ElevatedButton.icon(
-          onPressed: () {
-            ToastHelper.showInfo(
-              context,
-              isVi
-                  ? 'Tính năng tải PDF sẽ được bổ sung sau.'
-                  : 'PDF download will be added later.',
-            );
-          },
-          icon: const Icon(Icons.download_rounded),
-          label: Text(isVi ? 'Tải PDF' : 'Download PDF'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFF8FAFC),
-            foregroundColor: const Color(0xFF1E293B),
-            elevation: 0,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
-            side: const BorderSide(color: Color(0xFFCBD5E1)),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        ),
-        ElevatedButton.icon(
-          onPressed: _shareAchievement,
-          icon: const Icon(Icons.share_rounded),
-          label: Text(isVi ? 'Chia sẻ LinkedIn' : 'Share to LinkedIn'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF0A66C2),
-            foregroundColor: Colors.white,
-            elevation: 0,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildCertificateDisclaimer(bool isVi) {
     return Text(
       isVi
@@ -901,15 +838,9 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
         isCompact ? 24 : 46,
         0,
         isCompact ? 24 : 46,
-        isCompact ? 28 : 34,
+        isCompact ? 20 : 24,
       ),
-      child: Column(
-        children: [
-          _buildCertificateActions(isVi),
-          const SizedBox(height: 20),
-          _buildCertificateDisclaimer(isVi),
-        ],
-      ),
+      child: _buildCertificateDisclaimer(isVi),
     );
   }
 
@@ -963,17 +894,20 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
       },
     ];
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 1.65,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-      ),
-      itemCount: stats.length,
-      itemBuilder: (context, index) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 768;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: isWide ? 4 : 2,
+            childAspectRatio: isWide ? 1.85 : 1.65,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+          ),
+          itemCount: stats.length,
+          itemBuilder: (context, index) {
         final item = stats[index];
         final color = item['color'] as Color;
         final bg = item['bg'] as Color;
@@ -1052,7 +986,9 @@ class _CourseCompletionPageState extends State<CourseCompletionPage>
         );
       },
     );
-  }
+  },
+);
+}
 
   Widget _buildReviewSection(bool isVi) {
     if (_hasSubmittedReview) {
