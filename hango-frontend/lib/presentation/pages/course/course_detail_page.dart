@@ -17,6 +17,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../data/repositories/payment_repository.dart';
 import '../../../utils/toast_helper.dart';
+import '../../../utils/permission_utils.dart';
 
 class CourseDetailPage extends StatefulWidget {
   final dynamic courseId;
@@ -94,11 +95,7 @@ class _CourseDetailPageState extends State<CourseDetailPage>
       setState(() {
         _currentUserId = prefs.getInt('user_id') ?? 1;
         _userRoles = roles;
-        _canEnroll =
-            roles.contains('ENROLL_AND_LEARN_COURSES') ||
-            roles.contains('ROLE_ADMINISTRATOR') ||
-            roles.contains('ROLE_TRAINER') ||
-            roles.contains('TRAINER');
+        _canEnroll = PermissionUtils.canEnrollAndLearn(roles);
         _canRateAndComment =
             roles.contains('RATE_AND_COMMENT') ||
             roles.contains('ROLE_ADMINISTRATOR');

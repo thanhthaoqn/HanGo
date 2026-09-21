@@ -19,6 +19,7 @@ class PermissionUtils {
   static bool canEnrollAndLearn(List<String> roles) {
     return isAdministrator(roles) ||
         isTrainer(roles) ||
+        isCourseManager(roles) ||
         roles.contains('ENROLL_AND_LEARN_COURSES');
   }
 

@@ -22,7 +22,7 @@ public class CartController {
     private final CartService cartService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'COURSE_MANAGER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
     public ResponseEntity<?> getCart(@AuthenticationPrincipal UserDetailsImpl currentUser) {
         if (currentUser == null) {
             return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
@@ -37,7 +37,7 @@ public class CartController {
     }
 
     @PostMapping("/items")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'COURSE_MANAGER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
     public ResponseEntity<?> addItem(
             @RequestBody Map<String, Long> payload,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
@@ -58,7 +58,7 @@ public class CartController {
     }
 
     @DeleteMapping("/items/{courseId}")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'COURSE_MANAGER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
     public ResponseEntity<?> removeItem(
             @PathVariable Long courseId,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
@@ -75,7 +75,7 @@ public class CartController {
     }
 
     @DeleteMapping
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'COURSE_MANAGER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
     public ResponseEntity<?> clearCart(@AuthenticationPrincipal UserDetailsImpl currentUser) {
         if (currentUser == null) {
             return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
@@ -90,7 +90,7 @@ public class CartController {
     }
 
     @PostMapping("/sync")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'COURSE_MANAGER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
     public ResponseEntity<?> syncCart(
             @RequestBody Map<String, List<Long>> payload,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {

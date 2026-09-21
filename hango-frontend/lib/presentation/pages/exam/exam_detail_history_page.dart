@@ -9,6 +9,7 @@ import '../../widgets/shared_footer.dart';
 import '../../widgets/shared_header.dart';
 import '../login_page.dart';
 import 'exam_review_page.dart';
+import '../../../utils/permission_utils.dart';
 
 class ExamDetailHistoryPage extends StatefulWidget {
   final Exam? exam;
@@ -74,7 +75,7 @@ class _ExamDetailHistoryPageState extends State<ExamDetailHistoryPage> {
     final roles = prefs.getStringList('user_roles') ?? [];
     if (mounted) {
       setState(() {
-        _canAttemptExam = roles.contains('ATTEMPT_QUIZ_AND_EXAM') || roles.contains('ROLE_ADMINISTRATOR');
+        _canAttemptExam = PermissionUtils.canAttemptQuizAndExam(roles);
       });
     }
   }
