@@ -548,7 +548,11 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                 MaterialPageRoute(
                   builder: (context) => EditCoursePage(courseId: firstCourseId),
                 ),
-              );
+              ).then((_) {
+                if (mounted) {
+                  _fetchCoursesData();
+                }
+              });
             }
           }
         }

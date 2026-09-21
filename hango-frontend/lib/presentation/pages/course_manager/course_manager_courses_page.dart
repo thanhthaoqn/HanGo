@@ -509,7 +509,11 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => EditCoursePage(courseId: firstCourseId)),
-              );
+              ).then((_) {
+                if (mounted) {
+                  _loadCourses();
+                }
+              });
             }
           }
         }
