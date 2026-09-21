@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.stereotype.Repository;
 
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.List;
 
 @Repository
@@ -17,8 +19,10 @@ public interface CartItemRepository extends JpaRepository<CartItem, Long> {
     boolean existsByUserIdAndCourseId(Long userId, Long courseId);
 
     @Modifying
+    @Transactional
     void deleteByUserIdAndCourseId(Long userId, Long courseId);
 
     @Modifying
+    @Transactional
     void deleteByUserId(Long userId);
 }
