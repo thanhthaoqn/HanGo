@@ -55,7 +55,6 @@ dependencies:
   intl: ^0.20.3
   spreadsheet_decoder: ^2.3.0
   go_router: ^14.8.1
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
