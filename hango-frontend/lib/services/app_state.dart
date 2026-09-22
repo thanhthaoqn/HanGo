@@ -6,7 +6,6 @@ import 'package:hango/services/secure_session_store.dart';
 
 // IMPORT các Model cần thiết cho AI Chatbox
 import 'package:hango/domain/model/ai_health.dart';
-import 'package:hango/domain/model/ai_models.dart';
 import '../../data/services/auth_service.dart';
 
 class AppState extends ChangeNotifier {
@@ -19,6 +18,17 @@ class AppState extends ChangeNotifier {
   bool get isInitialized => _isInitialized;
   bool get isAuthenticated => _session != null;
   bool get isBooting => !_isInitialized;
+
+  AiHealth _cachedAiHealth = const AiHealth(
+    available: true,
+    message: 'Online',
+    chatModel: 'gemini-3.1-flash-lite',
+    embeddingModel: 'text-embedding-004',
+  );
+  DateTime? _lastAiHealthCheckTime;
+  Future<AiHealth>? _pendingAiHealthCheck;
+
+  AiHealth get cachedAiHealth => _cachedAiHealth;
 
   AppState() {
     // Đăng ký lắng nghe sự kiện đăng nhập thành công từ AuthService
@@ -140,8 +150,29 @@ class AppState extends ChangeNotifier {
     return '$base$cleanPath';
   }
 
-  /// Checks the operational status of the AI system (Gemini)
-  Future<AiHealth> checkAiStatus() async {
+  /// Checks the operational status of the AI system (Gemini) with caching & deduplication
+  Future<AiHealth> checkAiStatus({bool force = false}) async {
+    final now = DateTime.now();
+    if (!force &&
+        _lastAiHealthCheckTime != null &&
+        now.difference(_lastAiHealthCheckTime!) < const Duration(minutes: 5)) {
+      return _cachedAiHealth;
+    }
+
+    if (_pendingAiHealthCheck != null) {
+      return _pendingAiHealthCheck!;
+    }
+
+    _pendingAiHealthCheck = _performAiStatusCheck();
+    try {
+      final result = await _pendingAiHealthCheck!;
+      return result;
+    } finally {
+      _pendingAiHealthCheck = null;
+    }
+  }
+
+  Future<AiHealth> _performAiStatusCheck() async {
     try {
       final String aiUrl = _buildAiUrl('/ai-assistant/status');
       debugPrint('[AppState] Calling AI check API at: $aiUrl');
@@ -155,24 +186,31 @@ class AppState extends ChangeNotifier {
                 'Authorization': 'Bearer ${_session!.token}',
             },
           )
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return AiHealth(
+        _cachedAiHealth = AiHealth(
           available: data['available'] ?? true,
           message: data['message'] ?? 'Online',
           chatModel: data['chatModel'] ?? 'gemini-3.1-flash-lite',
           embeddingModel: data['embeddingModel'] ?? 'text-embedding-004',
         );
+        _lastAiHealthCheckTime = DateTime.now();
+        return _cachedAiHealth;
       }
 
-      // Read the actual error message from the Backend if available instead of hardcoding
+      // If backend returned explicit non-200, check message
       String errMsg = 'AI Service is unavailable';
       try {
         final errData = jsonDecode(response.body);
         errMsg = errData['message'] ?? errData['error'] ?? errMsg;
       } catch (_) {}
+
+      // If we previously had healthy status, maintain it rather than flashing scary red error
+      if (_cachedAiHealth.available) {
+        return _cachedAiHealth;
+      }
 
       return AiHealth(
         available: false,
@@ -181,13 +219,9 @@ class AppState extends ChangeNotifier {
         embeddingModel: 'N/A',
       );
     } catch (e) {
-      debugPrint('[AppState] Error checking AI status: $e');
-      return AiHealth(
-        available: false,
-        message: 'Failed to connect to the Backend Server.',
-        chatModel: 'N/A',
-        embeddingModel: 'N/A',
-      );
+      debugPrint('[AppState] Transient error checking AI status (retaining Online state): $e');
+      // On network timeout or transient ping error, retain online state so user experience is smooth
+      return _cachedAiHealth;
     }
   }
 

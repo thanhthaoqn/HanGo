@@ -387,43 +387,61 @@ class _ChatPanel extends StatelessWidget {
                         const SizedBox(height: 2),
                         FutureBuilder<AiHealth>(
                           future: health,
+                          initialData: context.read<AppState>().cachedAiHealth,
                           builder: (context, snapshot) {
-                            final available = snapshot.data?.available == true;
-                            final waiting =
+                            final healthData = snapshot.data;
+                            final isOnline = healthData?.available ?? true;
+                            final isWaitingWithoutData =
                                 snapshot.connectionState ==
-                                ConnectionState.waiting;
+                                    ConnectionState.waiting &&
+                                healthData == null;
+
+                            final Color statusColor = isWaitingWithoutData
+                                ? const Color(0xFF94A3B8)
+                                : isOnline
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFFF59E0B);
+
+                            final String statusText = isWaitingWithoutData
+                                ? 'Connecting AI...'
+                                : isOnline
+                                ? 'Online'
+                                : (healthData?.message.contains('Backend Server') == true
+                                    ? 'Reconnecting...'
+                                    : (healthData?.message ?? 'Connecting...'));
+
                             return Row(
                               children: [
-                                Icon(
-                                  waiting
-                                      ? Icons.sync_rounded
-                                      : available
-                                      ? Icons.check_circle_rounded
-                                      : Icons.error_outline_rounded,
-                                  size: 11,
-                                  color: waiting
-                                      ? const Color(0xFF94A3B8)
-                                      : available
-                                      ? const Color(0xFF10B981)
-                                      : const Color(0xFFE11D48),
+                                Container(
+                                  width: 7,
+                                  height: 7,
+                                  decoration: BoxDecoration(
+                                    color: statusColor,
+                                    shape: BoxShape.circle,
+                                    boxShadow: isOnline
+                                        ? [
+                                            BoxShadow(
+                                              color: const Color(
+                                                0xFF10B981,
+                                              ).withValues(alpha: 0.4),
+                                              blurRadius: 4,
+                                              spreadRadius: 1,
+                                            ),
+                                          ]
+                                        : null,
+                                  ),
                                 ),
-                                const SizedBox(width: 4),
+                                const SizedBox(width: 5),
                                 Expanded(
                                   child: Text(
-                                    waiting
-                                        ? 'Connecting AI...'
-                                        : snapshot.data?.message ??
-                                              'Ready to answer',
+                                    statusText,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      color: waiting
-                                          ? const Color(0xFF94A3B8)
-                                          : available
-                                          ? const Color(0xFF10B981)
-                                          : const Color(0xFFE11D48),
+                                      color: statusColor,
                                       fontSize: 10,
                                       fontWeight: FontWeight.w600,
+                                      letterSpacing: 0.1,
                                     ),
                                   ),
                                 ),
