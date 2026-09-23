@@ -93,22 +93,64 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
 
   void _addSingleQuestion() {
     setState(() {
+      final opts = <Map<String, dynamic>>[];
+      for (int i = 0; i < 4; i++) {
+        opts.add({
+          'textController': TextEditingController(text: ''),
+          'isCorrect': i == 0,
+          'explanationController': TextEditingController(),
+        });
+      }
       _singleQuestions.add({
         'questionTextController': TextEditingController(text: ''),
         'hintController': TextEditingController(text: ''),
-        'options': [
-          {
-            'textController': TextEditingController(text: ''),
-            'isCorrect': true,
-            'explanationController': TextEditingController(),
-          },
-          {
-            'textController': TextEditingController(text: ''),
-            'isCorrect': false,
-            'explanationController': TextEditingController(),
-          },
-        ],
+        'options': opts,
       });
+    });
+  }
+
+  void _addOptionToQuestion(int questionIndex) {
+    if (questionIndex < 0 || questionIndex >= _singleQuestions.length) return;
+    setState(() {
+      final opts =
+          _singleQuestions[questionIndex]['options'] as List<Map<String, dynamic>>;
+      opts.add({
+        'textController': TextEditingController(text: ''),
+        'isCorrect': opts.isEmpty,
+        'explanationController': TextEditingController(),
+      });
+    });
+  }
+
+  void _removeOptionFromQuestion(int questionIndex, int optionIndex) {
+    if (questionIndex < 0 || questionIndex >= _singleQuestions.length) return;
+    final opts =
+        _singleQuestions[questionIndex]['options'] as List<Map<String, dynamic>>;
+    if (opts.length <= 1) {
+      ToastHelper.showError(
+        context,
+        'Each question must have at least one option.',
+      );
+      return;
+    }
+    setState(() {
+      final removed = opts.removeAt(optionIndex);
+      (removed['textController'] as TextEditingController?)?.dispose();
+      (removed['explanationController'] as TextEditingController?)?.dispose();
+      if (!opts.any((o) => o['isCorrect'] == true) && opts.isNotEmpty) {
+        opts[0]['isCorrect'] = true;
+      }
+    });
+  }
+
+  void _handleOptionSelect(int questionIndex, int optionIndex) {
+    if (questionIndex < 0 || questionIndex >= _singleQuestions.length) return;
+    setState(() {
+      final opts =
+          _singleQuestions[questionIndex]['options'] as List<Map<String, dynamic>>;
+      for (int i = 0; i < opts.length; i++) {
+        opts[i]['isCorrect'] = (i == optionIndex);
+      }
     });
   }
 
@@ -1573,6 +1615,15 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
           });
         }
 
+        // Guarantee at least 4 options per question
+        while (opts.length < 4) {
+          opts.add({
+            'textController': TextEditingController(text: ''),
+            'isCorrect': false,
+            'explanationController': TextEditingController(),
+          });
+        }
+
         // Ensure only ONE correct for SINGLE
         final correctIndexes = <int>[];
         for (int i = 0; i < opts.length; i++) {
@@ -1714,11 +1765,9 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
             ),
           ),
           const SizedBox(height: 16),
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _singleQuestions.length,
-            itemBuilder: (context, setIdx) {
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: List.generate(_singleQuestions.length, (setIdx) {
               final set = _singleQuestions[setIdx];
               final String title = 'Question ${setIdx + 1}';
 
@@ -1836,11 +1885,9 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
                           const SizedBox(height: 16),
 
                           // Options list
-                          ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: opts.length,
-                            itemBuilder: (context, optIdx) {
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: List.generate(opts.length, (optIdx) {
                               final opt = opts[optIdx];
                               final bool isCorrect = opt['isCorrect'] as bool;
                               final TextEditingController textCtrl =
@@ -1868,18 +1915,7 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
                                 child: Row(
                                   children: [
                                     InkWell(
-                                      onTap: () {
-                                        setState(() {
-                                          for (
-                                            int i = 0;
-                                            i < opts.length;
-                                            i++
-                                          ) {
-                                            opts[i]['isCorrect'] =
-                                                (i == optIdx);
-                                          }
-                                        });
-                                      },
+                                      onTap: () => _handleOptionSelect(setIdx, optIdx),
                                       child: Container(
                                         width: 20,
                                         height: 20,
@@ -1931,47 +1967,26 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
                                         color: Color(0xFFEF4444),
                                         size: 18,
                                       ),
-                                      onPressed: () {
-                                        if (opts.length <= 1) {
-                                          ToastHelper.showError(
-                                            context,
-                                            'Must have at least one option.',
-                                          );
-                                          return;
-                                        }
-                                        setState(() {
-                                          opts.removeAt(optIdx);
-                                          if (!opts.any(
-                                                (o) => o['isCorrect'] == true,
-                                              ) &&
-                                              opts.isNotEmpty) {
-                                            opts[0]['isCorrect'] = true;
-                                          }
-                                        });
-                                      },
+                                      onPressed: () => _removeOptionFromQuestion(setIdx, optIdx),
                                       padding: EdgeInsets.zero,
                                       constraints: const BoxConstraints(),
                                     ),
                                   ],
                                 ),
                               );
-                            },
+                            }),
                           ),
 
                           // Add Option
                           TextButton.icon(
-                            onPressed: () {
-                              setState(() {
-                                opts.add({
-                                  'textController': TextEditingController(
-                                    text: '',
-                                  ),
-                                  'isCorrect': false,
-                                  'explanationController':
-                                      TextEditingController(),
-                                });
-                              });
-                            },
+                            onPressed: () => _addOptionToQuestion(setIdx),
+                            style: TextButton.styleFrom(
+                              foregroundColor: const Color(0xFF20B486),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 10,
+                                horizontal: 16,
+                              ),
+                            ),
                             icon: const Icon(
                               Icons.add,
                               size: 14,
@@ -2051,7 +2066,7 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
                   ],
                 ),
               );
-            },
+            }),
           ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
