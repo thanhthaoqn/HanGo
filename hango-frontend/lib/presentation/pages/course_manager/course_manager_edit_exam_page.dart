@@ -741,8 +741,16 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
             q.questionTextError = 'Question text cannot be empty';
             isValid = false;
           }
-          if (!q.options.any((opt) => opt.isCorrect)) {
+          if (q.options.any((opt) => opt.textController.text.trim().isEmpty)) {
+            q.optionsError = 'All answer options must have text';
+            isValid = false;
+          } else if (!q.options.any((opt) => opt.isCorrect)) {
             q.optionsError = 'Must have at least one correct option';
+            isValid = false;
+          } else if (q.options.any(
+            (opt) => opt.isCorrect && opt.textController.text.trim().isEmpty,
+          )) {
+            q.optionsError = 'The correct answer option cannot be empty';
             isValid = false;
           }
         }
