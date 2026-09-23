@@ -398,8 +398,8 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
                 _buildLeftSidebar(),
                 // Main Form Content
                 Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24.0),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
                     child: _buildMainForm(),
                   ),
                 ),
@@ -830,24 +830,26 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
             ),
           ],
         ),
-        const SizedBox(height: 24),
-        // Layout columns
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Left Column: Inputs & PDF Upload
-            Expanded(
-              flex: 3,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFEFF2F5)),
-                ),
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
+        const SizedBox(height: 16),
+        Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Left Column: Inputs & PDF Upload (Scrollable)
+              Expanded(
+                flex: 3,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFEFF2F5)),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                     // AI Generate
                     Container(
                       padding: const EdgeInsets.all(16),
@@ -1220,32 +1222,36 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
                     const SizedBox(height: 24),
 
                     // Description / Hint
-                  ],
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 24),
-            // Right Column: Type selection & options list
-            Expanded(
-              flex: 2,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Question Type Selection
-                  _buildQuestionTypeSelector(),
+              const SizedBox(width: 24),
+              // Right Column: Type selection & options list (Scrollable)
+              Expanded(
+                flex: 2,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Question Type Selection
+                      _buildQuestionTypeSelector(),
 
-                  const SizedBox(height: 24),
-                  // Answers Options list
-                  _buildAnswersPanel(),
-                ],
+                      const SizedBox(height: 24),
+                      // Answers Options list
+                      _buildAnswersPanel(),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 16),
         // Action Buttons Row
         const Divider(height: 1, color: Color(0xFFEFF2F5)),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
