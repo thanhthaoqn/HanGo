@@ -32,6 +32,7 @@ public class CreateTrainerQuestionAIResponseDTO {
         private String explanation;
         private Long categoryId;
         private Long difficultyId;
+        private Long skillParamId;
         private List<OptionDTO> options;
         private String sourceCitation;
     }

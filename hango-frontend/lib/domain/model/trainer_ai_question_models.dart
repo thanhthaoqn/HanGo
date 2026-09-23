@@ -27,6 +27,7 @@ class TrainerAiSingleQuestion {
   final String explanation;
   final int categoryId;
   final int difficultyId;
+  final int? skillParamId;
   final String? sourceCitation;
   final List<TrainerAiOption> options;
 
@@ -35,6 +36,7 @@ class TrainerAiSingleQuestion {
     required this.explanation,
     required this.categoryId,
     required this.difficultyId,
+    this.skillParamId,
     this.sourceCitation,
     required this.options,
   });
@@ -45,6 +47,7 @@ class TrainerAiSingleQuestion {
       explanation: (json['explanation'] ?? '') as String,
       categoryId: (json['categoryId'] as num).toInt(),
       difficultyId: (json['difficultyId'] as num).toInt(),
+      skillParamId: (json['skillParamId'] as num?)?.toInt(),
       sourceCitation: json['sourceCitation'] as String?,
       options: (json['options'] as List)
           .map((e) => TrainerAiOption.fromJson(e as Map<String, dynamic>))

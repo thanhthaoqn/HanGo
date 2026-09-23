@@ -11,7 +11,6 @@ import '../../../utils/file_picker_helper.dart';
 import 'add_new_question_page.dart';
 
 import '../../../data/repositories/trainer_ai_recommendation_repository.dart';
-import '../../../domain/model/trainer_ai_question_models.dart';
 
 class AddMultipleChoiceQuestionPage extends StatefulWidget {
   final int courseId;
@@ -145,6 +144,8 @@ class _AddMultipleChoiceQuestionPageState
               text: sq.explanation,
             ),
             'options': options,
+            'skillParamId': sq.skillParamId,
+            'difficultyId': sq.difficultyId,
           });
         });
       }
@@ -433,6 +434,8 @@ class _AddMultipleChoiceQuestionPageState
         'questionText': label,
         'explanation': exp,
         'options': payloadOptions,
+        if (set['skillParamId'] != null) 'skillParamId': set['skillParamId'],
+        if (set['difficultyId'] != null) 'difficultyId': set['difficultyId'],
       });
     }
 

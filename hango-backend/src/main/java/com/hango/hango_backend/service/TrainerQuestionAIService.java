@@ -126,7 +126,7 @@ public class TrainerQuestionAIService {
                     List.of(
                             GeminiGenerateRequest.Content.builder()
                                     .role("user")
-                                    .parts(List.of(GeminiGenerateRequest.Part.builder().text(buildUserInput(req)).build()))
+                                    .parts(List.of(GeminiGenerateRequest.Part.builder().text(buildUserInput(req, activeDifficulties)).build()))
                                     .build()
                     ),
                     true
@@ -141,7 +141,7 @@ public class TrainerQuestionAIService {
                     List.of(
                             GeminiGenerateRequest.Content.builder()
                                     .role("user")
-                                    .parts(List.of(GeminiGenerateRequest.Part.builder().text(buildUserInput(req)).build()))
+                                    .parts(List.of(GeminiGenerateRequest.Part.builder().text(buildUserInput(req, activeDifficulties)).build()))
                                     .build()
                     )
             );
@@ -181,8 +181,16 @@ public class TrainerQuestionAIService {
                 .distinct()
                 .collect(Collectors.joining(", "));
 
+        Long chosenSkillId = (req.getSkillType() != null && !req.getSkillType().isBlank())
+                ? activeSkills.stream()
+                        .filter(s -> s.getParamValue().equalsIgnoreCase(req.getSkillType().trim()))
+                        .map(SystemParameter::getId)
+                        .findFirst()
+                        .orElse(null)
+                : null;
+
         if (isMultipleBranch && response.getGroup() != null) {
-            fillSubQuestionSkillAndDifficulty(response.getGroup(), activeSkills, activeDifficulties);
+            fillSubQuestionSkillAndDifficulty(response.getGroup(), activeSkills, activeDifficulties, chosenSkillId, difficultyId);
 
             attachCitationToPassage(
                     response.getGroup().getPassageText(),
@@ -193,6 +201,12 @@ public class TrainerQuestionAIService {
             );
         } else if (!isMultipleBranch && response.getQuestions() != null) {
             for (CreateTrainerQuestionAIResponseDTO.SingleQuestionDTO q : response.getQuestions()) {
+                if (q.getDifficultyId() == null) {
+                    q.setDifficultyId(difficultyId);
+                }
+                if (q.getSkillParamId() == null && chosenSkillId != null) {
+                    q.setSkillParamId(chosenSkillId);
+                }
                 String finalCitation;
                 if (searchSources != null && !searchSources.isBlank()) {
                     finalCitation = "(Source: " + searchSources + ")";
@@ -320,17 +334,23 @@ public class TrainerQuestionAIService {
     private void fillSubQuestionSkillAndDifficulty(
             CreateTrainerQuestionAIResponseDTO.MultipleGroupDTO group,
             List<SystemParameter> activeSkills,
-            List<SystemParameter> activeDifficulties
+            List<SystemParameter> activeDifficulties,
+            Long chosenSkillId,
+            Long chosenDifficultyId
     ) {
         if (group.getSubQuestions() == null) return;
 
         Set<Long> validSkillIds = activeSkills.stream().map(SystemParameter::getId).collect(Collectors.toSet());
         Set<Long> validDifficultyIds = activeDifficulties.stream().map(SystemParameter::getId).collect(Collectors.toSet());
 
-        Long fallbackSkillId = activeSkills.isEmpty() ? null : activeSkills.get(0).getId();
-        Long fallbackDifficultyId = group.getDifficultyId() != null && validDifficultyIds.contains(group.getDifficultyId())
-                ? group.getDifficultyId()
-                : (activeDifficulties.isEmpty() ? null : activeDifficulties.get(0).getId());
+        Long fallbackSkillId = chosenSkillId != null && validSkillIds.contains(chosenSkillId)
+                ? chosenSkillId
+                : (activeSkills.isEmpty() ? null : activeSkills.get(0).getId());
+        Long fallbackDifficultyId = chosenDifficultyId != null && validDifficultyIds.contains(chosenDifficultyId)
+                ? chosenDifficultyId
+                : (group.getDifficultyId() != null && validDifficultyIds.contains(group.getDifficultyId())
+                        ? group.getDifficultyId()
+                        : (activeDifficulties.isEmpty() ? null : activeDifficulties.get(0).getId()));
 
         for (CreateTrainerQuestionAIResponseDTO.SubQuestionDTO sub : group.getSubQuestions()) {
             if (sub.getSkillParamId() == null || !validSkillIds.contains(sub.getSkillParamId())) {
@@ -438,12 +458,21 @@ public class TrainerQuestionAIService {
         }
     }
 
-    private String buildUserInput(CreateTrainerQuestionAIRequestDTO req) {
+    private String buildUserInput(CreateTrainerQuestionAIRequestDTO req, List<SystemParameter> activeDifficulties) {
+        Long diffId = req.getDifficultyId() != null ? req.getDifficultyId() : 14L;
+        String difficultyName = activeDifficulties.stream()
+                .filter(d -> d.getId().equals(diffId))
+                .map(SystemParameter::getParamValue)
+                .findFirst()
+                .orElse(diffId == 12L ? "Easy" : diffId == 13L ? "Medium" : diffId == 15L ? "Very Hard" : "Hard");
+
         StringBuilder sb = new StringBuilder();
-        sb.append("TOPIC_SEED:\n").append(req.getTopicSeed())
+        sb.append("EXAM_TARGET: Kỳ thi tốt nghiệp THPT Quốc Gia môn Tiếng Anh (Format mới 2025/2026 - Chuẩn GDPT 2018)\n")
+          .append("TOPIC_SEED:\n").append(req.getTopicSeed())
           .append("\n\nSECTION_ID: ").append(req.getSectionId())
           .append("\nCATEGORY_ID(DEFAULT): ").append(req.getCategoryId())
-          .append("\nDIFFICULTY_ID(DEFAULT): ").append(req.getDifficultyId());
+          .append("\nDIFFICULTY_ID(DEFAULT): ").append(req.getDifficultyId())
+          .append("\nDIFFICULTY_LEVEL: ").append(difficultyName);
           
         if (req.getSkillType() != null && !req.getSkillType().isBlank()) {
             sb.append("\nSKILL_TYPE: ").append(req.getSkillType());
@@ -469,15 +498,41 @@ public class TrainerQuestionAIService {
         Long categoryId = req.getCategoryId() != null ? req.getCategoryId() : 1L;
         boolean useSearchGrounding = Boolean.TRUE.equals(req.getUseSearchGrounding());
 
+        String difficultyName = activeDifficulties.stream()
+                .filter(d -> d.getId().equals(difficultyId))
+                .map(SystemParameter::getParamValue)
+                .findFirst()
+                .orElse(difficultyId == 12L ? "Easy" : difficultyId == 13L ? "Medium" : difficultyId == 15L ? "Very Hard" : "Hard");
+
+        String skillOptionsText = activeSkills.isEmpty() ? "" : activeSkills.stream()
+                .map(s -> s.getId() + "=" + s.getParamValue())
+                .collect(Collectors.joining(", "));
+        String difficultyOptionsText = activeDifficulties.isEmpty() ? "" : activeDifficulties.stream()
+                .map(d -> d.getId() + "=" + d.getParamValue())
+                .collect(Collectors.joining(", "));
+
+        Long chosenSkillId = (req.getSkillType() != null && !req.getSkillType().isBlank())
+                ? activeSkills.stream()
+                        .filter(s -> s.getParamValue().equalsIgnoreCase(req.getSkillType().trim()))
+                        .map(SystemParameter::getId)
+                        .findFirst()
+                        .orElse(null)
+                : null;
+
         if ("SINGLE".equals(mode)) {
             String skillReq = (req.getSkillType() != null && !req.getSkillType().isBlank()) 
-                    ? " The question MUST specifically test the skill: " + req.getSkillType() + "." 
+                    ? "The question MUST specifically test the skill: \"" + req.getSkillType() + "\" as tested in the Vietnamese THPT Quốc Gia English exam.\n" 
                     : "";
             String groundingReq = useSearchGrounding
-                    ? " Use Google Search to retrieve authentic grammar references, dictionaries, or reputable facts."
+                    ? "Use Google Search to retrieve authentic grammar references, dictionaries, or reputable facts.\n"
                     : "";
-            return "You are an expert English test question generator for HanGo trainer.\n" +
-                    "Create ONLY SINGLE multiple-choice questions. 4 options per question. Exactly 1 correct option." + skillReq + groundingReq + "\n" +
+            Long skillParamIdToOutput = chosenSkillId != null ? chosenSkillId : (activeSkills.isEmpty() ? 1L : activeSkills.get(0).getId());
+
+            return "You are an expert English test author for the Vietnamese National High School Graduation Exam (Kỳ thi tốt nghiệp THPT Quốc Gia môn Tiếng Anh - chuẩn chương trình GDPT 2018 format mới 2025/2026 của Bộ Giáo Dục và Đào Tạo).\n" +
+                    "Create ONLY SINGLE multiple-choice questions matching THPT Quốc Gia standards.\n" +
+                    "Each question must have exactly 4 options (A, B, C, D) with exactly 1 correct option and 3 plausible distractors.\n" +
+                    "The question and its options MUST be strictly designed at difficulty level: " + difficultyName + " (theo 4 mức độ tư duy của Bộ GD&ĐT: Nhận biết [Easy], Thông hiểu [Medium], Vận dụng [Hard], Vận dụng cao [Very Hard]).\n" +
+                    skillReq + groundingReq +
                     "Return PURE JSON only (no markdown).\n" +
                     "Schema:\n" +
                     "{\n" +
@@ -489,6 +544,7 @@ public class TrainerQuestionAIService {
                     "      \"sourceCitation\": \"...\",\n" +
                     "      \"categoryId\": " + categoryId + ",\n" +
                     "      \"difficultyId\": " + difficultyId + ",\n" +
+                    "      \"skillParamId\": " + skillParamIdToOutput + ",\n" +
                     "      \"options\": [\n" +
                     "        {\"optionText\": \"...\", \"isCorrect\": true},\n" +
                     "        {\"optionText\": \"...\", \"isCorrect\": false},\n" +
@@ -498,37 +554,97 @@ public class TrainerQuestionAIService {
                     "    }\n" +
                     "  ]\n" +
                     "}\n" +
-                    "Generate exactly " + quantity + " questions. Explanations should be short. Options should be plausible distractors.\n" +
+                    "Generate exactly " + quantity + " questions. Explanations should be short and insightful. Options should be plausible distractors.\n" +
                     "For sourceCitation: provide a brief citation of the reference book or publication if applicable (e.g. 'Source: BBC Learning English') without inventing fake URLs.";
         }
 
-        // MULTIPLE
-        String skillReqMulti = (req.getSkillType() != null && !req.getSkillType().isBlank())
-                ? " The questions MUST specifically test the skill: " + req.getSkillType() + "."
-                : "";
-        String groupReq = (req.getGroupType() != null && !req.getGroupType().isBlank())
-                ? " The format and passage MUST follow the structure of group type: " + req.getGroupType() + "."
-                : "";
+        // MULTIPLE (Question Group with reading passage)
+        String gType = req.getGroupType() != null ? req.getGroupType().trim() : "";
+        String gTypeLower = gType.toLowerCase();
+        boolean isBlankFilling = gTypeLower.contains("notice") || gTypeLower.contains("leaflet") || gTypeLower.contains("advertisement") || gTypeLower.contains("cloze");
+        boolean isReordering = gTypeLower.contains("reorder") || gTypeLower.contains("arrangement");
+
+        String groupReq;
+        String skillReqMulti;
+
+        if (isBlankFilling) {
+            String textTypeLabel = gTypeLower.contains("notice")
+                    ? "a formal public, school, or organizational notice/announcement (starting with a clear title like 'NOTICE / ANNOUNCEMENT', followed by concise bulleted or numbered items)"
+                    : gTypeLower.contains("cloze")
+                            ? "an authentic informative or narrative article for a cloze test"
+                            : "an engaging promotional leaflet, flyer, or advertisement (with a catchy header, bullet points, and key details)";
+
+            groupReq = "The passageText MUST be written as " + textTypeLabel + " according to group type \"" + gType + "\".\n" +
+                    "CRUCIAL BLANK-FILLING RULES (THPT QUỐC GIA FORMAT 2025/2026):\n" +
+                    "1. The passageText MUST contain EXACTLY " + quantity + " numbered blanks, numbered sequentially from (1) to (" + quantity + "), formatted as: (1) _______, (2) _______, ... up to (" + quantity + ") _______.\n" +
+                    "   (Example: 'All luggage (1) _______ in the terminal will be removed immediately. Passengers wishing to change seats (2) _______ the front desk. Any assistance needed (3) _______ to staff in advance.')\n" +
+                    "   DO NOT write a full text without blanks. The blanks are where key words/phrases are omitted for test-takers to fill in.\n" +
+                    "2. For each blank (i) in the passageText, generate the corresponding subQuestion (from i=1 to " + quantity + "):\n" +
+                    "   - questionText MUST be formatted as: \"Choose the best option to fill in blank (\" + i + \").\"\n" +
+                    "   - options MUST contain 4 candidate words, phrases, or clauses (A, B, C, D) to fill into blank (i) in the passage.\n" +
+                    "   - Exactly 1 option must be grammatically and semantically correct; the other 3 are plausible distractors.\n" +
+                    "   - explanation should clearly explain why the correct option fits blank (i) and why other choices are grammatically/lexically wrong.\n";
+
+            if (req.getSkillType() != null && !req.getSkillType().isBlank()) {
+                skillReqMulti = "CRUCIAL SKILL RULE: Each blank in the passage and its 4 options MUST specifically test the skill: \"" + req.getSkillType() + "\" (e.g., correct grammatical form, reduced relative clause, preposition, collocations, word forms).\n" +
+                        "For each subQuestion, set skillParamId = " + (chosenSkillId != null ? chosenSkillId : "the matching id") + 
+                        " corresponding to '" + req.getSkillType() + "'.\n";
+            } else {
+                skillReqMulti = "Each blank tests its own specific grammar or vocabulary skill appropriate for THPT Quốc Gia.\n" +
+                        "For every subQuestion, pick the single most relevant skillParamId from this list: [" + skillOptionsText + "].\n";
+            }
+        } else if (isReordering) {
+            groupReq = "The passageText MUST be a jumbled text, conversation, or letter where sentences or short paragraphs are labeled [a], [b], [c], [d], [e]... for group type \"" + gType + "\".\n" +
+                    "Each subQuestion asks for the correct order/arrangement of the labeled sentences (e.g. 'a - c - b - d').\n";
+
+            if (req.getSkillType() != null && !req.getSkillType().isBlank()) {
+                skillReqMulti = "Each subQuestion tests the skill: \"" + req.getSkillType() + "\".\n" +
+                        "For each subQuestion, set skillParamId = " + (chosenSkillId != null ? chosenSkillId : "the matching id") + 
+                        " corresponding to '" + req.getSkillType() + "'.\n";
+            } else {
+                skillReqMulti = "For every subQuestion, pick the single most relevant skillParamId from this list: [" + skillOptionsText + "].\n";
+            }
+        } else if (!gType.isBlank()) {
+            groupReq = "The format and passage MUST strictly follow the structure and style of group type: \"" + gType + "\" according to the Vietnamese National High School Graduation Exam (THPT Quốc Gia) format 2025/2026.\n" +
+                    "The passage provides the reading context and does NOT test an isolated skill by itself.\n";
+
+            if (req.getSkillType() != null && !req.getSkillType().isBlank()) {
+                skillReqMulti = "Each subQuestion MUST specifically test the reading comprehension skill: \"" + req.getSkillType() + "\".\n" +
+                        "For each subQuestion, set skillParamId = " + (chosenSkillId != null ? chosenSkillId : "the matching id") + 
+                        " corresponding to '" + req.getSkillType() + "'.\n";
+            } else {
+                skillReqMulti = "Each subQuestion tests its own specific reading skill (e.g. Main idea, Detail, Synonym/Vocabulary in context, Reference, Inference) appropriate for THPT Quốc Gia.\n" +
+                        "For every subQuestion, pick the single most relevant skillParamId from this list: [" + skillOptionsText + "].\n";
+            }
+        } else {
+            groupReq = "The passage MUST be an authentic reading passage suitable for the THPT Quốc Gia English exam.\n";
+
+            if (req.getSkillType() != null && !req.getSkillType().isBlank()) {
+                skillReqMulti = "Each subQuestion MUST specifically test the reading comprehension skill: \"" + req.getSkillType() + "\".\n" +
+                        "For each subQuestion, set skillParamId = " + (chosenSkillId != null ? chosenSkillId : "the matching id") + 
+                        " corresponding to '" + req.getSkillType() + "'.\n";
+            } else {
+                skillReqMulti = "Each subQuestion tests its own specific reading skill (e.g. Main idea, Detail, Synonym/Vocabulary in context, Reference, Inference) appropriate for THPT Quốc Gia.\n" +
+                        "For every subQuestion, pick the single most relevant skillParamId from this list: [" + skillOptionsText + "].\n";
+            }
+        }
+
+        String diffReqMulti = "The reading passage and all subQuestions MUST be strictly designed at difficulty level: " + difficultyName + 
+                " (theo chuẩn THPT Quốc Gia: Nhận biết [Easy], Thông hiểu [Medium], Vận dụng [Hard], Vận dụng cao [Very Hard]).\n";
+
         String groundingReqMulti = useSearchGrounding
-                ? " Use Google Search to find an authentic, reputable English reading passage/article (e.g. from BBC, The Guardian, National Geographic, British Council). The passage must be factual and questions must test reading comprehension on the real passage."
+                ? "Use Google Search to find an authentic, reputable English reading passage/article (e.g. from BBC, The Guardian, National Geographic, British Council). The passage must be factual, engaging, and appropriate for high school students.\n"
                 : "";
 
-        String skillOptionsText = activeSkills.isEmpty() ? "" : activeSkills.stream()
-                .map(s -> s.getId() + "=" + s.getParamValue())
-                .collect(Collectors.joining(", "));
-        String difficultyOptionsText = activeDifficulties.isEmpty() ? "" : activeDifficulties.stream()
-                .map(d -> d.getId() + "=" + d.getParamValue())
-                .collect(Collectors.joining(", "));
-        String perSubQuestionSkillReq = skillOptionsText.isEmpty() ? "" :
-                "\nEach subQuestion tests its own specific skill (they do NOT need to share the same skill). " +
-                "For every subQuestion, pick the single most relevant skillParamId from this list: [" + skillOptionsText + "].";
-        String perSubQuestionDifficultyReq = difficultyOptionsText.isEmpty() ? "" :
-                "\nFor every subQuestion, pick the most appropriate difficultyId from this list: [" + difficultyOptionsText + "].";
-
-        return "You are an expert English reading comprehension test question generator for HanGo trainer.\n" +
-                "Create a group question. passageText + subQuestions[]." + groupReq + "\n" +
-                "Each subQuestion is single-answer multiple-choice with 4 options and exactly 1 correct option." + skillReqMulti + groundingReqMulti +
-                perSubQuestionSkillReq + perSubQuestionDifficultyReq + "\n" +
+        return "You are an expert English reading comprehension test question generator for HanGo trainer (Kỳ thi tốt nghiệp THPT Quốc Gia môn Tiếng Anh - chuẩn chương trình GDPT 2018 format mới 2025/2026 của Bộ Giáo Dục và Đào Tạo).\n" +
+                "Create a group question consisting of passageText + subQuestions[].\n" +
+                groupReq +
+                diffReqMulti +
+                skillReqMulti +
+                groundingReqMulti +
+                (difficultyOptionsText.isEmpty() ? "" : "\nDifficulty options: [" + difficultyOptionsText + "].\n") +
+                "Each subQuestion is single-answer multiple-choice with exactly 4 options (A, B, C, D) and exactly 1 correct option.\n" +
+                "For every subQuestion, set difficultyId = " + difficultyId + " (" + difficultyName + ").\n" +
                 "Return PURE JSON only (no markdown).\n" +
                 "Schema:\n" +
                 "{\n" +
@@ -544,8 +660,8 @@ public class TrainerQuestionAIService {
                 "      {\n" +
                 "        \"questionText\": \"...\",\n" +
                 "        \"explanation\": \"...\",\n" +
-                "        \"skillParamId\": <id from the skill list above, or null if none given>,\n" +
-                "        \"difficultyId\": <id from the difficulty list above, or null if none given>,\n" +
+                "        \"skillParamId\": <id from the skill list above>,\n" +
+                "        \"difficultyId\": " + difficultyId + ",\n" +
                 "        \"options\": [\n" +
                 "          {\"optionText\": \"...\", \"isCorrect\": true},\n" +
                 "          {\"optionText\": \"...\", \"isCorrect\": false},\n" +
@@ -556,7 +672,7 @@ public class TrainerQuestionAIService {
                 "    ]\n" +
                 "  }\n" +
                 "}\n" +
-                "Generate at least 2 subQuestions. Here quantity=" + quantity + ". Generate exactly " + quantity + " subQuestions. Explanations should be short. Options should be plausible distractors.\n" +
+                "Generate at least 2 subQuestions. Here quantity=" + quantity + ". Generate exactly " + quantity + " subQuestions. Explanations should be short and insightful. Options should be plausible distractors.\n" +
                 "passageText must contain ONLY the article/passage itself (do NOT write 'Adapted from...' or source headers at the start of passageText). Provide the citation in the sourceCitation field instead.\n" +
                 "For sourceCitation: provide an authentic citation of the work, book, magazine, or article adapted for this passage (e.g. 'Adapted from The Psychology of Money', 'Adapted from National Geographic'). Do NOT invent fake web URLs (no http/https links).";
     }

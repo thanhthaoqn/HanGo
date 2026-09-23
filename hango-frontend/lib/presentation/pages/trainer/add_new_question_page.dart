@@ -307,13 +307,16 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
           });
         }
 
+        final int skillParamIdToSave = q['skillParamId'] as int? ?? _aiSkillId;
+        final int difficultyIdToSave = q['difficultyId'] as int? ?? _aiDifficultyId;
+
         final body = {
           'sectionId': widget.sectionId,
           'questionText': questionText,
           'explanation': explanation,
           'categoryId': _aiCategoryId,
-          'skillParamId': _aiSkillId,
-          'difficultyId': _aiDifficultyId,
+          'skillParamId': skillParamIdToSave,
+          'difficultyId': difficultyIdToSave,
           'usageType': _usageType,
           'options': payloadOptions,
         };
@@ -1644,6 +1647,8 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
           'questionTextController': TextEditingController(text: q.questionText),
           'hintController': TextEditingController(text: q.explanation),
           'options': opts,
+          'skillParamId': q.skillParamId,
+          'difficultyId': q.difficultyId,
         });
       }
 

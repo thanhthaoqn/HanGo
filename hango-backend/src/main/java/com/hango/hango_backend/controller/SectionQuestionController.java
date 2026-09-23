@@ -606,8 +606,8 @@ public class SectionQuestionController {
             for (CreateSubQuestionDTO subQ : subQuestions) {
                 Long subQuestionId = null;
                 final Long finalCategoryId = categoryId;
-                final Long finalDifficultyId = difficultyId;
-                final Long finalSkillParamId = skillParamId;
+                final Long finalDifficultyId = subQ.getDifficultyId() != null ? subQ.getDifficultyId() : difficultyId;
+                final Long finalSkillParamId = subQ.getSkillParamId() != null ? subQ.getSkillParamId() : skillParamId;
                 
                 try {
                     org.springframework.jdbc.support.GeneratedKeyHolder keyHolder = new org.springframework.jdbc.support.GeneratedKeyHolder();
