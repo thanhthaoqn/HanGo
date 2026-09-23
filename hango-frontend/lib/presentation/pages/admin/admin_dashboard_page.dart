@@ -1551,14 +1551,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     });
                   }
                 },
-                offset: const Offset(0, 52),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: const BorderSide(color: Color(0xFFF1F5F9), width: 1),
-                ),
-                elevation: 10,
+                offset: const Offset(0, 56),
                 color: Colors.white,
-                shadowColor: Colors.black.withOpacity(0.08),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: MouseRegion(
                   cursor: SystemMouseCursors.click,
                   child: Container(
@@ -1691,134 +1688,38 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 ),
                 itemBuilder: (context) => [
                   PopupMenuItem(
-                    enabled: false,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 36,
-                                height: 36,
-                                decoration: const BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Color(0xFF28B79B),
-                                      Color(0xFF1F9E84),
-                                    ],
-                                  ),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    _adminInitials,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                      fontFamily: 'Outfit',
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      _adminName,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF0F172A),
-                                        fontSize: 14,
-                                        fontFamily: 'Outfit',
-                                      ),
-                                    ),
-                                    Text(
-                                      _adminEmail,
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        color: Color(0xFF64748B),
-                                        fontFamily: 'Outfit',
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          const Divider(height: 1, color: Color(0xFFE2E8F0)),
-                        ],
-                      ),
-                    ),
-                  ),
-                  PopupMenuItem(
                     value: 'profile',
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE6FFFA),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(
-                              Icons.person_outline_rounded,
-                              size: 18,
-                              color: Color(0xFF28B79B),
-                            ),
+                    child: Row(
+                      children: const [
+                        Icon(Icons.person_outline,
+                            size: 18, color: Color(0xFF64748B)),
+                        SizedBox(width: 10),
+                        Text(
+                          'My Profile',
+                          style: TextStyle(
+                            fontFamily: 'Outfit',
+                            fontWeight: FontWeight.w500,
                           ),
-                          const SizedBox(width: 12),
-                          const Text(
-                            'Profile ',
-                            style: TextStyle(
-                              fontFamily: 'Outfit',
-                              color: Color(0xFF1E293B),
-                              fontWeight: FontWeight.w500,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-                  const PopupMenuDivider(height: 1),
+                  const PopupMenuDivider(),
                   PopupMenuItem(
                     value: 'logout',
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFEF2F2),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(
-                              Icons.logout_rounded,
-                              size: 18,
-                              color: Color(0xFFEF4444),
-                            ),
+                    child: Row(
+                      children: const [
+                        Icon(Icons.logout, size: 18, color: Colors.redAccent),
+                        SizedBox(width: 10),
+                        Text(
+                          'Logout',
+                          style: TextStyle(
+                            fontFamily: 'Outfit',
+                            color: Colors.redAccent,
+                            fontWeight: FontWeight.w500,
                           ),
-                          const SizedBox(width: 12),
-                          const Text(
-                            'Logout',
-                            style: TextStyle(
-                              fontFamily: 'Outfit',
-                              color: Color(0xFFEF4444),
-                              fontWeight: FontWeight.w500,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ],

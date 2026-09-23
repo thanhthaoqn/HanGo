@@ -113,16 +113,18 @@ class _CourseReviewDashboardDialogState extends State<CourseReviewDashboardDialo
                       _buildSidebarHeader(),
                       const Divider(height: 1, color: Color(0xFFE2E8F0)),
                       Expanded(
-                        child: SingleChildScrollView(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildCourseInfo(),
-                              const Divider(height: 1, color: Color(0xFFE2E8F0)),
-                              _buildSyllabusList(),
-                            ],
-                          ),
-                        ),
+                        child: _showReasonInput
+                            ? _buildRejectionChecklist()
+                            : SingleChildScrollView(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildCourseInfo(),
+                                    const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                                    _buildSyllabusList(),
+                                  ],
+                                ),
+                              ),
                       ),
                       const Divider(height: 1, color: Color(0xFFE2E8F0)),
                       _buildActionFooter(),
@@ -501,6 +503,201 @@ class _CourseReviewDashboardDialogState extends State<CourseReviewDashboardDialo
     );
   }
 
+  Widget _buildRejectionChecklist() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              InkWell(
+                onTap: () => setState(() => _showReasonInput = false),
+                borderRadius: BorderRadius.circular(6),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Icon(Icons.arrow_back, size: 18, color: Color(0xFF475569)),
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Rejection Checklist',
+                  style: TextStyle(
+                    color: Color(0xFF991B1B),
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Outfit',
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Check the issues below and provide details for the Trainer:',
+            style: TextStyle(color: Color(0xFF4B5563), fontFamily: 'Outfit', fontSize: 13),
+          ),
+          const SizedBox(height: 12),
+
+          // General Info Checkbox
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            title: const Text('General Info (Title, Description, Image)', style: TextStyle(fontFamily: 'Outfit', fontSize: 14, fontWeight: FontWeight.w500)),
+            value: _rejectGeneral,
+            activeColor: const Color(0xFFEF4444),
+            onChanged: (val) => setState(() => _rejectGeneral = val ?? false),
+          ),
+          if (_rejectGeneral)
+            Padding(
+              padding: const EdgeInsets.only(left: 32, bottom: 8),
+              child: TextField(
+                controller: _rejectGeneralCtrl,
+                maxLines: 2,
+                style: const TextStyle(fontSize: 13, fontFamily: 'Outfit'),
+                decoration: InputDecoration(
+                  hintText: 'E.g., Thumbnail is blurry...',
+                  filled: true,
+                  fillColor: const Color(0xFFFEF2F2),
+                  contentPadding: const EdgeInsets.all(10),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFEF4444))),
+                ),
+              ),
+            ),
+
+          // Content / Video Checkbox
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            title: const Text('Lesson Content (Video, Reading Material)', style: TextStyle(fontFamily: 'Outfit', fontSize: 14, fontWeight: FontWeight.w500)),
+            value: _rejectContent,
+            activeColor: const Color(0xFFEF4444),
+            onChanged: (val) => setState(() => _rejectContent = val ?? false),
+          ),
+          if (_rejectContent)
+            Padding(
+              padding: const EdgeInsets.only(left: 32, bottom: 8),
+              child: TextField(
+                controller: _rejectContentCtrl,
+                maxLines: 2,
+                style: const TextStyle(fontSize: 13, fontFamily: 'Outfit'),
+                decoration: InputDecoration(
+                  hintText: 'Specify Lesson (E.g., Lesson 2 video has no audio)...',
+                  filled: true,
+                  fillColor: const Color(0xFFFEF2F2),
+                  contentPadding: const EdgeInsets.all(10),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFEF4444))),
+                ),
+              ),
+            ),
+
+          // Quiz Checkbox
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            title: const Text('Quiz & Assessment', style: TextStyle(fontFamily: 'Outfit', fontSize: 14, fontWeight: FontWeight.w500)),
+            value: _rejectQuiz,
+            activeColor: const Color(0xFFEF4444),
+            onChanged: (val) => setState(() => _rejectQuiz = val ?? false),
+          ),
+          if (_rejectQuiz)
+            Padding(
+              padding: const EdgeInsets.only(left: 32, bottom: 8),
+              child: TextField(
+                controller: _rejectQuizCtrl,
+                maxLines: 2,
+                style: const TextStyle(fontSize: 13, fontFamily: 'Outfit'),
+                decoration: InputDecoration(
+                  hintText: 'Specify Lesson (E.g., Lesson 3 quiz has wrong answer)...',
+                  filled: true,
+                  fillColor: const Color(0xFFFEF2F2),
+                  contentPadding: const EdgeInsets.all(10),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFEF4444))),
+                ),
+              ),
+            ),
+
+          // Other Checkbox
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            title: const Text('Other Issues', style: TextStyle(fontFamily: 'Outfit', fontSize: 14, fontWeight: FontWeight.w500)),
+            value: _rejectOther,
+            activeColor: const Color(0xFFEF4444),
+            onChanged: (val) => setState(() => _rejectOther = val ?? false),
+          ),
+          if (_rejectOther)
+            Padding(
+              padding: const EdgeInsets.only(left: 32, bottom: 8),
+              child: TextField(
+                controller: _rejectOtherCtrl,
+                maxLines: 2,
+                style: const TextStyle(fontSize: 13, fontFamily: 'Outfit'),
+                decoration: InputDecoration(
+                  hintText: 'Enter other reasons...',
+                  filled: true,
+                  fillColor: const Color(0xFFFEF2F2),
+                  contentPadding: const EdgeInsets.all(10),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFEF4444))),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _submitReject() {
+    if (!_rejectGeneral && !_rejectContent && !_rejectQuiz && !_rejectOther) {
+      ToastHelper.showError(context, 'Please check at least one issue.');
+      return;
+    }
+
+    // Construct Markdown
+    List<String> reasons = [];
+
+    if (_rejectGeneral) {
+      String detail = _rejectGeneralCtrl.text.trim();
+      if (detail.isEmpty) detail = "Need to review general information.";
+      reasons.add("- [x] **General Info (Title, Description, Image):**\n  $detail");
+    }
+
+    if (_rejectContent) {
+      String detail = _rejectContentCtrl.text.trim();
+      if (detail.isEmpty) detail = "Content issues found in lessons.";
+      reasons.add("- [x] **Lesson Content (Video, Material):**\n  $detail");
+    }
+
+    if (_rejectQuiz) {
+      String detail = _rejectQuizCtrl.text.trim();
+      if (detail.isEmpty) detail = "Assessment issues found.";
+      reasons.add("- [x] **Quiz & Assessment:**\n  $detail");
+    }
+
+    if (_rejectOther) {
+      String detail = _rejectOtherCtrl.text.trim();
+      if (detail.isNotEmpty) {
+        reasons.add("- [x] **Other Issues:**\n  $detail");
+      }
+    }
+
+    String finalReason = reasons.join("\n\n");
+    widget.onReject(finalReason);
+  }
+
   Widget _buildActionFooter() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -509,155 +706,10 @@ class _CourseReviewDashboardDialogState extends State<CourseReviewDashboardDialo
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
         children: [
           if (_isPendingStatus(widget.course.status)) ...[
-            if (!_hasViewedAll)
-              Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFFBEB),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFFDE68A)),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.info_outline, size: 16, color: Color(0xFFB45309)),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Review all lessons to enable publishing.',
-                        style: TextStyle(fontFamily: 'Outfit', fontSize: 12, color: Color(0xFF92400E)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             if (_showReasonInput) ...[
-              const Text(
-                'Rejection Checklist',
-                style: TextStyle(color: Color(0xFF991B1B), fontWeight: FontWeight.bold, fontFamily: 'Outfit', fontSize: 14),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Check the issues below and provide details for the Trainer:',
-                style: TextStyle(color: Color(0xFF4B5563), fontFamily: 'Outfit', fontSize: 13),
-              ),
-              const SizedBox(height: 12),
-              
-              // General Info Checkbox
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                controlAffinity: ListTileControlAffinity.leading,
-                title: const Text('General Info (Title, Description, Image)', style: TextStyle(fontFamily: 'Outfit', fontSize: 14, fontWeight: FontWeight.w500)),
-                value: _rejectGeneral,
-                activeColor: const Color(0xFFEF4444),
-                onChanged: (val) => setState(() => _rejectGeneral = val ?? false),
-              ),
-              if (_rejectGeneral)
-                Padding(
-                  padding: const EdgeInsets.only(left: 32, bottom: 8),
-                  child: TextField(
-                    controller: _rejectGeneralCtrl,
-                    maxLines: 2,
-                    style: const TextStyle(fontSize: 13, fontFamily: 'Outfit'),
-                    decoration: InputDecoration(
-                      hintText: 'E.g., Thumbnail is blurry...',
-                      filled: true,
-                      fillColor: const Color(0xFFFEF2F2),
-                      contentPadding: const EdgeInsets.all(10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFEF4444))),
-                    ),
-                  ),
-                ),
-
-              // Content / Video Checkbox
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                controlAffinity: ListTileControlAffinity.leading,
-                title: const Text('Lesson Content (Video, Reading Material)', style: TextStyle(fontFamily: 'Outfit', fontSize: 14, fontWeight: FontWeight.w500)),
-                value: _rejectContent,
-                activeColor: const Color(0xFFEF4444),
-                onChanged: (val) => setState(() => _rejectContent = val ?? false),
-              ),
-              if (_rejectContent)
-                Padding(
-                  padding: const EdgeInsets.only(left: 32, bottom: 8),
-                  child: TextField(
-                    controller: _rejectContentCtrl,
-                    maxLines: 2,
-                    style: const TextStyle(fontSize: 13, fontFamily: 'Outfit'),
-                    decoration: InputDecoration(
-                      hintText: 'Specify Lesson (E.g., Lesson 2 video has no audio)...',
-                      filled: true,
-                      fillColor: const Color(0xFFFEF2F2),
-                      contentPadding: const EdgeInsets.all(10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFEF4444))),
-                    ),
-                  ),
-                ),
-
-              // Quiz Checkbox
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                controlAffinity: ListTileControlAffinity.leading,
-                title: const Text('Quiz & Assessment', style: TextStyle(fontFamily: 'Outfit', fontSize: 14, fontWeight: FontWeight.w500)),
-                value: _rejectQuiz,
-                activeColor: const Color(0xFFEF4444),
-                onChanged: (val) => setState(() => _rejectQuiz = val ?? false),
-              ),
-              if (_rejectQuiz)
-                Padding(
-                  padding: const EdgeInsets.only(left: 32, bottom: 8),
-                  child: TextField(
-                    controller: _rejectQuizCtrl,
-                    maxLines: 2,
-                    style: const TextStyle(fontSize: 13, fontFamily: 'Outfit'),
-                    decoration: InputDecoration(
-                      hintText: 'Specify Lesson (E.g., Lesson 3 quiz has wrong answer)...',
-                      filled: true,
-                      fillColor: const Color(0xFFFEF2F2),
-                      contentPadding: const EdgeInsets.all(10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFEF4444))),
-                    ),
-                  ),
-                ),
-
-              // Other Checkbox
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                controlAffinity: ListTileControlAffinity.leading,
-                title: const Text('Other Issues', style: TextStyle(fontFamily: 'Outfit', fontSize: 14, fontWeight: FontWeight.w500)),
-                value: _rejectOther,
-                activeColor: const Color(0xFFEF4444),
-                onChanged: (val) => setState(() => _rejectOther = val ?? false),
-              ),
-              if (_rejectOther)
-                Padding(
-                  padding: const EdgeInsets.only(left: 32, bottom: 8),
-                  child: TextField(
-                    controller: _rejectOtherCtrl,
-                    maxLines: 2,
-                    style: const TextStyle(fontSize: 13, fontFamily: 'Outfit'),
-                    decoration: InputDecoration(
-                      hintText: 'Enter other reasons...',
-                      filled: true,
-                      fillColor: const Color(0xFFFEF2F2),
-                      contentPadding: const EdgeInsets.all(10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFCA5A5))),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFEF4444))),
-                    ),
-                  ),
-                ),
-
-              const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
@@ -673,43 +725,7 @@ class _CourseReviewDashboardDialogState extends State<CourseReviewDashboardDialo
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () {
-                        if (!_rejectGeneral && !_rejectContent && !_rejectQuiz && !_rejectOther) {
-                          ToastHelper.showError(context, 'Please check at least one issue.');
-                          return;
-                        }
-                        
-                        // Construct Markdown
-                        List<String> reasons = [];
-                        
-                        if (_rejectGeneral) {
-                          String detail = _rejectGeneralCtrl.text.trim();
-                          if (detail.isEmpty) detail = "Need to review general information.";
-                          reasons.add("- [x] **General Info (Title, Description, Image):**\n  $detail");
-                        }
-                        
-                        if (_rejectContent) {
-                          String detail = _rejectContentCtrl.text.trim();
-                          if (detail.isEmpty) detail = "Content issues found in lessons.";
-                          reasons.add("- [x] **Lesson Content (Video, Material):**\n  $detail");
-                        }
-                        
-                        if (_rejectQuiz) {
-                          String detail = _rejectQuizCtrl.text.trim();
-                          if (detail.isEmpty) detail = "Assessment issues found.";
-                          reasons.add("- [x] **Quiz & Assessment:**\n  $detail");
-                        }
-                        
-                        if (_rejectOther) {
-                          String detail = _rejectOtherCtrl.text.trim();
-                          if (detail.isNotEmpty) {
-                            reasons.add("- [x] **Other Issues:**\n  $detail");
-                          }
-                        }
-                        
-                        String finalReason = reasons.join("\n\n");
-                        widget.onReject(finalReason);
-                      },
+                      onPressed: _submitReject,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFEF4444),
                         foregroundColor: Colors.white,
@@ -722,6 +738,28 @@ class _CourseReviewDashboardDialogState extends State<CourseReviewDashboardDialo
                 ],
               ),
             ] else ...[
+              if (!_hasViewedAll)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBEB),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.info_outline, size: 16, color: Color(0xFFB45309)),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Review all lessons to enable publishing.',
+                          style: TextStyle(fontFamily: 'Outfit', fontSize: 12, color: Color(0xFF92400E)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               Row(
                 children: [
                   Expanded(
@@ -755,6 +793,7 @@ class _CourseReviewDashboardDialogState extends State<CourseReviewDashboardDialo
                 ],
               ),
             ],
+
           ] else if (widget.course.status.toUpperCase() == 'PUBLISHED') ...[
             ElevatedButton.icon(
               onPressed: widget.onHide,
