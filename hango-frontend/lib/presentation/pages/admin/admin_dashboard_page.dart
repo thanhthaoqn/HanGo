@@ -79,6 +79,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   final AdminConfigService _adminConfigService = AdminConfigService();
   int _aiSubTabIndex = 0; // 0: Analytics, 1: Settings, 2: Prompts
   bool _isLoadingAiConfig = false;
+  bool _isSavingAiConfig = false;
+  bool _obscureApiKey = true;
   Map<String, String> _aiConfig = {};
   
   // Controllers for AI Settings
@@ -461,18 +463,21 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   Future<void> _saveAiConfig() async {
+    if (_isSavingAiConfig) return;
+    setState(() => _isSavingAiConfig = true);
     try {
       final configs = {
-        'GEMINI_API_KEY': _apiKeyController.text,
-        'GEMINI_CHAT_MODEL': _chatModelController.text,
-        'GEMINI_EMBEDDING_MODEL': _embeddingModelController.text,
-        'GEMINI_TIMEOUT_SECONDS': _timeoutController.text,
+        'GEMINI_API_KEY': _apiKeyController.text.trim(),
+        'GEMINI_CHAT_MODEL': _chatModelController.text.trim(),
+        'GEMINI_EMBEDDING_MODEL': _embeddingModelController.text.trim(),
+        'GEMINI_TIMEOUT_SECONDS': _timeoutController.text.trim(),
         'AI_ASSISTANT_SYSTEM_PROMPT': _assistantPromptController.text,
         'AI_TRAINER_EXAM_CHAT_PROMPT': _examChatPromptController.text,
         'AI_TRAINER_EXAM_GENERATE_PROMPT': _examGenPromptController.text,
       };
       await _adminConfigService.updateAiConfig(configs);
       if (mounted) ToastHelper.showSuccess(context, 'AI Configurations saved successfully');
+      await _fetchAiConfig();
     } catch (e) {
       debugPrint('[AdminDashboard] Error saving AI config: $e');
       if (mounted) {
@@ -486,6 +491,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           msg = 'Cannot connect to server. Please verify backend is running.';
         }
         ToastHelper.showError(context, msg);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSavingAiConfig = false);
       }
     }
   }
@@ -3331,11 +3340,38 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   ],
                 ),
               ),
+              const SizedBox(width: 16),
+              ElevatedButton.icon(
+                onPressed: _isSavingAiConfig ? null : _saveAiConfig,
+                icon: _isSavingAiConfig
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Icon(Icons.save_outlined, size: 18),
+                label: Text(_isSavingAiConfig ? 'Saving...' : 'Save Settings', style: const TextStyle(fontFamily: 'Fira Sans', fontWeight: FontWeight.w600)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0D9488),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 32),
           _buildSettingsSection('Security', [
-            _buildEnhancedTextField('Gemini API Key', _apiKeyController, isPassword: true, icon: Icons.key_rounded, placeholder: 'AIzaSy...'),
+            _buildEnhancedTextField(
+              'Gemini API Key',
+              _apiKeyController,
+              isPassword: _obscureApiKey,
+              icon: Icons.key_rounded,
+              placeholder: 'AIzaSy... / AQ.Ab...',
+              suffixWidget: IconButton(
+                icon: Icon(_obscureApiKey ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: const Color(0xFF94A3B8), size: 20),
+                onPressed: () => setState(() => _obscureApiKey = !_obscureApiKey),
+                tooltip: _obscureApiKey ? 'Show API Key' : 'Hide API Key',
+              ),
+              onSubmitted: (_) => _saveAiConfig(),
+            ),
           ]),
           const SizedBox(height: 24),
           _buildSettingsSection('Model Configuration', [
@@ -3350,9 +3386,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               ElevatedButton.icon(
-                onPressed: _saveAiConfig,
-                icon: const Icon(Icons.save_outlined, size: 18),
-                label: const Text('Save Settings', style: TextStyle(fontFamily: 'Fira Sans', fontWeight: FontWeight.w600)),
+                onPressed: _isSavingAiConfig ? null : _saveAiConfig,
+                icon: _isSavingAiConfig
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Icon(Icons.save_outlined, size: 18),
+                label: Text(_isSavingAiConfig ? 'Saving...' : 'Save Settings', style: const TextStyle(fontFamily: 'Fira Sans', fontWeight: FontWeight.w600)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0D9488),
                   foregroundColor: Colors.white,
@@ -3387,7 +3425,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  Widget _buildEnhancedTextField(String label, TextEditingController controller, {bool isPassword = false, bool isNumber = false, int maxLines = 1, IconData? icon, String? placeholder}) {
+  Widget _buildEnhancedTextField(
+    String label,
+    TextEditingController controller, {
+    bool isPassword = false,
+    bool isNumber = false,
+    int maxLines = 1,
+    IconData? icon,
+    String? placeholder,
+    Widget? suffixWidget,
+    ValueChanged<String>? onSubmitted,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -3398,11 +3446,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           obscureText: isPassword,
           maxLines: isPassword ? 1 : maxLines,
           keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+          onSubmitted: onSubmitted,
           style: TextStyle(fontFamily: isPassword ? 'Fira Code' : 'Fira Sans', fontSize: 14, color: const Color(0xFF1E293B)),
           decoration: InputDecoration(
             hintText: placeholder,
             hintStyle: const TextStyle(color: Color(0xFFCBD5E1)),
             prefixIcon: icon != null ? Icon(icon, color: const Color(0xFF94A3B8), size: 20) : null,
+            suffixIcon: suffixWidget,
             filled: true,
             fillColor: Colors.white,
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -3478,9 +3528,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               ElevatedButton.icon(
-                onPressed: _saveAiConfig,
-                icon: const Icon(Icons.save_outlined, size: 18),
-                label: const Text('Save Prompts', style: TextStyle(fontFamily: 'Fira Sans', fontWeight: FontWeight.w600)),
+                onPressed: _isSavingAiConfig ? null : _saveAiConfig,
+                icon: _isSavingAiConfig
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Icon(Icons.save_outlined, size: 18),
+                label: Text(_isSavingAiConfig ? 'Saving...' : 'Save Prompts', style: const TextStyle(fontFamily: 'Fira Sans', fontWeight: FontWeight.w600)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0D9488),
                   foregroundColor: Colors.white,
