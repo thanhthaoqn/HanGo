@@ -30,6 +30,7 @@ class _TakeExamPageState extends State<TakeExamPage>
   int _currentQuestionIndex = 0;
   bool _isSubmitted = false;
   bool _isSubmitting = false;
+  double _textScaleFactor = 1.0;
 
   // Answers cache: questionIndex -> selectedOptionIndex (0 to 3)
   Map<int, int> _userAnswers = {};
@@ -595,6 +596,98 @@ class _TakeExamPageState extends State<TakeExamPage>
     );
   }
 
+  Widget _buildPassageWithBlanks(String passageText, List<dynamic> groupQuestions) {
+    // Regex hỗ trợ các định dạng: _________, ___(1)___, ___ 1 ___, ___[1]___
+    final regex = RegExp(r'_{2,}\s*(?:\(\d+\)|\[\d+\]|\d+)?\s*_{2,}|_{3,}');
+    final matches = regex.allMatches(passageText).toList();
+    
+    if (matches.isEmpty) {
+      return Text(
+        passageText,
+        style: const TextStyle(
+          fontSize: 16,
+          color: Color(0xFF334155),
+          height: 1.6,
+        ),
+      );
+    }
+
+    List<InlineSpan> spans = [];
+    int currentPos = 0;
+    int blankIndex = 0;
+
+    for (final match in matches) {
+      // Add text before the blank
+      if (match.start > currentPos) {
+        spans.add(TextSpan(text: passageText.substring(currentPos, match.start)));
+      }
+
+      // Determine if this blank corresponds to a question in the group
+      if (blankIndex < groupQuestions.length) {
+        final q = groupQuestions[blankIndex];
+        final globalQIndex = q['globalIndex'] as int;
+        final selectedOptionIndex = _userAnswers[globalQIndex];
+
+        if (selectedOptionIndex != null && selectedOptionIndex >= 0 && selectedOptionIndex < q['options'].length) {
+          // User has selected an answer, display the answer text
+          final answerText = q['options'][selectedOptionIndex];
+          spans.add(
+            WidgetSpan(
+              alignment: PlaceholderAlignment.middle,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 10 * _textScaleFactor, vertical: 4 * _textScaleFactor),
+                margin: EdgeInsets.symmetric(horizontal: 4 * _textScaleFactor),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F8F5),
+                  border: Border(bottom: BorderSide(color: const Color(0xFF28B79B), width: 2 * _textScaleFactor)),
+                  borderRadius: BorderRadius.circular(4 * _textScaleFactor),
+                ),
+                child: Text(
+                  answerText,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF167B66),
+                  ),
+                ),
+              ),
+            ),
+          );
+        } else {
+          // Display the original underscores
+          spans.add(
+            TextSpan(
+              text: match.group(0),
+              style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2),
+            ),
+          );
+        }
+      } else {
+        // Extra blanks that don't have corresponding questions
+        spans.add(TextSpan(text: match.group(0)));
+      }
+
+      currentPos = match.end;
+      blankIndex++;
+    }
+
+    // Add remaining text after the last blank
+    if (currentPos < passageText.length) {
+      spans.add(TextSpan(text: passageText.substring(currentPos)));
+    }
+
+    return Text.rich(
+      TextSpan(
+        style: const TextStyle(
+          fontSize: 16,
+          color: Color(0xFF334155),
+          height: 1.6,
+        ),
+        children: spans,
+      ),
+    );
+  }
+
   Widget _buildExitExamHeader() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -757,13 +850,155 @@ class _TakeExamPageState extends State<TakeExamPage>
 
     // Find passage if exists
     String? passageText;
+    List<dynamic>? groupQuestions;
     for (var group in _examGroups) {
       final List qs = group['questions'];
       if (qs.any((q) => q['id'] == currentQuestion['id'])) {
         passageText = group['passage'];
+        groupQuestions = qs;
         break;
       }
     }
+
+    final zoomableContent = MediaQuery(
+      data: MediaQuery.of(context).copyWith(
+        textScaler: TextScaler.linear(MediaQuery.of(context).textScaler.scale(1.0) * _textScaleFactor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Passage text if available
+          if (passageText != null && passageText.isNotEmpty) ...[
+            Container(
+              padding: EdgeInsets.all(16 * _textScaleFactor),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(8 * _textScaleFactor),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: _buildPassageWithBlanks(passageText, groupQuestions ?? []),
+            ),
+            SizedBox(height: 24 * _textScaleFactor),
+          ],
+
+          // Question text
+          Text(
+            currentQuestion['content'],
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1F2937),
+              height: 1.4,
+            ),
+          ),
+          SizedBox(height: 32 * _textScaleFactor),
+
+          // Option cards
+          ...List.generate(4, (index) {
+            final isSelected =
+                _userAnswers[_currentQuestionIndex] == index;
+            final optionLabel = String.fromCharCode(
+              65 + index,
+            ); // A, B, C, D
+            final optionText = currentQuestion['options'][index];
+
+            return Padding(
+              padding: EdgeInsets.only(bottom: 16.0 * _textScaleFactor),
+              child: InkWell(
+                onTap: () =>
+                    _selectAnswer(_currentQuestionIndex, index),
+                borderRadius: BorderRadius.circular(12 * _textScaleFactor),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 20 * _textScaleFactor,
+                    vertical: 16 * _textScaleFactor,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? const Color(0xFFE8F8F5)
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(12 * _textScaleFactor),
+                    border: Border.all(
+                      color: isSelected
+                          ? const Color(0xFF28B79B)
+                          : Colors.grey.shade200,
+                      width: isSelected ? 2 : 1,
+                    ),
+                    boxShadow: [
+                      if (isSelected)
+                        BoxShadow(
+                          color: const Color(
+                            0xFF28B79B,
+                          ).withValues(alpha: 0.1),
+                          blurRadius: 10 * _textScaleFactor,
+                          offset: Offset(0, 4 * _textScaleFactor),
+                        )
+                      else
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.02),
+                          blurRadius: 4 * _textScaleFactor,
+                          offset: Offset(0, 2 * _textScaleFactor),
+                        ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      // Circle label (A, B, C, D)
+                      Container(
+                        width: 32 * _textScaleFactor,
+                        height: 32 * _textScaleFactor,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isSelected
+                              ? const Color(0xFF28B79B)
+                              : Colors.grey.shade100,
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          optionLabel,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: isSelected
+                                ? Colors.white
+                                : Colors.grey.shade700,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 16 * _textScaleFactor),
+                      // Option Text
+                      Expanded(
+                        child: Text(
+                          optionText,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                            color: isSelected
+                                ? const Color(0xFF1E293B)
+                                : Colors.grey.shade800,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                      // Radio checklist indicator
+                      if (isSelected)
+                        Icon(
+                          Icons.check_circle,
+                          color: const Color(0xFF28B79B),
+                          size: 22 * _textScaleFactor,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
 
     final contentBody = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -790,153 +1025,52 @@ class _TakeExamPageState extends State<TakeExamPage>
                 ),
               ),
             ),
-            Text(
-              'Question ${_currentQuestionIndex + 1} of ${_examQuestions.length}',
-              style: TextStyle(
-                color: Colors.grey.shade500,
-                fontWeight: FontWeight.w600,
-              ),
+            Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.remove_circle_outline, color: Color(0xFF94A3B8)),
+                  tooltip: 'Thu nhỏ chữ',
+                  onPressed: () {
+                    setState(() {
+                      if (_textScaleFactor > 0.6) _textScaleFactor -= 0.1;
+                    });
+                  },
+                ),
+                SizedBox(
+                  width: 50,
+                  child: Text(
+                    '${(_textScaleFactor * 100).round()}%',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add_circle_outline, color: Color(0xFF94A3B8)),
+                  tooltip: 'Phóng to chữ',
+                  onPressed: () {
+                    setState(() {
+                      if (_textScaleFactor < 1.6) _textScaleFactor += 0.1;
+                    });
+                  },
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  'Question ${_currentQuestionIndex + 1} of ${_examQuestions.length}',
+                  style: TextStyle(
+                    color: Colors.grey.shade500,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
         const SizedBox(height: 24),
-
-        // Passage text if available
-        if (passageText != null && passageText.isNotEmpty) ...[
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Text(
-              passageText,
-              style: const TextStyle(
-                fontSize: 16,
-                color: Color(0xFF334155),
-                height: 1.6,
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-        ],
-
-        // Question text
-        Text(
-          currentQuestion['content'],
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF1F2937),
-            height: 1.4,
-          ),
-        ),
-        const SizedBox(height: 32),
-
-        // Option cards
-        ...List.generate(4, (index) {
-          final isSelected =
-              _userAnswers[_currentQuestionIndex] == index;
-          final optionLabel = String.fromCharCode(
-            65 + index,
-          ); // A, B, C, D
-          final optionText = currentQuestion['options'][index];
-
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 16.0),
-            child: InkWell(
-              onTap: () =>
-                  _selectAnswer(_currentQuestionIndex, index),
-              borderRadius: BorderRadius.circular(12),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 16,
-                ),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? const Color(0xFFE8F8F5)
-                      : Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isSelected
-                        ? const Color(0xFF28B79B)
-                        : Colors.grey.shade200,
-                    width: isSelected ? 2 : 1,
-                  ),
-                  boxShadow: [
-                    if (isSelected)
-                      BoxShadow(
-                        color: const Color(
-                          0xFF28B79B,
-                        ).withValues(alpha: 0.1),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      )
-                    else
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.02),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    // Circle label (A, B, C, D)
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: isSelected
-                            ? const Color(0xFF28B79B)
-                            : Colors.grey.shade100,
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        optionLabel,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: isSelected
-                              ? Colors.white
-                              : Colors.grey.shade700,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    // Option Text
-                    Expanded(
-                      child: Text(
-                        optionText,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: isSelected
-                              ? FontWeight.w600
-                              : FontWeight.normal,
-                          color: isSelected
-                              ? const Color(0xFF1E293B)
-                              : Colors.grey.shade800,
-                          height: 1.4,
-                        ),
-                      ),
-                    ),
-                    // Radio checklist indicator
-                    if (isSelected)
-                      const Icon(
-                        Icons.check_circle,
-                        color: Color(0xFF28B79B),
-                        size: 22,
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }),
+        zoomableContent,
       ],
     );
 
