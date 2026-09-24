@@ -680,11 +680,13 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                                 sections: _sections,
                                                 courseStatus: _courseStatus,
                                                 rejectionReason: _rejectionReason,
-                                                onSectionsChanged: (updatedSections) async {
+                                                onSectionsChanged: (updatedSections, {bool autoSave = false}) async {
                                                   setState(() {
                                                     _sections = updatedSections;
                                                   });
-                                                  await _autoSaveCourse();
+                                                  if (autoSave) {
+                                                    await _autoSaveCourse();
+                                                  }
                                                 },
                                                 onStepChanged: (step) {
                                                   setState(() {
@@ -726,11 +728,13 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                     sections: _sections,
                                     courseStatus: _courseStatus,
                                     rejectionReason: _rejectionReason,
-                                    onSectionsChanged: (updatedSections) async {
+                                    onSectionsChanged: (updatedSections, {bool autoSave = false}) async {
                                       setState(() {
                                         _sections = updatedSections;
                                       });
-                                      await _autoSaveCourse();
+                                      if (autoSave) {
+                                        await _autoSaveCourse();
+                                      }
                                     },
                                     onStepChanged: (step) {
                                       setState(() {

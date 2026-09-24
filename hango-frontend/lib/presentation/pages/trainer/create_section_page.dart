@@ -9,7 +9,7 @@ class CreateSectionPage extends StatefulWidget {
   final String trainerName;
   final String trainerInitials;
   final List<dynamic> sections;
-  final Future<void> Function(List<dynamic> updatedSections) onSectionsChanged;
+  final Future<void> Function(List<dynamic> updatedSections, {bool autoSave}) onSectionsChanged;
   final ValueChanged<int>? onStepChanged;
   final String? courseStatus;
   final String? rejectionReason;
@@ -74,8 +74,8 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
     super.dispose();
   }
 
-  Future<void> _notifyParent() async {
-    await widget.onSectionsChanged(_localSections);
+  Future<void> _notifyParent({bool autoSave = false}) async {
+    await widget.onSectionsChanged(_localSections, autoSave: autoSave);
   }
 
   void _addSection() {
@@ -103,7 +103,7 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
       _codeController.clear();
       _descController.clear();
     });
-    _notifyParent();
+    _notifyParent(autoSave: false);
     ToastHelper.showSuccess(context, 'Section added successfully');
   }
 
@@ -125,7 +125,7 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
         _codeController.clear();
         _descController.clear();
       });
-      _notifyParent();
+      _notifyParent(autoSave: false);
       ToastHelper.showSuccess(context, 'Section updated successfully');
     }
   }
@@ -163,7 +163,7 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
       _expandedIndices.clear();
       _expandedIndices.addAll(updatedExpanded);
     });
-    _notifyParent();
+    _notifyParent(autoSave: false);
     ToastHelper.showError(context, 'Section deleted');
   }
 
@@ -649,7 +649,7 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                                         setState(() {
                                           _localSections = updatedSections;
                                         });
-                                        await _notifyParent();
+                                        await _notifyParent(autoSave: true);
                                       },
                                     ),
                                   ),
