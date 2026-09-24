@@ -647,9 +647,13 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
       } else {
         for (var blockData in blocksData) {
           final block = QuestionBlockState();
-          block.id = blockData['id'];
+          // Use (as num).toInt() to safely handle both int and double from JSON
+          // (Flutter Web's JS runtime may decode small integers as num/double)
+          block.id = blockData['id'] != null ? (blockData['id'] as num).toInt() : null;
           block.isGenerated = true; // Disable toggle for existing blocks
-          block.selectedGroupTypeId = blockData['categoryId'];
+          block.selectedGroupTypeId = blockData['categoryId'] != null
+              ? (blockData['categoryId'] as num).toInt()
+              : null;
 
           if (blockData['passageText'] != null &&
               blockData['passageText'].toString().isNotEmpty) {
@@ -664,13 +668,19 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
             block.questions.clear(); // Clear default empty question
             for (var qData in subQData) {
               final qState = QuestionState();
-              qState.id = qData['id'];
+              qState.id = qData['id'] != null ? (qData['id'] as num).toInt() : null;
               qState.questionTextController.text = qData['questionText'] ?? '';
               qState.explanationController.text = qData['explanation'] ?? '';
+
+              // Prefer question-level values; fall back to block-level values.
+              // Cast via num to guard against Flutter Web decoding JSON int as double.
+              final rawSkill = qData['skillParamId'] ?? blockData['skillParamId'];
               qState.selectedSkillId =
-                  qData['skillParamId'] ?? blockData['skillParamId'];
+                  rawSkill != null ? (rawSkill as num).toInt() : null;
+
+              final rawDiff = qData['difficultyId'] ?? blockData['difficultyId'];
               qState.selectedDifficultyId =
-                  qData['difficultyId'] ?? blockData['difficultyId'];
+                  rawDiff != null ? (rawDiff as num).toInt() : null;
 
               final optsData = qData['options'] as List?;
               if (optsData != null && optsData.isNotEmpty) {
@@ -1723,9 +1733,14 @@ class _CourseManagerEditExamPageState extends State<CourseManagerEditExamPage> {
     required String displayKey,
     String? errorText,
   }) {
-    // Fix Dropdown crash: verify if the value actually exists in the items list
-    bool valueExists =
-        value != null && items.any((item) => (item['id'] as int) == value);
+    // Fix Dropdown crash: verify if the value actually exists in the items list.
+    // Use (as num).toInt() because Flutter Web's JS runtime may decode JSON
+    // integers as num/double, and a bare `as int` cast would throw TypeError.
+    bool valueExists = value != null &&
+        items.any((item) {
+          if (item['id'] == null) return false;
+          return (item['id'] as num).toInt() == value;
+        });
     final int? safeValue = valueExists ? value : null;
 
     Widget dropdownWidget = Container(

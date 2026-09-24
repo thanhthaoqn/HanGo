@@ -24,6 +24,9 @@ class ExamReviewDashboardDialog extends StatefulWidget {
   final String? creatorName;
   final int? currentUserId;
   final VoidCallback? onEditExam;
+  /// Whether this exam is currently flagged as an Entry Exam candidate.
+  /// When true, hiding the exam triggers an extra warning dialog.
+  final bool isEntryExam;
 
   const ExamReviewDashboardDialog({
     super.key,
@@ -41,6 +44,7 @@ class ExamReviewDashboardDialog extends StatefulWidget {
     this.creatorName,
     this.currentUserId,
     this.onEditExam,
+    this.isEntryExam = false,
   });
 
   @override
@@ -183,6 +187,78 @@ class _ExamReviewDashboardDialogState extends State<ExamReviewDashboardDialog> {
   }
 
   void _confirmUpdateExamStatus(
+    String actionName,
+    String newStatus,
+    Color confirmColor, {
+    required String successMessage,
+  }) {
+    // ── Extra warning when hiding an Entry Exam ──────────────────────────────
+    // The backend will block if this is the last published entry exam and
+    // auto-clear the flag otherwise — but the CM should know in advance.
+    if (newStatus == 'HIDDEN' && widget.isEntryExam) {
+      showDialog(
+        context: context,
+        builder: (warnCtx) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Color(0xFFF59E0B)),
+              SizedBox(width: 8),
+              Text(
+                'Entry Exam Warning',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Outfit',
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'This exam is currently set as an Entry Exam candidate.\n\n'
+            '• If there are other published Entry Exams, hiding this exam will '
+            'automatically remove its Entry Exam flag.\n'
+            '• If this is the last published Entry Exam, hiding it will be '
+            'blocked — you must assign another exam as Entry Exam first.',
+            style: TextStyle(fontFamily: 'Outfit'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(warnCtx),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Color(0xFF64748B)),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(warnCtx);
+                // Proceed to normal confirmation dialog
+                _showHideConfirmDialog(actionName, newStatus, confirmColor,
+                    successMessage: successMessage);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF59E0B),
+              ),
+              child: const Text(
+                'I understand, continue',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+    _showHideConfirmDialog(actionName, newStatus, confirmColor,
+        successMessage: successMessage);
+  }
+
+  /// The standard single-step confirm dialog (used directly for non-entry-exam
+  /// hides, and as the second step for entry-exam hides after the warning).
+  void _showHideConfirmDialog(
     String actionName,
     String newStatus,
     Color confirmColor, {

@@ -150,12 +150,10 @@ public class ExamService {
         List<Exam> entryExams = examRepository.findByIsEntryExamTrueAndStatusAndDeletedAtIsNull("PUBLISHED");
         java.util.Set<Long> entryExamIds = entryExams.stream().map(Exam::getId).collect(Collectors.toSet());
 
-        boolean completed = false;
-        if (!entryExamIds.isEmpty()) {
-            List<ExamAttempt> attempts = examAttemptRepository.findByStudentIdOrderByStartedAtDesc(userId);
-            completed = attempts.stream()
-                    .anyMatch(a -> a.getExam() != null && entryExamIds.contains(a.getExam().getId()));
-        }
+        List<ExamAttempt> attempts = examAttemptRepository.findByStudentIdOrderByStartedAtDesc(userId);
+        boolean completed = attempts.stream()
+                .anyMatch(a -> Boolean.TRUE.equals(a.getIsEntryExam()) 
+                            || (a.getExam() != null && entryExamIds.contains(a.getExam().getId())));
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("configured", !entryExamIds.isEmpty());
@@ -303,6 +301,7 @@ public class ExamService {
         attempt.setStudent(student);
         attempt.setScore(calculatedScore);
         attempt.setAnswersJson(answersJson);
+        attempt.setIsEntryExam(Boolean.TRUE.equals(exam.getIsEntryExam()));
         attempt.setStartedAt(LocalDateTime.now().minusMinutes(exam.getDurationMinutes()));
         attempt.setSubmittedAt(LocalDateTime.now());
 

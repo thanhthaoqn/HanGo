@@ -321,10 +321,12 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
                   ?.toString()
                   .toUpperCase();
               return CourseManagerEditExamPage(
-                examId: _editingExamData!['id'] as int,
+                examId: (_editingExamData!['id'] as num).toInt(),
                 examTitle: _editingExamData!['title'] ?? 'Untitled Exam',
                 examExpectedCount:
-                    _editingExamData!['expectedQuestionCount'] as int? ?? 10,
+                    _editingExamData!['expectedQuestionCount'] != null
+                    ? (_editingExamData!['expectedQuestionCount'] as num).toInt()
+                    : 10,
                 isReadOnly: (examStatus != 'DRAFT' && examStatus != 'REJECTED' && examStatus != 'PUBLISHED' && examStatus != 'HIDDEN'),
                 courseManagerActionStatus: examStatus,
                 isCourseManager: true,
@@ -904,20 +906,29 @@ class _CourseManagerExamsPageState extends State<CourseManagerExamsPage> {
               showDialog(
                 context: context,
                 builder: (ctx) => ExamReviewDashboardDialog(
-                  examId: exam['id'] as int,
+                  examId: (exam['id'] as num).toInt(),
                   examTitle: exam['title'] ?? 'Untitled Exam',
-                  examExpectedCount: exam['expectedQuestionCount'] as int? ?? 10,
-                  examQuestionCount: exam['questionCount'] as int? ?? 0,
-                  examDurationMinutes: exam['durationMinutes'] as int? ?? 0,
+                  examExpectedCount: exam['expectedQuestionCount'] != null
+                      ? (exam['expectedQuestionCount'] as num).toInt()
+                      : 10,
+                  examQuestionCount: exam['questionCount'] != null
+                      ? (exam['questionCount'] as num).toInt()
+                      : 0,
+                  examDurationMinutes: exam['durationMinutes'] != null
+                      ? (exam['durationMinutes'] as num).toInt()
+                      : 0,
                   examCreatedAt: _formatDate(exam['createdAt']),
                   examUpdatedAt: exam['updatedAt'] != null
                       ? _formatDate(exam['updatedAt'])
                       : null,
                   status: status,
                   isCourseManager: true,
-                  creatorId: exam['creatorId'] as int?,
+                  creatorId: exam['creatorId'] != null
+                      ? (exam['creatorId'] as num).toInt()
+                      : null,
                   creatorName: exam['creatorName']?.toString(),
                   currentUserId: _currentUserId,
+                  isEntryExam: exam['isEntryExam'] == true,
                   onActionSuccess: () {
                     _fetchExamsData();
                   },

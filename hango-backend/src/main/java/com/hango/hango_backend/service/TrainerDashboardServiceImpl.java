@@ -1379,6 +1379,30 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
         }
 
         String oldStatus = exam.getStatus();
+
+        // ── Entry-Exam guard ──────────────────────────────────────────────────
+        // When hiding an exam that is flagged as an Entry Exam we must ensure
+        // the learner-facing placement test remains available at all times.
+        if ("HIDDEN".equalsIgnoreCase(status) && Boolean.TRUE.equals(exam.getIsEntryExam())) {
+            // Count how many OTHER published entry-exam candidates still exist
+            // (excluding this exam itself, which is still PUBLISHED at this point).
+            long otherPublishedEntryExams =
+                    examRepository.countByIsEntryExamTrueAndStatusAndDeletedAtIsNull("PUBLISHED") - 1;
+
+            if (otherPublishedEntryExams <= 0) {
+                // This is the last published entry exam — block the action.
+                throw new RuntimeException(
+                        "Cannot hide this exam: it is the only published Entry Exam. "
+                        + "Please assign another published exam as Entry Exam first, "
+                        + "then hide this one.");
+            }
+
+            // There are other published entry exams — auto-clear the flag so
+            // the hidden exam is no longer served to learners.
+            exam.setIsEntryExam(false);
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
         exam.setStatus(status);
         examRepository.save(exam);
         examHistoryService.log(exam, mapStatusChangeToAction(oldStatus, status), oldStatus, status, null, null);

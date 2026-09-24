@@ -42,6 +42,9 @@ public interface ExamRepository extends JpaRepository<Exam, Long> {
 
     long countByIsEntryExamTrueAndDeletedAtIsNull();
 
+    // Count published entry exams — used to guard against hiding the last one.
+    long countByIsEntryExamTrueAndStatusAndDeletedAtIsNull(String status);
+
     @Query("SELECT e.id, e.title, e.createdAt, e.expectedQuestionCount, e.durationMinutes, e.status, e.visibility, e.thumbnailUrl, e.description, e.passingScore, u.id, u.fullName, e.rejectionReason " +
            "FROM Exam e LEFT JOIN e.createdBy u WHERE e.deletedAt IS NULL AND (u.id = :trainerId OR UPPER(e.status) != 'DRAFT') " +
            "ORDER BY e.createdAt DESC")

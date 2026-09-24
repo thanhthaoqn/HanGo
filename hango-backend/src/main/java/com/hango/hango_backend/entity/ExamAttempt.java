@@ -31,4 +31,7 @@ public class ExamAttempt {
 
     @Column(name = "answers_json", columnDefinition = "TEXT")
     private String answersJson;
+
+    @Column(name = "is_entry_exam")
+    private Boolean isEntryExam = false;
 }

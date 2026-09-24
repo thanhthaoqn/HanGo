@@ -325,9 +325,11 @@ class _CourseManagerCreateExamPageState
       context,
       MaterialPageRoute(
         builder: (context) => CourseManagerEditExamPage(
-          examId: examData['id'] as int,
+          examId: (examData['id'] as num).toInt(),
           examTitle: examData['title'] as String? ?? 'Untitled Exam',
-          examExpectedCount: examData['expectedQuestionCount'] as int? ?? 10,
+          examExpectedCount: examData['expectedQuestionCount'] != null
+              ? (examData['expectedQuestionCount'] as num).toInt()
+              : 10,
           isCourseManager: widget.isCourseManager,
           initialAiData: examData['aiData'] as TrainerAiExamGenerateResponse?,
         ),

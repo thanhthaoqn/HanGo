@@ -395,10 +395,12 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
             )
           : _editingExamData != null
           ? CourseManagerEditExamPage(
-              examId: _editingExamData!['id'] as int,
+              examId: (_editingExamData!['id'] as num).toInt(),
               examTitle: _editingExamData!['title'] ?? 'Untitled Exam',
               examExpectedCount:
-                  _editingExamData!['expectedQuestionCount'] as int? ?? 10,
+                  _editingExamData!['expectedQuestionCount'] != null
+                  ? (_editingExamData!['expectedQuestionCount'] as num).toInt()
+                  : 10,
               isReadOnly: ![
                 'DRAFT',
                 'REJECTED',
@@ -453,13 +455,13 @@ class _TrainerExamsPageState extends State<TrainerExamsPage> {
                         )
                       : _editingExamData != null
                       ? CourseManagerEditExamPage(
-                          examId: _editingExamData!['id'] as int,
+                          examId: (_editingExamData!['id'] as num).toInt(),
                           examTitle:
                               _editingExamData!['title'] ?? 'Untitled Exam',
                           examExpectedCount:
-                              _editingExamData!['expectedQuestionCount']
-                                  as int? ??
-                              10,
+                              _editingExamData!['expectedQuestionCount'] != null
+                              ? (_editingExamData!['expectedQuestionCount'] as num).toInt()
+                              : 10,
                           isReadOnly: !['DRAFT', 'REJECTED', 'PUBLISHED']
                               .contains(
                                 _editingExamData!['status']
