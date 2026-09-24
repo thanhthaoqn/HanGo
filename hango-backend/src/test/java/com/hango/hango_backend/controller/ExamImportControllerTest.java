@@ -72,7 +72,7 @@ class ExamImportControllerTest {
             wb.createSheet("INFO");
             Sheet examSheet = wb.createSheet("EXAM");
             writeRow(examSheet, 0, new String[] { "Exam Code", "Title", "Description", "Question Count",
-                    "Passing Score", "Time", "Thumbnail URL" });
+                    "Time", "Passing Score", "Thumbnail URL" });
             int r = 1;
             for (String[] row : examRows) {
                 writeRow(examSheet, r++, row);
@@ -102,7 +102,7 @@ class ExamImportControllerTest {
 
     private String[] examRow(String code, String title, String desc, String qCount, String passingScore,
             String time) {
-        return new String[] { code, title, desc, qCount, passingScore, time, null };
+        return new String[] { code, title, desc, qCount, time, passingScore, null };
     }
 
     private String[] standaloneQuestionRow(String examCode, String qText, String correct, String skill,
