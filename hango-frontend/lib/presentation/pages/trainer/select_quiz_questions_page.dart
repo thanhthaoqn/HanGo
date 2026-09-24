@@ -4,6 +4,7 @@ import 'package:hango/presentation/widgets/internal_app_header.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../../widgets/trainer_action_required_card.dart';
+import '../../widgets/trainer_insights_card.dart';
 import '../../../utils/config.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../utils/toast_helper.dart';
@@ -724,8 +725,7 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
     }
     
     List<TextEditingController> optCtrls = options.map((o) => TextEditingController(text: o)).toList();
-    if (optCtrls.isEmpty) {
-      optCtrls.add(TextEditingController());
+    while (optCtrls.length < 4) {
       optCtrls.add(TextEditingController());
     }
     
@@ -1330,97 +1330,8 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
             rejectionReason: widget.rejectionReason,
           ),
           const SizedBox(height: 20),
-          // Trainer Tips Card
-          Container(
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFEFF2F5)),
-            ),
-            child: Stack(
-              children: [
-                // Background Watermark
-                Positioned(
-                  right: -24,
-                  bottom: -24,
-                  child: Icon(
-                    Icons.lightbulb_outline,
-                    size: 120,
-                    color: const Color(0xFF20B486).withOpacity(0.05),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF20B486).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(
-                              Icons.lightbulb_outline,
-                              color: Color(0xFF20B486),
-                              size: 18,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          const Text(
-                            'Trainer Insights',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1E293B),
-                              fontFamily: 'Outfit',
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Engaging videos and clear syllabus help students stay motivated. Consider adding short quizzes after each section to reinforce learning.',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF64748B),
-                          height: 1.5,
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      InkWell(
-                        onTap: () {},
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text(
-                              'Explore more tips',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF20B486),
-                                fontFamily: 'Outfit',
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            const Icon(
-                              Icons.arrow_forward_rounded,
-                              color: Color(0xFF20B486),
-                              size: 16,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+          // Trainer Insights Card
+          const TrainerInsightsCard(),
         ],
       ),
     );

@@ -133,6 +133,12 @@ class _AddMultipleChoiceQuestionPageState
             'isCorrect': j == correctIdx,
           });
         }
+        while (options.length < 4) {
+          options.add({
+            'textController': TextEditingController(text: ''),
+            'isCorrect': false,
+          });
+        }
 
         setState(() {
           _answerSets.add({
@@ -289,29 +295,34 @@ class _AddMultipleChoiceQuestionPageState
   }
 
   void _addOptionToSet(int setIndex) {
+    if (setIndex < 0 || setIndex >= _answerSets.length) return;
     setState(() {
       final options =
           _answerSets[setIndex]['options'] as List<Map<String, dynamic>>;
       options.add({
-        'textController': TextEditingController(),
-        'isCorrect': false,
+        'textController': TextEditingController(text: ''),
+        'isCorrect': options.isEmpty,
       });
     });
   }
 
   void _removeOptionFromSet(int setIndex, int optionIndex) {
+    if (setIndex < 0 || setIndex >= _answerSets.length) return;
     final options =
         _answerSets[setIndex]['options'] as List<Map<String, dynamic>>;
-    if (options.length <= 1) {
+    if (options.length <= 2) {
       ToastHelper.showError(
         context,
-        'Each question set must have at least one option.',
+        'Each question set must have at least 2 options.',
       );
       return;
     }
     setState(() {
       options[optionIndex]['textController'].dispose();
       options.removeAt(optionIndex);
+      if (!options.any((o) => o['isCorrect'] == true) && options.isNotEmpty) {
+        options[0]['isCorrect'] = true;
+      }
     });
   }
 
@@ -1983,12 +1994,10 @@ class _AddMultipleChoiceQuestionPageState
                             ),
                             const SizedBox(height: 12),
 
-                            // Options builder for this question set
-                            ListView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: options.length,
-                              itemBuilder: (context, optIdx) {
+                            // Options list for this question set
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: List.generate(options.length, (optIdx) {
                                 final opt = options[optIdx];
                                 final bool isCorrect = opt['isCorrect'] as bool;
                                 final textCtrl =
@@ -2084,23 +2093,49 @@ class _AddMultipleChoiceQuestionPageState
                                     ],
                                   ),
                                 );
-                              },
+                              }),
                             ),
+
                             // Add option to set button
-                            TextButton.icon(
-                              onPressed: () => _addOptionToSet(setIdx),
-                              icon: const Icon(
-                                Icons.add,
-                                size: 14,
-                                color: Color(0xFF20B486),
-                              ),
-                              label: const Text(
-                                'Add Option',
-                                style: TextStyle(
-                                  color: Color(0xFF20B486),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: 'Outfit',
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: InkWell(
+                                onTap: () => _addOptionToSet(setIdx),
+                                borderRadius: BorderRadius.circular(6),
+                                mouseCursor: SystemMouseCursors.click,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                    horizontal: 14,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF0FDF4),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: const Color(0xFFBBF7D0),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.add_circle_outline,
+                                        size: 16,
+                                        color: Color(0xFF20B486),
+                                      ),
+                                      SizedBox(width: 6),
+                                      Text(
+                                        'Add Option',
+                                        style: TextStyle(
+                                          color: Color(0xFF20B486),
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          fontFamily: 'Outfit',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),

@@ -10,6 +10,7 @@ import '../../../utils/toast_helper.dart';
 import '../../../utils/file_picker_helper.dart';
 import 'add_multiple_choice_question_page.dart';
 import '../../../data/repositories/trainer_ai_recommendation_repository.dart';
+import '../../widgets/trainer_insights_card.dart';
 
 class AddNewQuestionPage extends StatefulWidget {
   final int courseId;
@@ -126,10 +127,10 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
     if (questionIndex < 0 || questionIndex >= _singleQuestions.length) return;
     final opts =
         _singleQuestions[questionIndex]['options'] as List<Map<String, dynamic>>;
-    if (opts.length <= 1) {
+    if (opts.length <= 2) {
       ToastHelper.showError(
         context,
-        'Each question must have at least one option.',
+        'Each question must have at least 2 options.',
       );
       return;
     }
@@ -548,6 +549,7 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
   }
 
   Widget _buildLeftSidebar() {
+    const activeColor = Color(0xFF20B486);
     return Container(
       width: 260,
       decoration: const BoxDecoration(
@@ -569,76 +571,20 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
             ),
           ),
           const SizedBox(height: 16),
-          // Step 1: Introduction
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(color: const Color(0xFFEFF2F5)),
+          // Item 1: Introduction
+          InkWell(
+            onTap: () {
+              Navigator.pop(context);
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                children: [
-                  Container(
-                    width: 24,
-                    height: 24,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFE2F9F3),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.check,
-                      color: Color(0xFF20B486),
-                      size: 14,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Introduction',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E293B),
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        'Completed',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF20B486),
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'Outfit',
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          // Step 2: Syllabus
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(color: const Color(0xFF20B486)),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Stack(
-              children: [
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  bottom: 0,
-                  child: Container(width: 4, color: const Color(0xFF20B486)),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: const Color(0xFFEFF2F5)),
                 ),
-                Padding(
+                child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 12,
@@ -651,26 +597,89 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
                           border: Border.all(
-                            color: const Color(0xFF20B486),
+                            color: const Color(0xFF94A3B8),
                             width: 1.5,
                           ),
                           shape: BoxShape.circle,
                         ),
                         child: const Text(
-                          '2',
+                          '1',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF20B486),
+                            color: Color(0xFF94A3B8),
                             fontFamily: 'Outfit',
                           ),
                         ),
                       ),
                       const SizedBox(width: 12),
-                      const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      const Text(
+                        'Introduction',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF94A3B8),
+                          fontFamily: 'Outfit',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Item 2: Syllabus
+          InkWell(
+            onTap: () {
+              Navigator.pop(context);
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: const Color(0xFFEFF2F5)),
+                ),
+                child: Stack(
+                  children: [
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      child: Container(width: 4, color: activeColor),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      child: Row(
                         children: [
-                          Text(
+                          Container(
+                            width: 24,
+                            height: 24,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: activeColor,
+                                width: 1.5,
+                              ),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Text(
+                              '2',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: activeColor,
+                                fontFamily: 'Outfit',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
                             'Syllabus',
                             style: TextStyle(
                               fontSize: 14,
@@ -679,90 +688,17 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
                               fontFamily: 'Outfit',
                             ),
                           ),
-                          SizedBox(height: 2),
-                          Text(
-                            'In progress',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFF94A3B8),
-                              fontFamily: 'Outfit',
-                            ),
-                          ),
                         ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
-          const Spacer(),
-          // Progress Overview Box
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFEFF2F5)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'Progress Overview',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
-                    fontFamily: 'Outfit',
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  '1/3 steps completed successfully. Complete the remaining steps to publish the course.',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF64748B),
-                    height: 1.4,
-                    fontFamily: 'Outfit',
-                  ),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE2E8F0),
-                    foregroundColor: const Color(0xFF94A3B8),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  icon: const Icon(Icons.send_outlined, size: 14),
-                  label: const Text(
-                    'Submit for Review',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                      fontFamily: 'Outfit',
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Center(
-                  child: Text(
-                    'submit once 100% completed',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Color(0xFF94A3B8),
-                      fontFamily: 'Outfit',
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          const SizedBox(height: 20),
+          // Trainer Insights Card
+          const TrainerInsightsCard(),
         ],
       ),
     );
@@ -1741,7 +1677,7 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
               ),
               icon: const Icon(Icons.add, size: 14, color: Color(0xFF475569)),
               label: const Text(
-                'Add New Quesion',
+                'Add New Question',
                 style: TextStyle(
                   color: Color(0xFF475569),
                   fontWeight: FontWeight.bold,
@@ -1989,27 +1925,45 @@ class _AddNewQuestionPageState extends State<AddNewQuestionPage> {
                           ),
 
                           // Add Option
-                          TextButton.icon(
-                            onPressed: () => _addOptionToQuestion(setIdx),
-                            style: TextButton.styleFrom(
-                              foregroundColor: const Color(0xFF20B486),
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 10,
-                                horizontal: 16,
-                              ),
-                            ),
-                            icon: const Icon(
-                              Icons.add,
-                              size: 14,
-                              color: Color(0xFF20B486),
-                            ),
-                            label: const Text(
-                              'Add Option',
-                              style: TextStyle(
-                                color: Color(0xFF20B486),
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'Outfit',
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: InkWell(
+                              onTap: () => _addOptionToQuestion(setIdx),
+                              borderRadius: BorderRadius.circular(6),
+                              mouseCursor: SystemMouseCursors.click,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                  horizontal: 14,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF0FDF4),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: const Color(0xFFBBF7D0),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.add_circle_outline,
+                                      size: 16,
+                                      color: Color(0xFF20B486),
+                                    ),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      'Add Option',
+                                      style: TextStyle(
+                                        color: Color(0xFF20B486),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'Outfit',
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
