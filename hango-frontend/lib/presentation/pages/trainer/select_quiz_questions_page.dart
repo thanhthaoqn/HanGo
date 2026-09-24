@@ -692,23 +692,50 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
     );
   }
 
+  int? _extractId(dynamic val) {
+    if (val == null) return null;
+    if (val is int) return val;
+    if (val is num) return val.toInt();
+    return int.tryParse(val.toString());
+  }
+
   // Edit Question Dialog
   Future<void> _showEditQuestionDialog(Map<String, dynamic> q) async {
     final TextEditingController textCtrl = TextEditingController(text: q['questionText'] ?? '');
     final TextEditingController explCtrl = TextEditingController(text: q['explanation'] ?? '');
-    final TextEditingController passageCtrl = TextEditingController(text: q['passageText'] ?? (q['questionGroup'] != null ? q['questionGroup']['contextText'] : ''));
-    int? currentSkillParamId = q['skillParamId'] ?? (q['skillParam'] != null ? q['skillParam']['id'] : null);
-    int? currentGroupTypeParamId = q['questionGroup'] != null ? (q['questionGroup']['groupTypeParamId'] ?? (q['questionGroup']['groupTypeParam'] != null ? q['questionGroup']['groupTypeParam']['id'] : null)) : null;
-    int? currentDifficultyParamId = q['difficultyParamId'] ?? (q['difficultyParam'] != null ? q['difficultyParam']['id'] : null);
+    final TextEditingController passageCtrl = TextEditingController(
+      text: q['passageText'] ?? (q['questionGroup'] is Map ? q['questionGroup']['contextText'] : ''),
+    );
+    int? currentSkillParamId = _extractId(q['skillParamId'] ?? (q['skillParam'] is Map ? q['skillParam']['id'] : null));
+    int? currentGroupTypeParamId = _extractId(
+      q['groupTypeParamId'] ??
+      (q['questionGroup'] is Map
+        ? (q['questionGroup']['groupTypeParamId'] ?? (q['questionGroup']['groupTypeParam'] is Map ? q['questionGroup']['groupTypeParam']['id'] : null))
+        : null)
+    );
+    int? currentDifficultyParamId = _extractId(q['difficultyParamId'] ?? (q['difficultyParam'] is Map ? q['difficultyParam']['id'] : null));
     
-    if (currentSkillParamId != null && !_skillsList.any((s) => s['id'] == currentSkillParamId)) currentSkillParamId = null;
-    if (currentGroupTypeParamId != null && !_groupTypesList.any((g) => g['id'] == currentGroupTypeParamId)) currentGroupTypeParamId = null;
-    if (currentDifficultyParamId != null && !_difficultyList.any((d) => d['id'] == currentDifficultyParamId)) currentDifficultyParamId = null;
+    if (currentSkillParamId != null && !_skillsList.any((s) => _extractId(s['id']) == currentSkillParamId)) {
+      currentSkillParamId = null;
+    }
+    if (currentGroupTypeParamId != null && !_groupTypesList.any((g) => _extractId(g['id']) == currentGroupTypeParamId)) {
+      currentGroupTypeParamId = null;
+    }
+    if (currentDifficultyParamId != null && !_difficultyList.any((d) => _extractId(d['id']) == currentDifficultyParamId)) {
+      currentDifficultyParamId = null;
+    }
 
-    bool isGrouped = q['passageText'] != null || q['questionGroup'] != null;
+    bool isGrouped = (q['passageText'] != null && q['passageText'].toString().trim().isNotEmpty) ||
+        q['questionGroup'] != null ||
+        q['group_id'] != null ||
+        q['groupId'] != null;
     
     List<String> options = [];
     int correctIndex = 0;
+    if (q['correctIndex'] != null) {
+      final parsedCorrect = _extractId(q['correctIndex']);
+      if (parsedCorrect != null) correctIndex = parsedCorrect;
+    }
     if (q['options'] != null) {
       final opts = q['options'] as List;
       for (int i = 0; i < opts.length; i++) {
@@ -725,307 +752,411 @@ class _SelectQuizQuestionsPageState extends State<SelectQuizQuestionsPage> {
     }
     
     List<TextEditingController> optCtrls = options.map((o) => TextEditingController(text: o)).toList();
-    while (optCtrls.length < 4) {
-      optCtrls.add(TextEditingController());
+    if (optCtrls.isEmpty) {
+      while (optCtrls.length < 4) {
+        optCtrls.add(TextEditingController());
+      }
+    } else {
+      while (optCtrls.length < 2) {
+        optCtrls.add(TextEditingController());
+      }
     }
     
-    if (correctIndex >= optCtrls.length) correctIndex = 0;
+    if (correctIndex >= optCtrls.length || correctIndex < 0) correctIndex = 0;
     
     bool isSaving = false;
 
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setStateSB) {
-            return AlertDialog(
-              backgroundColor: Colors.white,
-              title: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Edit Question', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF1E293B))),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Color(0xFF64748B)),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-              content: SingleChildScrollView(
-                child: SizedBox(
-                  width: 600,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (isGrouped) ...[
-                        const Text('Passage Text (Group Context)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569))),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: passageCtrl,
-                          maxLines: 4,
-                          decoration: InputDecoration(
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF20B486))),
-                            hintText: 'Enter passage text...',
+    try {
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) {
+          return StatefulBuilder(
+            builder: (context, setStateSB) {
+              return AlertDialog(
+                backgroundColor: Colors.white,
+                title: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Edit Question', style: TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF1E293B))),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Color(0xFF64748B)),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                content: SingleChildScrollView(
+                  child: SizedBox(
+                    width: 600,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (isGrouped) ...[
+                          const Text('Passage Text (Group Context)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569))),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: passageCtrl,
+                            maxLines: 4,
+                            decoration: InputDecoration(
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF20B486))),
+                              hintText: 'Enter passage text...',
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        const Text('Group Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569))),
+                          const SizedBox(height: 16),
+                          const Text('Group Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569))),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(8)),
+                            child: DropdownButton<int>(
+                              isExpanded: true, underline: const SizedBox(),
+                              value: currentGroupTypeParamId,
+                              hint: const Text('Select Group Type'),
+                              items: [
+                                const DropdownMenuItem<int>(value: null, child: Text('None')),
+                                ..._groupTypesList.map((g) => DropdownMenuItem<int>(
+                                  value: _extractId(g['id']),
+                                  child: Text(g['paramValue'] ?? ''),
+                                )),
+                              ],
+                              onChanged: (val) => setStateSB(() => currentGroupTypeParamId = val),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                        const Text('Skill Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569))),
                         const SizedBox(height: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(8)),
                           child: DropdownButton<int>(
                             isExpanded: true, underline: const SizedBox(),
-                            value: currentGroupTypeParamId,
-                            hint: const Text('Select Group Type'),
+                            value: currentSkillParamId,
+                            hint: const Text('Select Skill Type'),
                             items: [
                               const DropdownMenuItem<int>(value: null, child: Text('None')),
-                              ..._groupTypesList.map((g) => DropdownMenuItem<int>(value: g['id'], child: Text(g['paramValue'] ?? ''))),
+                              ..._skillsList.map((s) => DropdownMenuItem<int>(
+                                value: _extractId(s['id']),
+                                child: Text(s['paramValue'] ?? ''),
+                              )),
                             ],
-                            onChanged: (val) => setStateSB(() => currentGroupTypeParamId = val),
+                            onChanged: (val) => setStateSB(() => currentSkillParamId = val),
                           ),
                         ),
                         const SizedBox(height: 16),
-                      ],
-                      const Text('Skill Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569))),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(8)),
-                        child: DropdownButton<int>(
-                          isExpanded: true, underline: const SizedBox(),
-                          value: currentSkillParamId,
-                          hint: const Text('Select Skill Type'),
-                          items: [
-                            const DropdownMenuItem<int>(value: null, child: Text('None')),
-                            ..._skillsList.map((s) => DropdownMenuItem<int>(value: s['id'], child: Text(s['paramValue'] ?? ''))),
-                          ],
-                          onChanged: (val) => setStateSB(() => currentSkillParamId = val),
+                        const Text('Difficulty', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569))),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(8)),
+                          child: DropdownButton<int>(
+                            isExpanded: true, underline: const SizedBox(),
+                            value: currentDifficultyParamId,
+                            hint: const Text('Select Difficulty'),
+                            items: [
+                              const DropdownMenuItem<int>(value: null, child: Text('None')),
+                              ..._difficultyList.map((d) => DropdownMenuItem<int>(
+                                value: _extractId(d['id']),
+                                child: Text(d['paramValue'] ?? ''),
+                              )),
+                            ],
+                            onChanged: (val) => setStateSB(() => currentDifficultyParamId = val),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text('Difficulty', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569))),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(border: Border.all(color: Colors.grey), borderRadius: BorderRadius.circular(8)),
-                        child: DropdownButton<int>(
-                          isExpanded: true, underline: const SizedBox(),
-                          value: currentDifficultyParamId,
-                          hint: const Text('Select Difficulty'),
-                          items: [
-                            const DropdownMenuItem<int>(value: null, child: Text('None')),
-                            ..._difficultyList.map((d) => DropdownMenuItem<int>(value: d['id'], child: Text(d['paramValue'] ?? ''))),
-                          ],
-                          onChanged: (val) => setStateSB(() => currentDifficultyParamId = val),
+                        const SizedBox(height: 16),
+                        const Text('Question Text', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569))),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: textCtrl,
+                          maxLines: 3,
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF20B486))),
+                            contentPadding: const EdgeInsets.all(12),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text('Question Text', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569))),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: textCtrl,
-                        maxLines: 3,
-                        decoration: InputDecoration(
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF20B486))),
-                          contentPadding: const EdgeInsets.all(12),
+                        const SizedBox(height: 16),
+                        const Text('Explanation', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569))),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: explCtrl,
+                          maxLines: 2,
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF20B486))),
+                            contentPadding: const EdgeInsets.all(12),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text('Explanation', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569))),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: explCtrl,
-                        maxLines: 2,
-                        decoration: InputDecoration(
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF20B486))),
-                          contentPadding: const EdgeInsets.all(12),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text('Options', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569))),
-                      const SizedBox(height: 8),
-                      ...List.generate(optCtrls.length, (index) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8.0),
-                          child: Row(
-                            children: [
-                              Radio<int>(
-                                value: index,
-                                groupValue: correctIndex,
-                                activeColor: const Color(0xFF20B486),
-                                onChanged: (val) {
-                                  setStateSB(() {
-                                    correctIndex = val!;
-                                  });
-                                },
-                              ),
-                              Expanded(
-                                child: TextField(
-                                  controller: optCtrls[index],
-                                  decoration: InputDecoration(
-                                    hintText: 'Option ${index + 1}',
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF20B486))),
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        const SizedBox(height: 16),
+                        const Text('Options', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569))),
+                        const SizedBox(height: 8),
+                        ...List.generate(optCtrls.length, (index) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8.0),
+                            child: Row(
+                              children: [
+                                Radio<int>(
+                                  value: index,
+                                  groupValue: correctIndex,
+                                  activeColor: const Color(0xFF20B486),
+                                  onChanged: (val) {
+                                    setStateSB(() {
+                                      correctIndex = val!;
+                                    });
+                                  },
+                                ),
+                                Expanded(
+                                  child: TextField(
+                                    controller: optCtrls[index],
+                                    decoration: InputDecoration(
+                                      hintText: 'Option ${index + 1}',
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF20B486))),
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    ),
                                   ),
                                 ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline, size: 20, color: Color(0xFFEF4444)),
-                                onPressed: () {
-                                  if (optCtrls.length > 2) {
-                                    setStateSB(() {
-                                      optCtrls[index].dispose();
-                                      optCtrls.removeAt(index);
-                                      if (correctIndex == index) correctIndex = 0;
-                                      else if (correctIndex > index) correctIndex--;
-                                    });
-                                  } else {
-                                    ToastHelper.showError(ctx, 'Minimum 2 options required.');
-                                  }
-                                },
-                              )
-                            ],
-                          ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, size: 20, color: Color(0xFFEF4444)),
+                                  onPressed: () {
+                                    if (optCtrls.length > 2) {
+                                      setStateSB(() {
+                                        optCtrls[index].dispose();
+                                        optCtrls.removeAt(index);
+                                        if (correctIndex == index) {
+                                          correctIndex = 0;
+                                        } else if (correctIndex > index) {
+                                          correctIndex--;
+                                        }
+                                      });
+                                    } else {
+                                      ToastHelper.showError(ctx, 'Minimum 2 options required.');
+                                    }
+                                  },
+                                )
+                              ],
+                            ),
+                          );
+                        }),
+                        const SizedBox(height: 8),
+                        TextButton.icon(
+                          onPressed: () {
+                            setStateSB(() {
+                              optCtrls.add(TextEditingController());
+                            });
+                          },
+                          icon: const Icon(Icons.add, size: 16, color: Color(0xFF20B486)),
+                          label: const Text('Add Option', style: TextStyle(color: Color(0xFF20B486), fontWeight: FontWeight.bold)),
+                        )
+                      ],
+                    ),
+                  ),
+                ),
+                actions: [
+                  OutlinedButton(
+                    onPressed: isSaving ? null : () => Navigator.pop(ctx),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: const Text('Cancel', style: TextStyle(color: Color(0xFF475569))),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF20B486),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: isSaving ? null : () async {
+                      final qId = q['id'];
+                      final updatedText = textCtrl.text.trim();
+                      final updatedExpl = explCtrl.text.trim();
+                      final updatedOpts = optCtrls.map((c) => c.text.trim()).toList();
+                      
+                      if (updatedText.isEmpty) {
+                        ToastHelper.showError(ctx, 'Question text cannot be empty.');
+                        return;
+                      }
+                      if (updatedOpts.any((o) => o.isEmpty)) {
+                        ToastHelper.showError(ctx, 'All options must be filled.');
+                        return;
+                      }
+
+                      setStateSB(() => isSaving = true);
+
+                      try {
+                        final token = await _authService.getToken();
+                        final Map<String, dynamic> payload = {
+                          "questionText": updatedText,
+                          "explanation": updatedExpl,
+                          "options": List.generate(updatedOpts.length, (i) => {
+                            "optionText": updatedOpts[i],
+                            "isCorrect": i == correctIndex
+                          })
+                        };
+                        
+                        if (isGrouped) {
+                          payload["passageText"] = passageCtrl.text.trim();
+                          final gId = q['questionGroup'] is Map 
+                              ? q['questionGroup']['id'] 
+                              : (q['groupId'] ?? q['group_id']);
+                          if (gId != null) {
+                            payload["groupId"] = gId;
+                          }
+                          if (currentGroupTypeParamId != null) {
+                            payload["groupTypeParamId"] = currentGroupTypeParamId;
+                          }
+                        }
+                        if (currentSkillParamId != null) {
+                          payload["skillParamId"] = currentSkillParamId;
+                        }
+                        if (currentDifficultyParamId != null) {
+                          payload["difficultyId"] = currentDifficultyParamId;
+                        }
+                        
+                        final response = await http.put(
+                          Uri.parse('$apiBaseUrl/trainer/questions/$qId'),
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer $token',
+                          },
+                          body: jsonEncode(payload),
                         );
-                      }),
-                      const SizedBox(height: 8),
-                      TextButton.icon(
-                        onPressed: () {
-                          setStateSB(() {
-                            optCtrls.add(TextEditingController());
-                          });
-                        },
-                        icon: const Icon(Icons.add, size: 16, color: Color(0xFF20B486)),
-                        label: const Text('Add Option', style: TextStyle(color: Color(0xFF20B486), fontWeight: FontWeight.bold)),
-                      )
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                OutlinedButton(
-                  onPressed: isSaving ? null : () => Navigator.pop(ctx),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFFCBD5E1)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  child: const Text('Cancel', style: TextStyle(color: Color(0xFF475569))),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF20B486),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  onPressed: isSaving ? null : () async {
-                    final qId = q['id'];
-                    final updatedText = textCtrl.text.trim();
-                    final updatedExpl = explCtrl.text.trim();
-                    final updatedOpts = optCtrls.map((c) => c.text.trim()).toList();
-                    
-                    if (updatedText.isEmpty) {
-                      ToastHelper.showError(ctx, 'Question text cannot be empty.');
-                      return;
-                    }
-                    if (updatedOpts.any((o) => o.isEmpty)) {
-                      ToastHelper.showError(ctx, 'All options must be filled.');
-                      return;
-                    }
 
-                    setStateSB(() => isSaving = true);
+                        if (response.statusCode == 200) {
+                          ToastHelper.showSuccess(ctx, 'Question updated successfully');
+                          if (mounted) {
+                            Navigator.pop(ctx);
+                            
+                            // Update local draft state instead of fetching from server to preserve unsaved drafts
+                            setState(() {
+                              final index = _quizQuestions.indexWhere((item) => item['id'] == qId);
 
-                    try {
-                      final token = await _authService.getToken();
-                      final Map<String, dynamic> payload = {
-                        "questionText": updatedText,
-                        "explanation": updatedExpl,
-                        "options": List.generate(updatedOpts.length, (i) => {
-                          "optionText": updatedOpts[i],
-                          "isCorrect": i == correctIndex
-                        })
-                      };
-                      
-                      if (isGrouped) {
-                        payload["passageText"] = passageCtrl.text.trim();
-                        if (q['questionGroup'] != null) {
-                          payload["groupId"] = q['questionGroup']['id'];
-                        }
-                        if (currentGroupTypeParamId != null) {
-                          payload["groupTypeParamId"] = currentGroupTypeParamId;
-                        }
-                      }
-                      if (currentSkillParamId != null) {
-                        payload["skillParamId"] = currentSkillParamId;
-                      }
-                      if (currentDifficultyParamId != null) {
-                        payload["difficultyId"] = currentDifficultyParamId;
-                      }
-                      
-                      final response = await http.put(
-                        Uri.parse('$apiBaseUrl/trainer/questions/$qId'),
-                        headers: {
-                          'Content-Type': 'application/json',
-                          'Authorization': 'Bearer $token',
-                        },
-                        body: jsonEncode(payload),
-                      );
+                              void updateQuestionMap(Map<String, dynamic> target) {
+                                target['questionText'] = updatedText;
+                                target['explanation'] = updatedExpl;
+                                
+                                if (isGrouped) {
+                                  final pText = passageCtrl.text.trim();
+                                  target['passageText'] = pText;
+                                  if (target['questionGroup'] != null && target['questionGroup'] is Map) {
+                                    target['questionGroup']['contextText'] = pText;
+                                    target['questionGroup']['groupTypeParamId'] = currentGroupTypeParamId;
+                                  }
+                                }
+                                
+                                // Group Type
+                                target['groupTypeParamId'] = currentGroupTypeParamId;
+                                if (currentGroupTypeParamId != null) {
+                                  final gObj = _groupTypesList.firstWhere(
+                                    (g) => _extractId(g['id']) == currentGroupTypeParamId,
+                                    orElse: () => null,
+                                  );
+                                  target['groupTypeName'] = gObj != null ? gObj['paramValue'] : null;
+                                  if (target['questionGroup'] != null && target['questionGroup'] is Map) {
+                                    target['questionGroup']['groupTypeParamId'] = currentGroupTypeParamId;
+                                    if (target['questionGroup']['groupTypeParam'] != null && target['questionGroup']['groupTypeParam'] is Map) {
+                                      target['questionGroup']['groupTypeParam']['id'] = currentGroupTypeParamId;
+                                      target['questionGroup']['groupTypeParam']['paramValue'] = target['groupTypeName'];
+                                    }
+                                  }
+                                } else {
+                                  target['groupTypeName'] = null;
+                                  if (target['questionGroup'] != null && target['questionGroup'] is Map) {
+                                    target['questionGroup']['groupTypeParamId'] = null;
+                                    if (target['questionGroup']['groupTypeParam'] != null && target['questionGroup']['groupTypeParam'] is Map) {
+                                      target['questionGroup']['groupTypeParam']['id'] = null;
+                                      target['questionGroup']['groupTypeParam']['paramValue'] = null;
+                                    }
+                                  }
+                                }
 
-                      if (response.statusCode == 200) {
-                        ToastHelper.showSuccess(ctx, 'Question updated successfully');
-                        if (mounted) {
-                          Navigator.pop(ctx);
-                          
-                          // Update local draft state instead of fetching from server to preserve unsaved drafts
-                          setState(() {
-                            final index = _quizQuestions.indexWhere((item) => item['id'] == qId);
-                            if (index != -1) {
-                              _quizQuestions[index]['questionText'] = updatedText;
-                              _quizQuestions[index]['explanation'] = updatedExpl;
-                              
-                              if (isGrouped) {
-                                _quizQuestions[index]['passageText'] = passageCtrl.text.trim();
+                                // Skill
+                                target['skillParamId'] = currentSkillParamId;
+                                if (currentSkillParamId != null) {
+                                  final sObj = _skillsList.firstWhere(
+                                    (s) => _extractId(s['id']) == currentSkillParamId,
+                                    orElse: () => null,
+                                  );
+                                  target['skillName'] = sObj != null ? sObj['paramValue'] : null;
+                                  if (target['skillParam'] != null && target['skillParam'] is Map) {
+                                    target['skillParam']['id'] = currentSkillParamId;
+                                    target['skillParam']['paramValue'] = target['skillName'];
+                                  }
+                                } else {
+                                  target['skillName'] = null;
+                                  if (target['skillParam'] != null && target['skillParam'] is Map) {
+                                    target['skillParam']['id'] = null;
+                                    target['skillParam']['paramValue'] = null;
+                                  }
+                                }
+
+                                // Difficulty
+                                target['difficultyParamId'] = currentDifficultyParamId;
+                                if (currentDifficultyParamId != null) {
+                                  final dObj = _difficultyList.firstWhere(
+                                    (d) => _extractId(d['id']) == currentDifficultyParamId,
+                                    orElse: () => null,
+                                  );
+                                  target['difficultyName'] = dObj != null ? dObj['paramValue'] : null;
+                                  if (target['difficultyParam'] != null && target['difficultyParam'] is Map) {
+                                    target['difficultyParam']['id'] = currentDifficultyParamId;
+                                    target['difficultyParam']['paramValue'] = target['difficultyName'];
+                                  }
+                                } else {
+                                  target['difficultyName'] = null;
+                                  if (target['difficultyParam'] != null && target['difficultyParam'] is Map) {
+                                    target['difficultyParam']['id'] = null;
+                                    target['difficultyParam']['paramValue'] = null;
+                                  }
+                                }
+
+                                // Options & Correct Index
+                                target['options'] = List.generate(updatedOpts.length, (i) => {
+                                  "optionText": updatedOpts[i],
+                                  "isCorrect": i == correctIndex,
+                                });
+                                target['correctIndex'] = correctIndex;
                               }
-                              
-                              // Re-fetch the param values for display
-                              if (currentSkillParamId != null) {
-                                final sObj = _skillsList.firstWhere((s) => s['id'] == currentSkillParamId, orElse: () => null);
-                                if (sObj != null) _quizQuestions[index]['skillName'] = sObj['paramValue'];
+
+                              if (index != -1) {
+                                updateQuestionMap(_quizQuestions[index]);
                               }
-                              if (currentDifficultyParamId != null) {
-                                final dObj = _difficultyList.firstWhere((d) => d['id'] == currentDifficultyParamId, orElse: () => null);
-                                if (dObj != null) _quizQuestions[index]['difficultyName'] = dObj['paramValue'];
-                              }
-                            }
-                          });
+                              updateQuestionMap(q);
+                            });
+                          }
+                        } else {
+                          ToastHelper.showError(ctx, 'Failed to update question.');
+                          setStateSB(() => isSaving = false);
                         }
-                      } else {
-                        ToastHelper.showError(ctx, 'Failed to update question.');
+                      } catch (e) {
+                        ToastHelper.showError(ctx, 'Error updating question: $e');
                         setStateSB(() => isSaving = false);
                       }
-                    } catch (e) {
-                      ToastHelper.showError(ctx, 'Error updating question: $e');
-                      setStateSB(() => isSaving = false);
-                    }
-                  },
-                  child: isSaving 
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Text('Save Changes', style: TextStyle(color: Colors.white)),
-                )
-              ],
-            );
-          }
-        );
+                    },
+                    child: isSaving 
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Text('Save Changes', style: TextStyle(color: Colors.white)),
+                  )
+                ],
+              );
+            }
+          );
+        }
+      );
+    } finally {
+      textCtrl.dispose();
+      explCtrl.dispose();
+      passageCtrl.dispose();
+      for (final c in optCtrls) {
+        c.dispose();
       }
-    );
+    }
   }
 
   @override
