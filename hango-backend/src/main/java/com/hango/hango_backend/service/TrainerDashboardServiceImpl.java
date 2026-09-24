@@ -830,7 +830,16 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
                 if (!requestLessonIds.contains(existingLesson.getId())) {
                     if (existingLesson.getContent() != null)
                         cloudinaryService.deleteFile(existingLesson.getContent());
-                    lessonRepository.delete(existingLesson);
+                    if (savedSection.getLessons() != null) {
+                        savedSection.getLessons().removeIf(l -> l.getId() != null && l.getId().equals(existingLesson.getId()));
+                    }
+                    existingLesson.setDeletedAt(java.time.LocalDateTime.now());
+                    lessonRepository.save(existingLesson);
+                    try {
+                        lessonRepository.delete(existingLesson);
+                    } catch (Exception ignored) {
+                        // Soft delete fallback already recorded via deletedAt
+                    }
                 }
             }
 

@@ -654,6 +654,9 @@ class _CreateSectionPageState extends State<CreateSectionPage> {
                                     ),
                                   ),
                                 );
+                                if (mounted) {
+                                  setState(() {});
+                                }
                                 if (result == 'goToIntroduction' && widget.onStepChanged != null) {
                                   widget.onStepChanged!(1);
                                 }

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -44,11 +45,12 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
   late int? _activeSectionIndex;
   final Set<int> _expandedIndices = {};
   bool _showTypeSelection = false;
+  bool _isSavingLesson = false;
 
   @override
   void initState() {
     super.initState();
-    _localSections = List.from(widget.sections);
+    _localSections = jsonDecode(jsonEncode(widget.sections));
     _activeSectionIndex = widget.selectedSectionIndex;
     _expandedIndices.add(widget.selectedSectionIndex);
     if (_activeSectionIndex != null &&
@@ -62,9 +64,6 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
 
   String get apiBaseUrl => EnvConfig.v1BaseUrl;
 
-  Future<void> _notifyParent() async {
-    await widget.onSectionsChanged(_localSections);
-  }
 
   void _showAddLessonDialog(int sectionIndex, String type) {
     final titleController = TextEditingController();
@@ -168,7 +167,6 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                     _localSections[sectionIndex]['lessons'] = lessons;
                     _showTypeSelection = false;
                   });
-                  _notifyParent();
                   Navigator.pop(context);
                 }
               },
@@ -237,7 +235,6 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                               _localSections = updatedSections;
                               _showTypeSelection = false;
                             });
-                            await _notifyParent();
                           },
                         ),
                       ),
@@ -318,7 +315,6 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                               _localSections = updatedSections;
                               _showTypeSelection = false;
                             });
-                            await _notifyParent();
                           },
                         ),
                       ),
@@ -399,7 +395,7 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                               _localSections = updatedSections;
                               _showTypeSelection = false;
                             });
-                            await _notifyParent();
+                            await widget.onSectionsChanged(_localSections);
                           },
                         ),
                       ),
@@ -499,13 +495,12 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
     );
   }
 
-  void _deleteLesson(int sectionIndex, int lessonIndex) async {
+  void _deleteLesson(int sectionIndex, int lessonIndex) {
     setState(() {
       final lessons = List.from(_localSections[sectionIndex]['lessons'] ?? []);
       lessons.removeAt(lessonIndex);
       _localSections[sectionIndex]['lessons'] = lessons;
     });
-    await _notifyParent();
   }
 
   void _showEditLessonDialog(int sectionIndex, int lessonIndex) {
@@ -653,7 +648,6 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                         };
                         _localSections[sectionIndex]['lessons'] = lessons;
                       });
-                      _notifyParent();
                       Navigator.pop(context);
                     }
                   },
@@ -1120,7 +1114,6 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                           _localSections.removeAt(_activeSectionIndex!);
                           _activeSectionIndex = null;
                         });
-                        _notifyParent();
                       },
                     ),
                   ],
@@ -1159,7 +1152,6 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                             setState(() {
                               _localSections = updatedSections;
                             });
-                            await _notifyParent();
                           },
                         ),
                       ),
@@ -1180,7 +1172,6 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                             setState(() {
                               _localSections = updatedSections;
                             });
-                            await _notifyParent();
                           },
                           lessonIndex: lessonIndex,
                         ),
@@ -1201,7 +1192,6 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                             setState(() {
                               _localSections = updatedSections;
                             });
-                            await _notifyParent();
                           },
                           lessonIndex: lessonIndex,
                         ),
@@ -1404,7 +1394,6 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                                 _activeSectionIndex = null;
                               }
                             });
-                            _notifyParent();
                           },
                         ),
                         IconButton(
@@ -1730,7 +1719,6 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                                                     _localSections =
                                                         updatedSections;
                                                   });
-                                                  await _notifyParent();
                                                 },
                                           ),
                                     ),
@@ -1818,7 +1806,6 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
                                                     _localSections =
                                                         updatedSections;
                                                   });
-                                                  await _notifyParent();
                                                 },
                                           ),
                                     ),
@@ -2007,7 +1994,7 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
         const Spacer(),
         OutlinedButton(
           onPressed: () {
-            Navigator.pop(context);
+            Navigator.pop(context, false);
           },
           style: OutlinedButton.styleFrom(
             foregroundColor: const Color(0xFF4B5563),
@@ -2028,10 +2015,25 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
         ),
         const SizedBox(width: 12),
         ElevatedButton(
-          onPressed: () {
-            _notifyParent();
-            Navigator.pop(context);
-          },
+          onPressed: _isSavingLesson
+              ? null
+              : () async {
+                  setState(() {
+                    _isSavingLesson = true;
+                  });
+                  try {
+                    await widget.onSectionsChanged(_localSections);
+                    if (mounted) {
+                      Navigator.pop(context, true);
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      setState(() {
+                        _isSavingLesson = false;
+                      });
+                    }
+                  }
+                },
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF20B486),
             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
@@ -2040,15 +2042,24 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
             ),
             elevation: 0,
           ),
-          child: const Text(
-            'Save',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-              fontFamily: 'Outfit',
-            ),
-          ),
+          child: _isSavingLesson
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : const Text(
+                  'Save',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    fontFamily: 'Outfit',
+                  ),
+                ),
         ),
       ],
     );
