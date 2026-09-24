@@ -24,6 +24,7 @@ class ExamReviewDashboardDialog extends StatefulWidget {
   final String? creatorName;
   final int? currentUserId;
   final VoidCallback? onEditExam;
+
   /// Whether this exam is currently flagged as an Entry Exam candidate.
   /// When true, hiding the exam triggers an extra warning dialog.
   final bool isEntryExam;
@@ -152,7 +153,10 @@ class _ExamReviewDashboardDialogState extends State<ExamReviewDashboardDialog> {
     return found['paramValue']?.toString();
   }
 
-  Future<void> _updateExamStatus(String newStatus, {String? successMessage}) async {
+  Future<void> _updateExamStatus(
+    String newStatus, {
+    String? successMessage,
+  }) async {
     try {
       final token = await _authService.getToken();
       if (token == null) return;
@@ -176,7 +180,22 @@ class _ExamReviewDashboardDialogState extends State<ExamReviewDashboardDialog> {
         }
       } else {
         if (mounted) {
-          ToastHelper.show(context, 'Error updating status', isError: true);
+          String errMsg =
+              'Cannot hide this exam (it is the only Entry Exam). Please assign another exam first!';
+          try {
+            final Map<String, dynamic> body = jsonDecode(response.body);
+            if (body.containsKey('message') &&
+                body['message'] != null &&
+                body['message'].toString().trim().isNotEmpty) {
+              // Only override if the backend gave a specific message
+              // (but if backend gives generic 'An internal system error...', we might still show it. Let's filter it).
+              String beMsg = body['message'].toString();
+              if (!beMsg.contains('internal system error')) {
+                errMsg = beMsg;
+              }
+            }
+          } catch (_) {}
+          ToastHelper.show(context, errMsg, isError: true);
         }
       }
     } catch (e) {
@@ -232,8 +251,12 @@ class _ExamReviewDashboardDialogState extends State<ExamReviewDashboardDialog> {
               onPressed: () {
                 Navigator.pop(warnCtx);
                 // Proceed to normal confirmation dialog
-                _showHideConfirmDialog(actionName, newStatus, confirmColor,
-                    successMessage: successMessage);
+                _showHideConfirmDialog(
+                  actionName,
+                  newStatus,
+                  confirmColor,
+                  successMessage: successMessage,
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFF59E0B),
@@ -252,8 +275,12 @@ class _ExamReviewDashboardDialogState extends State<ExamReviewDashboardDialog> {
       return;
     }
     // ─────────────────────────────────────────────────────────────────────────
-    _showHideConfirmDialog(actionName, newStatus, confirmColor,
-        successMessage: successMessage);
+    _showHideConfirmDialog(
+      actionName,
+      newStatus,
+      confirmColor,
+      successMessage: successMessage,
+    );
   }
 
   /// The standard single-step confirm dialog (used directly for non-entry-exam
@@ -583,67 +610,65 @@ class _ExamReviewDashboardDialogState extends State<ExamReviewDashboardDialog> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                  _buildStatusBadge(widget.status),
-                  const SizedBox(width: 16),
-                  Text(
-                    'Questions: ${widget.examQuestionCount}/${widget.examExpectedCount}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF64748B),
-                      fontFamily: 'Outfit',
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Text(
-                    'Duration: ${widget.examDurationMinutes}m',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF64748B),
-                      fontFamily: 'Outfit',
-                    ),
-                  ),
-                  if (widget.examCreatedAt != null) ...[
-                    const SizedBox(width: 16),
-                    Text(
-                      'Created: ${widget.examCreatedAt}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF64748B),
-                        fontFamily: 'Outfit',
+                      _buildStatusBadge(widget.status),
+                      const SizedBox(width: 16),
+                      Text(
+                        'Questions: ${widget.examQuestionCount}/${widget.examExpectedCount}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF64748B),
+                          fontFamily: 'Outfit',
+                        ),
                       ),
-                    ),
-                  ],
-                  if (widget.examUpdatedAt != null) ...[
-                    const SizedBox(width: 16),
-                    Text(
-                      'Updated: ${widget.examUpdatedAt}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF64748B),
-                        fontFamily: 'Outfit',
+                      const SizedBox(width: 16),
+                      Text(
+                        'Duration: ${widget.examDurationMinutes}m',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF64748B),
+                          fontFamily: 'Outfit',
+                        ),
                       ),
-                    ),
-                  ],
-                  if (widget.creatorId != null) ...[
-                    const SizedBox(width: 16),
-                    const Icon(
-                      Icons.person_outline,
-                      size: 16,
-                      color: Color(0xFF64748B),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      _isOwnExam
-                          ? 'Me'
-                          : (widget.creatorName ?? 'Unknown'),
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF64748B),
-                        fontFamily: 'Outfit',
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+                      if (widget.examCreatedAt != null) ...[
+                        const SizedBox(width: 16),
+                        Text(
+                          'Created: ${widget.examCreatedAt}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF64748B),
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                      ],
+                      if (widget.examUpdatedAt != null) ...[
+                        const SizedBox(width: 16),
+                        Text(
+                          'Updated: ${widget.examUpdatedAt}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF64748B),
+                            fontFamily: 'Outfit',
+                          ),
+                        ),
+                      ],
+                      if (widget.creatorId != null) ...[
+                        const SizedBox(width: 16),
+                        const Icon(
+                          Icons.person_outline,
+                          size: 16,
+                          color: Color(0xFF64748B),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _isOwnExam ? 'Me' : (widget.creatorName ?? 'Unknown'),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF64748B),
+                            fontFamily: 'Outfit',
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -986,220 +1011,224 @@ class _ExamReviewDashboardDialogState extends State<ExamReviewDashboardDialog> {
         scrollDirection: Axis.horizontal,
         reverse: true,
         child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Close',
-              style: TextStyle(
-                color: Color(0xFF64748B),
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          if (_isOwnExam &&
-              ['REJECTED', 'PUBLISHED', 'HIDDEN'].contains(widget.status.toUpperCase()) &&
-              widget.onEditExam != null) ...[
-            const SizedBox(width: 12),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.pop(context); // close dialog
-                widget.onEditExam!();
-              },
-              icon: const Icon(Icons.edit, size: 18),
-              label: const Text(
-                'Update Exam',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF20B486),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-              ),
-            ),
-          ],
-          if (widget.isCourseManager &&
-              (widget.status.toUpperCase() == 'SUBMITTED' ||
-                  widget.status.toUpperCase() == 'PENDING')) ...[
-            const SizedBox(width: 12),
-            if (!_hasScrolledToBottom)
-              const Text(
-                '(Scroll to bottom to review)',
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Close',
                 style: TextStyle(
-                  color: Color(0xFFEF4444),
-                  fontSize: 12,
+                  color: Color(0xFF64748B),
                   fontWeight: FontWeight.bold,
                 ),
               ),
-            const SizedBox(width: 12),
-            ElevatedButton(
-              onPressed: _hasScrolledToBottom ? _showRejectDialog : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: const Color(0xFFEF4444),
-                disabledForegroundColor: Colors.grey,
-                side: BorderSide(
-                  color: _hasScrolledToBottom
-                      ? const Color(0xFFEF4444)
-                      : Colors.grey,
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-              ),
-              child: const Text(
-                'Reject',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
             ),
-            const SizedBox(width: 12),
-            ElevatedButton(
-              onPressed: _hasScrolledToBottom
-                  ? () {
-                      showDialog(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text(
-                            'Approve Exam',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          content: Text(
-                            'Are you sure you want to approve and publish the exam "${widget.examTitle}"?',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx),
-                              child: const Text('Cancel'),
+            if (_isOwnExam &&
+                [
+                  'REJECTED',
+                  'PUBLISHED',
+                  'HIDDEN',
+                ].contains(widget.status.toUpperCase()) &&
+                widget.onEditExam != null) ...[
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context); // close dialog
+                  widget.onEditExam!();
+                },
+                icon: const Icon(Icons.edit, size: 18),
+                label: const Text(
+                  'Update Exam',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF20B486),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                ),
+              ),
+            ],
+            if (widget.isCourseManager &&
+                (widget.status.toUpperCase() == 'SUBMITTED' ||
+                    widget.status.toUpperCase() == 'PENDING')) ...[
+              const SizedBox(width: 12),
+              if (!_hasScrolledToBottom)
+                const Text(
+                  '(Scroll to bottom to review)',
+                  style: TextStyle(
+                    color: Color(0xFFEF4444),
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              const SizedBox(width: 12),
+              ElevatedButton(
+                onPressed: _hasScrolledToBottom ? _showRejectDialog : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: const Color(0xFFEF4444),
+                  disabledForegroundColor: Colors.grey,
+                  side: BorderSide(
+                    color: _hasScrolledToBottom
+                        ? const Color(0xFFEF4444)
+                        : Colors.grey,
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                ),
+                child: const Text(
+                  'Reject',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton(
+                onPressed: _hasScrolledToBottom
+                    ? () {
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text(
+                              'Approve Exam',
+                              style: TextStyle(fontWeight: FontWeight.bold),
                             ),
-                            ElevatedButton(
-                              onPressed: () {
-                                Navigator.pop(ctx);
-                                _publishExamAsManager();
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF20B486),
+                            content: Text(
+                              'Are you sure you want to approve and publish the exam "${widget.examTitle}"?',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx),
+                                child: const Text('Cancel'),
                               ),
-                              child: const Text(
-                                'Approve',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
+                              ElevatedButton(
+                                onPressed: () {
+                                  Navigator.pop(ctx);
+                                  _publishExamAsManager();
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF20B486),
+                                ),
+                                child: const Text(
+                                  'Approve',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-                  : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF20B486),
-                disabledBackgroundColor: Colors.grey.shade300,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-              ),
-              child: const Text(
-                'Approve & Publish',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-          if (widget.isCourseManager &&
-              widget.status.toUpperCase() == 'PUBLISHED') ...[
-            const SizedBox(width: 12),
-            ElevatedButton.icon(
-              onPressed: () {
-                final exam = Exam(
-                  id: widget.examId.toString(),
-                  title: widget.examTitle,
-                  creatorName: 'Trainer',
-                  questionCount: widget.examExpectedCount,
-                  durationMinutes: 60,
-                  rating: 5.0,
-                  learnerCountFormatted: '0',
-                );
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ExamDetailHistoryPage(exam: exam),
+                            ],
+                          ),
+                        );
+                      }
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF20B486),
+                  disabledBackgroundColor: Colors.grey.shade300,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
                   ),
-                );
-              },
-              icon: const Icon(Icons.visibility, size: 18),
-              label: const Text(
-                'View as Learner',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: const Color(0xFF3B82F6),
-                side: const BorderSide(color: Color(0xFF3B82F6)),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
+                ),
+                child: const Text(
+                  'Approve & Publish',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            ElevatedButton(
-              onPressed: () => _confirmUpdateExamStatus(
-                'Hide',
-                'HIDDEN',
-                const Color(0xFFF59E0B),
-                successMessage: 'Exam hidden successfully!',
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: const Color(0xFFF59E0B),
-                side: const BorderSide(color: Color(0xFFF59E0B)),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
+            ],
+            if (widget.isCourseManager &&
+                widget.status.toUpperCase() == 'PUBLISHED') ...[
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
+                onPressed: () {
+                  final exam = Exam(
+                    id: widget.examId.toString(),
+                    title: widget.examTitle,
+                    creatorName: 'Trainer',
+                    questionCount: widget.examExpectedCount,
+                    durationMinutes: 60,
+                    rating: 5.0,
+                    learnerCountFormatted: '0',
+                  );
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ExamDetailHistoryPage(exam: exam),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.visibility, size: 18),
+                label: const Text(
+                  'View as Learner',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: const Color(0xFF3B82F6),
+                  side: const BorderSide(color: Color(0xFF3B82F6)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
                 ),
               ),
-              child: const Text(
-                'Hide Exam',
-                style: TextStyle(fontWeight: FontWeight.bold),
+              const SizedBox(width: 12),
+              ElevatedButton(
+                onPressed: () => _confirmUpdateExamStatus(
+                  'Hide',
+                  'HIDDEN',
+                  const Color(0xFFF59E0B),
+                  successMessage: 'Exam hidden successfully!',
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: const Color(0xFFF59E0B),
+                  side: const BorderSide(color: Color(0xFFF59E0B)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                ),
+                child: const Text(
+                  'Hide Exam',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
-            ),
+            ],
+            if (widget.isCourseManager &&
+                widget.status.toUpperCase() == 'HIDDEN') ...[
+              const SizedBox(width: 12),
+              ElevatedButton(
+                onPressed: () => _confirmUpdateExamStatus(
+                  'Publish',
+                  'PUBLISHED',
+                  const Color(0xFF6366F1),
+                  successMessage: 'Exam published successfully!',
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6366F1),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                ),
+                child: const Text(
+                  'Publish Exam Again',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
           ],
-          if (widget.isCourseManager &&
-              widget.status.toUpperCase() == 'HIDDEN') ...[
-            const SizedBox(width: 12),
-            ElevatedButton(
-              onPressed: () => _confirmUpdateExamStatus(
-                'Publish',
-                'PUBLISHED',
-                const Color(0xFF6366F1),
-                successMessage: 'Exam published successfully!',
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6366F1),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-              ),
-              child: const Text(
-                'Publish Exam Again',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ],
         ),
       ),
     );

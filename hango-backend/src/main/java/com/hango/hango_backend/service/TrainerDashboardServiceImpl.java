@@ -1391,10 +1391,10 @@ public class TrainerDashboardServiceImpl implements TrainerDashboardService {
 
             if (otherPublishedEntryExams <= 0) {
                 // This is the last published entry exam — block the action.
-                throw new RuntimeException(
+                throw new ApiException(
                         "Cannot hide this exam: it is the only published Entry Exam. "
                         + "Please assign another published exam as Entry Exam first, "
-                        + "then hide this one.");
+                        + "then hide this one.", org.springframework.http.HttpStatus.BAD_REQUEST);
             }
 
             // There are other published entry exams — auto-clear the flag so
