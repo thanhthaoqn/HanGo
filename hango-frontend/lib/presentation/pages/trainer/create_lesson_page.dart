@@ -1072,53 +1072,14 @@ class _CreateLessonPageState extends State<CreateLessonPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Section Header Row
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    section['title'] ?? 'Untitled Section',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E293B),
-                      fontFamily: 'Outfit',
-                    ),
-                  ),
-                ),
-                Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(
-                        Icons.edit,
-                        color: Color(0xFFF59E0B),
-                        size: 20,
-                      ),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      onPressed: () {
-                        // Handle edit section title if needed
-                      },
-                    ),
-                    const SizedBox(width: 16),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.delete_outline,
-                        color: Color(0xFFEF4444),
-                        size: 20,
-                      ),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      onPressed: () {
-                        setState(() {
-                          _localSections.removeAt(_activeSectionIndex!);
-                          _activeSectionIndex = null;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ],
+            Text(
+              section['title'] ?? 'Untitled Section',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E293B),
+                fontFamily: 'Outfit',
+              ),
             ),
             const SizedBox(height: 16),
             const Divider(color: Color(0xFFEFF2F5), height: 1),
