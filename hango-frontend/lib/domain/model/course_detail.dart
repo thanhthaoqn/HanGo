@@ -100,6 +100,8 @@ class CourseDetail {
   final String? latestPublishedVersion;
   final String? trainerBio;
   final List<String> trainerCertificates;
+  final String? creatorAvatar;
+  final String? trainerAvatar;
   final List<CourseSession> sessions;
   final String? uuid;
 
@@ -124,6 +126,8 @@ class CourseDetail {
     this.latestPublishedVersion,
     this.trainerBio,
     this.trainerCertificates = const [],
+    this.creatorAvatar,
+    this.trainerAvatar,
     required this.sessions,
     this.uuid,
   });
@@ -161,6 +165,8 @@ class CourseDetail {
       latestPublishedVersion: json['latestPublishedVersion'] as String?,
       trainerBio: json['trainerBio'] as String?,
       trainerCertificates: certs,
+      creatorAvatar: json['creatorAvatar'] as String? ?? json['trainerAvatar'] as String?,
+      trainerAvatar: json['trainerAvatar'] as String? ?? json['creatorAvatar'] as String?,
       sessions: sessionsList,
       uuid: json['uuid'] as String?,
     );
@@ -187,6 +193,8 @@ class CourseDetail {
     String? latestPublishedVersion,
     String? trainerBio,
     List<String>? trainerCertificates,
+    String? creatorAvatar,
+    String? trainerAvatar,
     List<CourseSession>? sessions,
   }) {
     return CourseDetail(
@@ -213,6 +221,8 @@ class CourseDetail {
           latestPublishedVersion ?? this.latestPublishedVersion,
       trainerBio: trainerBio ?? this.trainerBio,
       trainerCertificates: trainerCertificates ?? this.trainerCertificates,
+      creatorAvatar: creatorAvatar ?? this.creatorAvatar,
+      trainerAvatar: trainerAvatar ?? this.trainerAvatar,
       sessions: sessions ?? this.sessions,
     );
   }

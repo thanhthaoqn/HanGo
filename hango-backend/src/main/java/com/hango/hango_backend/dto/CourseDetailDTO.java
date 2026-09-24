@@ -20,6 +20,8 @@ public class CourseDetailDTO {
     private String creatorName;
     private Long creatorId;
     private Boolean isCreator;
+    private String creatorAvatar;
+    private String trainerAvatar;
     private String difficultyName;
     private Double rating;
     private Integer totalRatings;

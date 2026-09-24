@@ -1513,6 +1513,11 @@ class _CourseDetailPageState extends State<CourseDetailPage>
     final String initials = trainerName.isNotEmpty
         ? trainerName.trim().split(' ').last[0].toUpperCase()
         : 'T';
+    final avatarUrl = (course.trainerAvatar != null && course.trainerAvatar!.trim().isNotEmpty)
+        ? course.trainerAvatar!.trim()
+        : ((course.creatorAvatar != null && course.creatorAvatar!.trim().isNotEmpty)
+            ? course.creatorAvatar!.trim()
+            : null);
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -1527,17 +1532,47 @@ class _CourseDetailPageState extends State<CourseDetailPage>
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              CircleAvatar(
-                radius: 40,
-                backgroundColor: const Color(0xFFE6F4EA),
-                child: Text(
-                  initials,
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF28B79B),
-                    fontFamily: 'Outfit',
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFE6F4EA),
+                  border: Border.all(
+                    color: const Color(0xFF28B79B).withOpacity(0.2),
+                    width: 2,
                   ),
+                ),
+                child: ClipOval(
+                  child: (avatarUrl != null && avatarUrl.isNotEmpty)
+                      ? Image.network(
+                          avatarUrl,
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Center(
+                            child: Text(
+                              initials,
+                              style: const TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF28B79B),
+                                fontFamily: 'Outfit',
+                              ),
+                            ),
+                          ),
+                        )
+                      : Center(
+                          child: Text(
+                            initials,
+                            style: const TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF28B79B),
+                              fontFamily: 'Outfit',
+                            ),
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(width: 20),

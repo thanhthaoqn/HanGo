@@ -405,11 +405,15 @@ public class CourseServiceImpl implements CourseService {
 
         List<String> trainerCertificates = new ArrayList<>();
         String trainerBio = null;
-        if (course.getCreator() != null && course.getCreator().getId() != null) {
-            TrainerProfile profile = trainerProfileRepository.findById(course.getCreator().getId()).orElse(null);
-            if (profile != null) {
-                trainerBio = profile.getBio();
-                trainerCertificates = extractCertificateNames(profile);
+        String creatorAvatar = null;
+        if (course.getCreator() != null) {
+            creatorAvatar = course.getCreator().getAvatarUrl();
+            if (course.getCreator().getId() != null) {
+                TrainerProfile profile = trainerProfileRepository.findById(course.getCreator().getId()).orElse(null);
+                if (profile != null) {
+                    trainerBio = profile.getBio();
+                    trainerCertificates = extractCertificateNames(profile);
+                }
             }
         }
 
@@ -422,6 +426,8 @@ public class CourseServiceImpl implements CourseService {
                 .creatorName(creatorName)
                 .creatorId(course.getCreator() != null ? course.getCreator().getId() : null)
                 .isCreator(isCreator)
+                .creatorAvatar(creatorAvatar)
+                .trainerAvatar(creatorAvatar)
                 .trainerBio(trainerBio)
                 .trainerCertificates(trainerCertificates)
                 .difficultyName(difficultyName)
