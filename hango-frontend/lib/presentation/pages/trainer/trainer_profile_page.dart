@@ -814,36 +814,21 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
       ),
       child: Row(
         children: [
-          Stack(
-            children: [
-              Container(
-                width: 90,
-                height: 90,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFF20B486), width: 2),
-                ),
-                child: _avatarUrl != null && _avatarUrl!.isNotEmpty
-                    ? ClipOval(
-                        child: Image.network(
-                          _avatarUrl!,
-                          width: 90,
-                          height: 90,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Center(
-                            child: Text(
-                              _trainerInitials,
-                              style: const TextStyle(
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF20B486),
-                                fontFamily: 'Outfit',
-                              ),
-                            ),
-                          ),
-                        ),
-                      )
-                    : Center(
+          Container(
+            width: 90,
+            height: 90,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFF20B486), width: 2),
+            ),
+            child: _avatarUrl != null && _avatarUrl!.isNotEmpty
+                ? ClipOval(
+                    child: Image.network(
+                      _avatarUrl!,
+                      width: 90,
+                      height: 90,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Center(
                         child: Text(
                           _trainerInitials,
                           style: const TextStyle(
@@ -854,45 +839,19 @@ class _TrainerProfilePageState extends State<TrainerProfilePage> {
                           ),
                         ),
                       ),
-              ),
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: InkWell(
-                  onTap: _isUploadingAvatar
-                      ? null
-                      : () async {
-                          final uploaded = await _uploadFileToCloudinary();
-                          if (uploaded != null) {
-                            setState(() {
-                              _avatarUrl = uploaded;
-                            });
-                          }
-                        },
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF20B486),
-                      shape: BoxShape.circle,
                     ),
-                    child: _isUploadingAvatar
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Icon(
-                            Icons.camera_alt,
-                            color: Colors.white,
-                            size: 14,
-                          ),
+                  )
+                : Center(
+                    child: Text(
+                      _trainerInitials,
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF20B486),
+                        fontFamily: 'Outfit',
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ],
           ),
           const SizedBox(width: 20),
           Expanded(
@@ -2473,24 +2432,63 @@ class _UpdateTrainerProfileModalState extends State<_UpdateTrainerProfileModal> 
   }
 
   Future<void> _pickAvatar() async {
-    final pickedFile = await pickImage();
-    if (pickedFile != null) {
+    try {
+      final pickedFile = await pickImage();
+      if (pickedFile == null || pickedFile.bytes.isEmpty) return;
+
+      final croppedBytes = await ImageCropperDialog.show(
+        context,
+        imageBytes: Uint8List.fromList(pickedFile.bytes),
+        title: LanguageManager.isVi
+            ? 'Chỉnh sửa ảnh đại diện'
+            : 'Adjust Avatar Photo',
+      );
+      if (croppedBytes == null) return;
+
       setState(() => _isUploadingAvatar = true);
-      try {
-        final res = await AuthService().uploadAvatar(pickedFile);
-        if (res['success'] == true && mounted) {
+
+      final url = Uri.parse(
+        'https://api.cloudinary.com/v1_1/diqekap4o/image/upload',
+      );
+      final request = http.MultipartRequest('POST', url)
+        ..fields['upload_preset'] = 'hango_preset'
+        ..files.add(
+          http.MultipartFile.fromBytes(
+            'file',
+            croppedBytes,
+            filename: 'avatar_${DateTime.now().millisecondsSinceEpoch}.png',
+          ),
+        );
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(responseBody);
+        final uploadedUrl = data['secure_url'] ?? data['url'];
+
+        if (mounted) {
           setState(() {
-            _avatarUrl = res['data']['avatarUrl'];
+            _avatarUrl = uploadedUrl;
             _isUploadingAvatar = false;
           });
-        } else {
-          throw Exception('Upload failed');
+          ToastHelper.showSuccess(
+            context,
+            LanguageManager.isVi
+                ? 'Tải ảnh đại diện lên thành công!'
+                : 'Avatar uploaded successfully!',
+          );
         }
-      } catch (e) {
-        if (mounted) {
-          setState(() => _isUploadingAvatar = false);
-          ToastHelper.showError(context, 'Lỗi khi tải ảnh lên.');
-        }
+      } else {
+        throw Exception('Cloudinary error: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isUploadingAvatar = false);
+        ToastHelper.showError(
+          context,
+          LanguageManager.isVi ? 'Lỗi khi tải ảnh lên.' : 'Failed to upload avatar: $e',
+        );
       }
     }
   }

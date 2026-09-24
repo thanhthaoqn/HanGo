@@ -190,7 +190,7 @@ public class AuthController {
     }
 
     @PostMapping("/profile/avatar")
-    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR') or hasRole('COURSE_MANAGER')")
+    @PreAuthorize("hasAuthority('ENROLL_AND_LEARN_COURSES') or hasAnyRole('TRAINER', 'COURSE_MANAGER', 'ADMINISTRATOR') or hasAuthority('MANAGE_ACCOUNTS_ROLES')")
     public ResponseEntity<?> uploadAvatar(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestParam("file") MultipartFile file) {
