@@ -411,9 +411,9 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                         children: <Widget>[
                           Container(
                             padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.shade50,
-                              borderRadius: const BorderRadius.only(
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFECFDF5),
+                              borderRadius: BorderRadius.only(
                                 topLeft: Radius.circular(16),
                                 topRight: Radius.circular(16),
                               ),
@@ -422,14 +422,14 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                               children: [
                                 Container(
                                   padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.orange.shade100,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFD1FAE5),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: Icon(Icons.warning_amber_rounded, color: Colors.orange.shade800, size: 28),
+                                  child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 28),
                                 ),
                                 const SizedBox(width: 16),
-                                Expanded(
+                                const Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
@@ -438,15 +438,17 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                                         style: TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.bold,
-                                          color: Colors.orange.shade900,
+                                          color: Color(0xFF065F46),
+                                          fontFamily: 'Outfit',
                                         ),
                                       ),
-                                      const SizedBox(height: 4),
+                                      SizedBox(height: 4),
                                       Text(
-                                        'However, we automatically resolved some formatting issues.',
+                                        'Course imported successfully with automatic adjustments.',
                                         style: TextStyle(
                                           fontSize: 13,
-                                          color: Colors.orange.shade800,
+                                          color: Color(0xFF047857),
+                                          height: 1.3,
                                         ),
                                       ),
                                     ],
@@ -461,11 +463,12 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text(
-                                  'Details:',
+                                  'System Adjustments:',
                                   style: TextStyle(
-                                    fontWeight: FontWeight.bold,
+                                    fontWeight: FontWeight.w600,
                                     fontSize: 14,
-                                    color: Colors.black87,
+                                    color: Color(0xFF334155),
+                                    fontFamily: 'Outfit',
                                   ),
                                 ),
                                 const SizedBox(height: 12),
@@ -479,19 +482,19 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                                       return Container(
                                         padding: const EdgeInsets.all(12),
                                         decoration: BoxDecoration(
-                                          color: Colors.grey.shade50,
+                                          color: const Color(0xFFF8FAFC),
                                           borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: Colors.grey.shade200),
+                                          border: Border.all(color: const Color(0xFFE2E8F0)),
                                         ),
                                         child: Row(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            const Icon(Icons.info_outline, color: Colors.grey, size: 18),
+                                            const Icon(Icons.auto_fix_high_rounded, color: Color(0xFF20B486), size: 18),
                                             const SizedBox(width: 10),
                                             Expanded(
                                               child: Text(
                                                 warnings[index].toString(),
-                                                style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.4),
+                                                style: const TextStyle(fontSize: 13, color: Color(0xFF334155), height: 1.4),
                                               ),
                                             ),
                                           ],
@@ -505,7 +508,7 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                                   width: double.infinity,
                                   child: ElevatedButton(
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.orange.shade600,
+                                      backgroundColor: const Color(0xFF20B486),
                                       foregroundColor: Colors.white,
                                       padding: const EdgeInsets.symmetric(vertical: 14),
                                       shape: RoundedRectangleBorder(
@@ -515,8 +518,8 @@ class _TrainerCoursesPageState extends State<TrainerCoursesPage> {
                                     ),
                                     onPressed: () => Navigator.of(ctx).pop(),
                                     child: const Text(
-                                      'I Understand, Continue',
-                                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                                      'Continue',
+                                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, fontFamily: 'Outfit'),
                                     ),
                                   ),
                                 ),
