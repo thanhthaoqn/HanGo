@@ -470,8 +470,30 @@ public class ExamService {
     }
     
     public List<LearnerExamQuestionDTO> getExamQuestions(Long examId) {
+        return getExamQuestions(examId, null);
+    }
+
+    public List<LearnerExamQuestionDTO> getExamQuestions(Long examId, Long userId) {
         List<Question> questions = questionRepository.findByExamIdOrderByQuestionOrder(examId);
-        
+
+        boolean hasPriorAttempt = userId != null
+                && examAttemptRepository.countByExamIdAndStudentId(examId, userId) > 0;
+
+        boolean isStaff = false;
+        if (userId != null) {
+            User user = userRepository.findById(userId).orElse(null);
+            if (user != null && user.getRoles() != null) {
+                isStaff = user.getRoles().stream().anyMatch(r ->
+                        "TRAINER".equalsIgnoreCase(r.getRoleName())
+                                || "COURSE_MANAGER".equalsIgnoreCase(r.getRoleName())
+                                || "ADMINISTRATOR".equalsIgnoreCase(r.getRoleName())
+                                || "TRAINER_LEAD".equalsIgnoreCase(r.getRoleName())
+                );
+            }
+        }
+
+        boolean canViewExplanation = (userId == null) || isStaff || hasPriorAttempt;
+
         return questions.stream().map(q -> {
             LearnerQuestionGroupDTO groupDto = null;
             if (q.getQuestionGroup() != null && q.getQuestionGroup().getContextText() != null) {
@@ -480,14 +502,14 @@ public class ExamService {
                         .passage(q.getQuestionGroup().getContextText())
                         .build();
             }
-            
+
             List<LearnerQuestionOptionDTO> opts = q.getOptions().stream().map(opt -> 
                 LearnerQuestionOptionDTO.builder()
                         .id(opt.getId())
                         .optionText(opt.getOptionText())
                         .build()
             ).collect(Collectors.toList());
-            
+
             return LearnerExamQuestionDTO.builder()
                     .id(q.getId())
                     .content(q.getQuestionText())
@@ -495,11 +517,16 @@ public class ExamService {
                     .globalIndex(null)
                     .group(groupDto)
                     .options(opts)
+                    .explanation(canViewExplanation ? q.getExplanation() : null)
                     .build();
         }).collect(Collectors.toList());
     }
 
     public List<LearnerExamQuestionDTO> getExamQuestionsByIdentifier(String identifier) {
+        return getExamQuestionsByIdentifier(identifier, null);
+    }
+
+    public List<LearnerExamQuestionDTO> getExamQuestionsByIdentifier(String identifier, Long userId) {
         if (identifier == null || identifier.isBlank()) {
             throw new RuntimeException("Exam identifier cannot be blank");
         }
@@ -509,11 +536,11 @@ public class ExamService {
         } catch (NumberFormatException ignored) {}
 
         if (id != null) {
-            return getExamQuestions(id);
+            return getExamQuestions(id, userId);
         } else {
             Exam exam = examRepository.findByUuidAndDeletedAtIsNull(identifier)
                     .orElseThrow(() -> new RuntimeException("Exam not found with UUID: " + identifier));
-            return getExamQuestions(exam.getId());
+            return getExamQuestions(exam.getId(), userId);
         }
     }
 }

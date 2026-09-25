@@ -59,7 +59,8 @@ public class ExamController {
     @GetMapping("/{identifier}/questions")
     @PreAuthorize("hasAuthority('ATTEMPT_QUIZ_AND_EXAM') or hasAuthority('CREATE_EXAMS_TRAINER') or hasAuthority('CREATE_AND_MANAGE_EXAMS_CM') or hasAuthority('MANAGE_ACCOUNTS_ROLES') or hasRole('ADMINISTRATOR')")
     public ResponseEntity<List<LearnerExamQuestionDTO>> getExamQuestions(@PathVariable String identifier) {
-        List<LearnerExamQuestionDTO> questions = examService.getExamQuestionsByIdentifier(identifier);
+        Long currentUserId = getCurrentUserId();
+        List<LearnerExamQuestionDTO> questions = examService.getExamQuestionsByIdentifier(identifier, currentUserId);
         return ResponseEntity.ok(questions);
     }
 

@@ -16,6 +16,7 @@ public class LearnerExamQuestionDTO {
     private String content; // question_text
     private String skill; // from skillParam
     private Integer globalIndex; // question_order
+    private String explanation;
     
     private LearnerQuestionGroupDTO group;
     private List<LearnerQuestionOptionDTO> options;

@@ -333,6 +333,8 @@ class _ExamReviewPageState extends State<ExamReviewPage> {
         final passage = group?['passage'] as String?;
         final isFirstQuestionInGroup = index == 0 || (group != null && _examQuestions[index - 1]['group']?['id'] != group['id']);
         final showPassage = passage != null && passage.isNotEmpty && isFirstQuestionInGroup;
+        final rawExplanation = q['explanation']?.toString().trim() ?? '';
+        final hasExplanation = rawExplanation.isNotEmpty;
 
         return Container(
           key: _questionKeys[index],
@@ -576,10 +578,11 @@ class _ExamReviewPageState extends State<ExamReviewPage> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            q['explanation'] ?? '',
-                            style: const TextStyle(
+                            hasExplanation ? rawExplanation : 'No explanation provided for this question.',
+                            style: TextStyle(
                               fontSize: 13,
-                              color: Color(0xFF78350F),
+                              color: hasExplanation ? const Color(0xFF78350F) : Colors.black45,
+                              fontStyle: hasExplanation ? FontStyle.normal : FontStyle.italic,
                               height: 1.4,
                             ),
                           ),
