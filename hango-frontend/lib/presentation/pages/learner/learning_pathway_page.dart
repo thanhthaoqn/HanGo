@@ -11,6 +11,7 @@ import '../../../domain/entities/learning_pathway.dart';
 import '../../../data/repositories/pathway_repository.dart';
 import '../../../utils/language_manager.dart';
 import '../../../utils/toast_helper.dart';
+import '../../../routes/app_routes.dart';
 import '../course/course_detail_page.dart';
 import 'mastery_quiz_page.dart';
 
@@ -29,6 +30,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
   bool _isLoading = true;
   bool _isDarkMode = false;
   String? _errorMessage;
+  bool _isAuthError = false;
 
   @override
   void initState() {
@@ -40,6 +42,7 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _isAuthError = false;
     });
 
     try {
@@ -63,12 +66,24 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
       _refreshRerouteSuggestion();
     } catch (e) {
       if (!mounted) return;
-      // 404 = user chua co pathway nao (chua lam exam) -> hien man hinh empty state
+      final raw = e.toString().toLowerCase();
+      final isVi = LanguageManager.isVi;
       setState(() {
         _pathway = null;
-        _errorMessage = e.toString().contains('404')
-            ? 'No active pathway yet. Finish an exam to let AI build a route for you.'
-            : e.toString();
+        if (raw.contains('auth') || raw.contains('token') || raw.contains('401') || raw.contains('đăng nhập')) {
+          _isAuthError = true;
+          _errorMessage = isVi
+              ? 'Vui lòng đăng nhập để xem lộ trình học tập cá nhân hóa của bạn.'
+              : 'Please log in to view your personalized learning pathway.';
+        } else if (raw.contains('404')) {
+          _isAuthError = false;
+          _errorMessage = isVi
+              ? 'Chưa có lộ trình học tập nào. Hãy hoàn thành một bài thi để AI thiết lập lộ trình cho bạn.'
+              : 'No active pathway yet. Finish an exam to let AI build a route for you.';
+        } else {
+          _isAuthError = false;
+          _errorMessage = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+        }
       });
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -694,25 +709,31 @@ class _LearningPathwayPageState extends State<LearningPathwayPage> {
                   color: const Color(0xFF28B79B).withOpacity(0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.route_rounded, size: 42, color: Color(0xFF28B79B)),
+                child: Icon(_isAuthError ? Icons.lock_outline_rounded : Icons.route_rounded, size: 42, color: const Color(0xFF28B79B)),
               ),
               const SizedBox(height: 18),
               Text(
-                'No pathway to show yet',
+                _isAuthError
+                    ? (LanguageManager.isVi ? 'Yêu cầu đăng nhập' : 'Authentication Required')
+                    : (LanguageManager.isVi ? 'Chưa có lộ trình học tập' : 'No pathway to show yet'),
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: titleColor),
               ),
               const SizedBox(height: 10),
               Text(
-                _errorMessage ?? 'Finish an exam first, then HanGo can build a personalized learning route.',
+                _errorMessage ?? (LanguageManager.isVi
+                    ? 'Hãy hoàn thành một bài thi trước, sau đó HanGo sẽ xây dựng lộ trình học tập cá nhân hóa cho bạn.'
+                    : 'Finish an exam first, then HanGo can build a personalized learning route.'),
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 14, height: 1.5, color: textColor),
               ),
               const SizedBox(height: 22),
               ElevatedButton.icon(
-                onPressed: _loadPathway,
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Reload pathway'),
+                onPressed: _isAuthError ? () => context.go(AppRoutes.login) : _loadPathway,
+                icon: Icon(_isAuthError ? Icons.login_rounded : Icons.refresh_rounded),
+                label: Text(_isAuthError
+                    ? (LanguageManager.isVi ? 'Đăng nhập ngay' : 'Log in now')
+                    : (LanguageManager.isVi ? 'Tải lại lộ trình' : 'Reload pathway')),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF28B79B),
                   foregroundColor: Colors.white,

@@ -29,6 +29,7 @@ import '../trainer/trainer_dashboard_page.dart';
 import '../trainer/onboarding/trainer_type_selection_page.dart';
 import '../trainer/onboarding/trainer_onboarding_status_page.dart';
 import '../../../data/services/trainer_onboarding_service.dart';
+import '../../../data/services/public_stats_service.dart';
 import '../../../utils/toast_helper.dart';
 import '../../../utils/permission_utils.dart';
 
@@ -406,23 +407,14 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
   }
 
   Future<void> _fetchPublicStats() async {
-    try {
-      final response = await http.get(
-        Uri.parse('${EnvConfig.v1BaseUrl}/metadata/public-stats'),
-      );
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(
-          utf8.decode(response.bodyBytes),
-        );
-        if (mounted) {
-          setState(() {
-            _totalCoursesCount = (data['coursesCount'] ?? 0) as int;
-            _totalLearnersCount = (data['learnersCount'] ?? 0) as int;
-            _totalExamsCount = (data['freeExamsCount'] ?? 0) as int;
-          });
-        }
-      }
-    } catch (_) {}
+    await PublicStatsService.fetch(force: true);
+    if (mounted) {
+      setState(() {
+        _totalCoursesCount = PublicStatsService.coursesCount;
+        _totalLearnersCount = PublicStatsService.learnersCount;
+        _totalExamsCount = PublicStatsService.freeExamsCount;
+      });
+    }
   }
 
   final ScrollController _coursesScrollController = ScrollController();
@@ -475,6 +467,9 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
   @override
   void initState() {
     super.initState();
+    _totalCoursesCount = PublicStatsService.coursesCount;
+    _totalLearnersCount = PublicStatsService.learnersCount;
+    _totalExamsCount = PublicStatsService.freeExamsCount;
     AuthService.userChangeNotifier.addListener(_onUserChanged);
     _loadUserInfo();
     _fetchCourses();
@@ -1172,7 +1167,7 @@ class _LearnerHomePageState extends State<LearnerHomePage> {
                       _buildHeroStat(
                         _totalLearnersCount > 0
                             ? '$_totalLearnersCount+'
-                            : '1+',
+                            : '0+',
                         isVi ? 'Học viên' : 'Learners',
                       ),
                       _buildHeroStat(

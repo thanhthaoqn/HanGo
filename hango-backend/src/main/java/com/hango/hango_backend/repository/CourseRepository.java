@@ -176,6 +176,9 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
 
         long countByStatusAndDeletedAtIsNull(String status);
 
+        @Query("SELECT COUNT(c) FROM Course c WHERE c.status = 'PUBLISHED' AND c.deletedAt IS NULL AND (c.latestVersionId = c.id OR c.latestVersionId IS NULL)")
+        long countLatestPublishedCourses();
+
         boolean existsByCodeIgnoreCase(String code);
 
         boolean existsByCodeIgnoreCaseAndIdNot(String code, Long id);

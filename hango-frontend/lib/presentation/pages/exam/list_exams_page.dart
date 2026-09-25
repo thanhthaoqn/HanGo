@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:ui';
 import 'package:http/http.dart' as http;
 import '../../../utils/config.dart';
+import '../../../data/services/public_stats_service.dart';
 import '../../../data/repositories/exam_repository.dart';
 import '../../../domain/entities/exam.dart';
 import '../../../utils/language_manager.dart';
@@ -44,25 +45,20 @@ class _ListExamsPageState extends State<ListExamsPage> {
   int _totalExamsCount = 0;
 
   Future<void> _fetchPublicStats() async {
-    try {
-      final response = await http.get(
-        Uri.parse('${EnvConfig.v1BaseUrl}/metadata/public-stats'),
-      );
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(utf8.decode(response.bodyBytes));
-        if (mounted) {
-          setState(() {
-            _totalLearnersCount = (data['learnersCount'] ?? 0) as int;
-            _totalExamsCount = (data['freeExamsCount'] ?? 0) as int;
-          });
-        }
-      }
-    } catch (_) {}
+    await PublicStatsService.fetch();
+    if (mounted) {
+      setState(() {
+        _totalLearnersCount = PublicStatsService.learnersCount;
+        _totalExamsCount = PublicStatsService.freeExamsCount;
+      });
+    }
   }
 
   @override
   void initState() {
     super.initState();
+    _totalLearnersCount = PublicStatsService.learnersCount;
+    _totalExamsCount = PublicStatsService.freeExamsCount;
     _loadPermissions();
     _fetchPage(0);
     _fetchPublicStats();
@@ -339,12 +335,12 @@ class _ListExamsPageState extends State<ListExamsPage> {
                     runSpacing: 16,
                     children: [
                       _buildGlassStat(
-                        _totalLearnersCount > 0 ? _totalLearnersCount : 42,
+                        _totalLearnersCount,
                         isVi ? 'Học viên tham gia' : 'Active learners',
                         Icons.people_rounded,
                       ),
                       _buildGlassStat(
-                        _totalExamsCount > 0 ? _totalExamsCount : 10,
+                        _totalExamsCount,
                         isVi ? 'Đề thi sẵn có' : 'Mock exams available',
                         Icons.assignment_rounded,
                       ),
@@ -780,6 +776,22 @@ class _AnimatedCounterState extends State<AnimatedCounter> with SingleTickerProv
         setState(() {});
       });
     _controller.forward();
+  }
+
+  @override
+  void didUpdateWidget(covariant AnimatedCounter oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.targetValue != widget.targetValue) {
+      _animation = Tween<double>(
+        begin: _animation.value,
+        end: widget.targetValue.toDouble(),
+      ).animate(
+        CurvedAnimation(parent: _controller, curve: Curves.easeOutQuad),
+      );
+      _controller
+        ..reset()
+        ..forward();
+    }
   }
 
   @override

@@ -18,7 +18,7 @@ class PathwayRepository {
     final uri = Uri.parse('$baseUrl/pathways/me');
 
     if (token == null || token.isEmpty) {
-      throw Exception('Không tìm thấy auth token. Vui lòng đăng nhập lại.');
+      throw Exception('Auth token not found. Please log in again.');
     }
 
     final response = await http.get(
@@ -52,7 +52,7 @@ class PathwayRepository {
     final uri = Uri.parse('$baseUrl/pathways/generate');
 
     if (token == null || token.isEmpty) {
-      throw Exception('Không tìm thấy auth token. Vui lòng đăng nhập lại.');
+      throw Exception('Auth token not found. Please log in again.');
     }
 
     // Body gui len backend: examAttemptId la bat buoc, cac truong planning la optional
@@ -122,7 +122,7 @@ class PathwayRepository {
     final uri = Uri.parse('$baseUrl/pathways/$pathwayId/nodes/$nodeId/mastery');
 
     if (token == null || token.isEmpty) {
-      throw Exception('Không tìm thấy auth token. Vui lòng đăng nhập lại.');
+      throw Exception('Auth token not found. Please log in again.');
     }
 
     final body = {
@@ -160,7 +160,7 @@ class PathwayRepository {
         Uri.parse('$baseUrl/pathways/$pathwayId/nodes/$nodeId/mastery/questions');
 
     if (token == null || token.isEmpty) {
-      throw Exception('Không tìm thấy auth token. Vui lòng đăng nhập lại.');
+      throw Exception('Auth token not found. Please log in again.');
     }
 
     final response = await http.get(
@@ -193,7 +193,7 @@ class PathwayRepository {
         Uri.parse('$baseUrl/pathways/$pathwayId/nodes/$nodeId/mastery/submit');
 
     if (token == null || token.isEmpty) {
-      throw Exception('Không tìm thấy auth token. Vui lòng đăng nhập lại.');
+      throw Exception('Auth token not found. Please log in again.');
     }
 
     // JSON object chi nhan string key -> doi questionId sang chuoi
@@ -228,7 +228,7 @@ class PathwayRepository {
     final uri = Uri.parse(urlStr);
 
     if (token == null || token.isEmpty) {
-      throw Exception('Không tìm thấy auth token. Vui lòng đăng nhập lại.');
+      throw Exception('Auth token not found. Please log in again.');
     }
 
     final response = await http.put(
@@ -254,7 +254,7 @@ class PathwayRepository {
     final uri = Uri.parse(urlStr);
 
     if (token == null || token.isEmpty) {
-      throw Exception('Không tìm thấy auth token. Vui lòng đăng nhập lại.');
+      throw Exception('Auth token not found. Please log in again.');
     }
 
     final response = await http.post(
@@ -329,7 +329,7 @@ class PathwayRepository {
     final uri = Uri.parse('$baseUrl/pathways/$pathwayId/schedule');
 
     if (token == null || token.isEmpty) {
-      throw Exception('Không tìm thấy auth token.');
+      throw Exception('Auth token not found. Please log in again.');
     }
 
     final body = {
@@ -366,7 +366,7 @@ class PathwayRepository {
     final uri = Uri.parse('$baseUrl/pathways/$pathwayId/mentor-action');
 
     if (token == null || token.isEmpty) {
-      throw Exception('Không tìm thấy auth token. Vui lòng đăng nhập lại.');
+      throw Exception('Auth token not found. Please log in again.');
     }
 
     final response = await http.post(
@@ -401,7 +401,7 @@ class PathwayRepository {
     final uri = Uri.parse('$baseUrl/pathways/$pathwayId/chat');
 
     if (token == null || token.isEmpty) {
-      throw Exception('Không tìm thấy auth token. Vui lòng đăng nhập lại.');
+      throw Exception('Auth token not found. Please log in again.');
     }
 
     final body = {
@@ -435,7 +435,7 @@ class PathwayRepository {
     final uri = Uri.parse('$baseUrl/pathways/$pathwayId/chat/history');
 
     if (token == null || token.isEmpty) {
-      throw Exception('Không tìm thấy auth token.');
+      throw Exception('Auth token not found. Please log in again.');
     }
 
     final response = await http.get(
@@ -460,7 +460,7 @@ class PathwayRepository {
     final uri = Uri.parse('$baseUrl/pathways/$pathwayId/chat/history');
 
     if (token == null || token.isEmpty) {
-      throw Exception('Không tìm thấy auth token.');
+      throw Exception('Auth token not found. Please log in again.');
     }
 
     final response = await http.delete(
