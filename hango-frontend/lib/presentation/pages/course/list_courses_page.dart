@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:ui';
 import 'package:http/http.dart' as http;
 import '../../../utils/config.dart';
+import '../../../data/services/public_stats_service.dart';
 import '../../../data/repositories/course_repository.dart';
 import '../../../domain/model/course.dart';
 import '../../../utils/language_manager.dart';
@@ -39,24 +40,18 @@ class _ListCoursesPageState extends State<ListCoursesPage> {
   int _totalLearnersCount = 0;
 
   Future<void> _fetchPublicStats() async {
-    try {
-      final response = await http.get(
-        Uri.parse('${EnvConfig.v1BaseUrl}/metadata/public-stats'),
-      );
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(utf8.decode(response.bodyBytes));
-        if (mounted) {
-          setState(() {
-            _totalLearnersCount = (data['learnersCount'] ?? 0) as int;
-          });
-        }
-      }
-    } catch (_) {}
+    await PublicStatsService.fetch();
+    if (mounted) {
+      setState(() {
+        _totalLearnersCount = PublicStatsService.learnersCount;
+      });
+    }
   }
 
   @override
   void initState() {
     super.initState();
+    _totalLearnersCount = PublicStatsService.learnersCount;
     _fetchPage(0);
     _fetchPublicStats();
   }
@@ -315,7 +310,7 @@ class _ListCoursesPageState extends State<ListCoursesPage> {
                     runSpacing: 16,
                     children: [
                       _buildGlassStat(
-                        _totalLearnersCount > 0 ? _totalLearnersCount : 42,
+                        _totalLearnersCount,
                         isVi ? 'Học viên đang học' : 'Active learners',
                         Icons.people_rounded,
                       ),
@@ -788,6 +783,22 @@ class _AnimatedCounterState extends State<AnimatedCounter> with SingleTickerProv
         setState(() {});
       });
     _controller.forward();
+  }
+
+  @override
+  void didUpdateWidget(covariant AnimatedCounter oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.targetValue != widget.targetValue) {
+      _animation = Tween<double>(
+        begin: _animation.value,
+        end: widget.targetValue.toDouble(),
+      ).animate(
+        CurvedAnimation(parent: _controller, curve: Curves.easeOutQuad),
+      );
+      _controller
+        ..reset()
+        ..forward();
+    }
   }
 
   @override

@@ -597,24 +597,6 @@ class _ComprehensiveDashboardTabState extends State<ComprehensiveDashboardTab> {
                     isActive: _showPlatformFee,
                     onTap: () => setState(() => _showPlatformFee = !_showPlatformFee),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(Icons.lock_clock_rounded, size: 12, color: Color(0xFF64748B)),
-                        SizedBox(width: 4),
-                        Text(
-                          'VNPay IPN',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
-                        ),
-                      ],
-                    ),
-                  ),
                 ],
               ),
             ],

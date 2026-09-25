@@ -38,11 +38,14 @@ public class MetadataController {
 
     @GetMapping("/public-stats")
     public ResponseEntity<Map<String, Object>> getPublicStats() {
-        long courses = courseRepository.countByStatusAndDeletedAtIsNull("PUBLISHED");
+        // Real count of unique published courses visible on the website (latest version only)
+        long courses = courseRepository.countLatestPublishedCourses();
+        if (courses == 0) courses = courseRepository.countByStatusAndDeletedAtIsNull("PUBLISHED");
         if (courses == 0) courses = courseRepository.count();
 
-        // Real count of learners/users from MySQL DB
-        long learners = userRepository.countTotalLearners();
+        // Real count of learners/users from MySQL DB (matching Admin Dashboard)
+        long learners = userRepository.countByRoleName("LEARNER");
+        if (learners == 0) learners = userRepository.countTotalLearners();
         if (learners == 0) learners = userRepository.count();
 
         long freeExams = examRepository.findByDeletedAtIsNullAndStatus("PUBLISHED").size();
