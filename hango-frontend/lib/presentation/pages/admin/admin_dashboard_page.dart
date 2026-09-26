@@ -20,6 +20,7 @@ import '../../widgets/admin/role/role_detail_drawer.dart';
 import '../../widgets/admin/dashboard/comprehensive_dashboard_tab.dart';
 import '../../../utils/file_picker_helper.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../../../utils/language_manager.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   final int initialIndex;
@@ -44,6 +45,16 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   List<NotificationItem> _notifications = [];
   int _unreadNotificationCount = 0;
   bool _isLoadingNotifications = false;
+  StateSetter? _popupSetState;
+
+  void _updatePopup() {
+    if (_popupSetState == null) return;
+    try {
+      _popupSetState!(() {});
+    } catch (_) {
+      _popupSetState = null;
+    }
+  }
 
   // Profile tab state variables
   bool _isLoadingProfile = false;
@@ -182,7 +193,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   Future<void> _loadNotifications() async {
     if (_isLoadingNotifications) return;
-    setState(() => _isLoadingNotifications = true);
+    if (_notifications.isEmpty) {
+      setState(() => _isLoadingNotifications = true);
+      _updatePopup();
+    }
     try {
       final notifications = await _notificationRepository.getNotifications();
       final unreadCount = await _notificationRepository.getUnreadCount();
@@ -192,8 +206,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         _unreadNotificationCount = unreadCount;
         _isLoadingNotifications = false;
       });
+      _updatePopup();
     } catch (_) {
       if (mounted) setState(() => _isLoadingNotifications = false);
+      _updatePopup();
     }
   }
 
@@ -219,6 +235,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             .toList();
         _unreadNotificationCount = _unreadNotificationCount > 0 ? _unreadNotificationCount - 1 : 0;
       });
+      _updatePopup();
     } catch (_) {}
   }
 
@@ -241,6 +258,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             .toList();
         _unreadNotificationCount = 0;
       });
+      _updatePopup();
     } catch (_) {}
   }
 
@@ -1367,6 +1385,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     color: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     onOpened: _loadNotifications,
+                    onCanceled: () {
+                      _popupSetState = null;
+                    },
                     icon: const Icon(
                       Icons.notifications_none_outlined,
                       color: Color(0xFF4B5563),
@@ -1376,90 +1397,102 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       PopupMenuItem<void>(
                         enabled: false,
                         child: StatefulBuilder(
-                          builder: (context, setMenuState) => Container(
-                            width: 320,
-                            constraints: const BoxConstraints(maxHeight: 420),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      const Text(
-                                        'Thông báo',
-                                        style: TextStyle(
-                                          fontFamily: 'Outfit',
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
-                                          color: Color(0xFF0F172A),
-                                        ),
-                                      ),
-                                      if (_unreadNotificationCount > 0)
-                                        InkWell(
-                                          onTap: () async {
-                                            await _markAllNotificationsAsRead();
-                                            setMenuState(() {});
-                                          },
-                                          child: const Text(
-                                            'Đánh dấu đã đọc',
-                                            style: TextStyle(fontSize: 12, color: Color(0xFF28B79B), fontWeight: FontWeight.w600),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                const Divider(height: 1, color: Color(0xFFE2E8F0)),
-                                if (_isLoadingNotifications)
-                                  const Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 32),
-                                    child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                                  )
-                                else if (_notifications.isEmpty)
-                                  const Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 24),
-                                    child: Column(
+                          builder: (context, setMenuState) {
+                            _popupSetState = setMenuState;
+                            return Container(
+                              width: 320,
+                              constraints: const BoxConstraints(maxHeight: 420),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Icon(Icons.notifications_off_outlined, size: 40, color: Color(0xFF94A3B8)),
-                                        SizedBox(height: 12),
                                         Text(
-                                          'Không có thông báo mới',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
+                                          LanguageManager.isVi ? 'Thông báo' : 'Notifications',
+                                          style: const TextStyle(
                                             fontFamily: 'Outfit',
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w500,
-                                            color: Color(0xFF64748B),
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                            color: Color(0xFF0F172A),
                                           ),
                                         ),
+                                        if (_unreadNotificationCount > 0)
+                                          InkWell(
+                                            onTap: () async {
+                                              await _markAllNotificationsAsRead();
+                                              _updatePopup();
+                                            },
+                                            child: Text(
+                                              LanguageManager.isVi ? 'Đánh dấu đã đọc' : 'Mark all as read',
+                                              style: const TextStyle(fontSize: 12, color: Color(0xFF28B79B), fontWeight: FontWeight.w600),
+                                            ),
+                                          ),
                                       ],
                                     ),
-                                  )
-                                else
-                                  Flexible(
-                                    child: ListView.separated(
-                                      shrinkWrap: true,
-                                      padding: const EdgeInsets.only(top: 12),
-                                      itemCount: _notifications.length,
-                                      separatorBuilder: (_, __) => const Padding(
-                                        padding: EdgeInsets.symmetric(vertical: 10),
-                                        child: Divider(height: 1, color: Color(0xFFF1F5F9)),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                                  if (_isLoadingNotifications)
+                                    const Padding(
+                                      padding: EdgeInsets.symmetric(vertical: 32),
+                                      child: Center(
+                                        child: SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.5,
+                                            color: Color(0xFF28B79B),
+                                          ),
+                                        ),
                                       ),
-                                      itemBuilder: (context, index) {
-                                        final n = _notifications[index];
-                                        return InkWell(
-                                          onTap: () async {
-                                            await _markNotificationAsRead(n);
-                                            setMenuState(() {});
-                                            if (n.type == 'TrainerApplicationSubmitted' && mounted) {
-                                              Navigator.of(context).pop();
-                                              setState(() => _selectedMenuIndex = 6);
-                                            }
-                                          },
+                                    )
+                                  else if (_notifications.isEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 24),
+                                      child: Column(
+                                        children: [
+                                          const Icon(Icons.notifications_off_outlined, size: 40, color: Color(0xFF94A3B8)),
+                                          const SizedBox(height: 12),
+                                          Text(
+                                            LanguageManager.isVi ? 'Không có thông báo mới' : 'No notifications',
+                                            textAlign: TextAlign.center,
+                                            style: const TextStyle(
+                                              fontFamily: 'Outfit',
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                              color: Color(0xFF64748B),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  else
+                                    Flexible(
+                                      child: ListView.separated(
+                                        shrinkWrap: true,
+                                        padding: const EdgeInsets.only(top: 12),
+                                        itemCount: _notifications.length,
+                                        separatorBuilder: (_, __) => const Padding(
+                                          padding: EdgeInsets.symmetric(vertical: 10),
+                                          child: Divider(height: 1, color: Color(0xFFF1F5F9)),
+                                        ),
+                                        itemBuilder: (context, index) {
+                                          final n = _notifications[index];
+                                          return InkWell(
+                                            onTap: () async {
+                                              await _markNotificationAsRead(n);
+                                              _updatePopup();
+                                              if (n.type == 'TrainerApplicationSubmitted' && mounted) {
+                                                _popupSetState = null;
+                                                Navigator.of(context).pop();
+                                                setState(() => _selectedMenuIndex = 6);
+                                              }
+                                            },
                                           child: Container(
                                             color: n.read ? Colors.transparent : const Color(0xFFF0FDFA),
                                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1510,11 +1543,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                   ),
                               ],
                             ),
-                          ),
-                        ),
+                          );
+                        },
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
+                ),
                   if (_unreadNotificationCount > 0)
                     Positioned(
                       right: 6,

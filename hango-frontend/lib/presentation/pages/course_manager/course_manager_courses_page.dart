@@ -154,13 +154,7 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
   }
 
   Future<void> _rejectCourse(CourseReviewCourse course, {String reason = ''}) async {
-    final confirmed = await _confirmAction(
-      title: 'Return to draft?',
-      message:
-          'This will return "${course.title}" to DRAFT so the trainer can revise and submit again.\n\nReason: ${reason.isEmpty ? "None" : reason}',
-      confirmLabel: 'Return',
-      confirmColor: const Color(0xFFEF4444),
-    );
+    final confirmed = await _showRejectCourseDialog(course, reason);
     if (!confirmed) return;
 
     try {
@@ -580,46 +574,486 @@ class _CourseManagerCoursesPageState extends State<CourseManagerCoursesPage> {
     required String message,
     required String confirmLabel,
     required Color confirmColor,
+    IconData icon = Icons.info_outline_rounded,
   }) async {
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        title: Text(
-          title,
-          style: const TextStyle(
-            color: Color(0xFF0F172A),
-            fontFamily: 'Outfit',
-            fontWeight: FontWeight.bold,
-          ),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.white,
+        elevation: 8,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFFF1F5F9), width: 1),
         ),
-        content: Text(
-          message,
-          style: const TextStyle(
-            color: Color(0xFF475569),
-            fontFamily: 'Outfit',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: confirmColor,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: confirmColor.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Icon(icon, color: confirmColor, size: 22),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              color: Color(0xFF0F172A),
+                              fontFamily: 'Outfit',
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            message,
+                            style: const TextStyle(
+                              color: Color(0xFF475569),
+                              fontFamily: 'Outfit',
+                              fontSize: 13.5,
+                              height: 1.45,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    OutlinedButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                        side: const BorderSide(color: Color(0xFFCBD5E1)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          fontFamily: 'Outfit',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: confirmColor,
+                        foregroundColor: Colors.white,
+                        elevation: 1,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: Text(
+                        confirmLabel,
+                        style: const TextStyle(
+                          fontFamily: 'Outfit',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            child: Text(confirmLabel),
           ),
-        ],
+        ),
       ),
     );
     return result ?? false;
+  }
+
+  Future<bool> _showRejectCourseDialog(CourseReviewCourse course, String reason) async {
+    final reasons = _parseRejectReasons(reason);
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.white,
+        elevation: 8,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Color(0xFFF1F5F9), width: 1),
+        ),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 540),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top Header with warning icon & title
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF2F2),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFFFEE2E2), width: 1.5),
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.assignment_return_rounded,
+                          color: Color(0xFFEF4444),
+                          size: 22,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Return Course to Draft?',
+                            style: TextStyle(
+                              fontFamily: 'Outfit',
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF0F172A),
+                              height: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'This will return the course to DRAFT status so the trainer can revise and resubmit.',
+                            style: TextStyle(
+                              fontFamily: 'Outfit',
+                              fontSize: 13,
+                              color: Color(0xFF64748B),
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF94A3B8)),
+                      splashRadius: 18,
+                      onPressed: () => Navigator.pop(context, false),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+
+                // Course card
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE2E8F0),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.menu_book_rounded, size: 16, color: Color(0xFF475569)),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              course.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontFamily: 'Outfit',
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                            if (course.creatorName.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                'Trainer: ${course.creatorName}',
+                                style: const TextStyle(
+                                  fontFamily: 'Outfit',
+                                  fontSize: 12,
+                                  color: Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF3C7),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          '➔ DRAFT',
+                          style: TextStyle(
+                            fontFamily: 'Outfit',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFB45309),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+
+                // Reasons Section Header
+                Row(
+                  children: const [
+                    Icon(Icons.rate_review_outlined, size: 15, color: Color(0xFFEF4444)),
+                    SizedBox(width: 6),
+                    Text(
+                      'FEEDBACK FOR TRAINER',
+                      style: TextStyle(
+                        fontFamily: 'Outfit',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFB91C1C),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
+                // Reasons Content Card
+                Flexible(
+                  child: Container(
+                    width: double.infinity,
+                    constraints: const BoxConstraints(maxHeight: 220),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF2F2).withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFFCA5A5).withValues(alpha: 0.6)),
+                    ),
+                    child: reasons.isEmpty
+                        ? const Text(
+                            'No specific reason provided.',
+                            style: TextStyle(fontFamily: 'Outfit', fontSize: 13, color: Color(0xFF64748B)),
+                          )
+                        : Scrollbar(
+                            thumbVisibility: true,
+                            child: SingleChildScrollView(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  for (int i = 0; i < reasons.length; i++) ...[
+                                    _buildReasonCard(reasons[i]),
+                                    if (i < reasons.length - 1) const SizedBox(height: 8),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 22),
+
+                // Action Buttons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    OutlinedButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                        side: const BorderSide(color: Color(0xFFCBD5E1)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          fontFamily: 'Outfit',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: () => Navigator.pop(context, true),
+                      icon: const Icon(Icons.assignment_return_rounded, size: 16),
+                      label: const Text(
+                        'Confirm Return to Draft',
+                        style: TextStyle(
+                          fontFamily: 'Outfit',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFEF4444),
+                        foregroundColor: Colors.white,
+                        elevation: 1,
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    return result ?? false;
+  }
+
+  List<_RejectReasonItem> _parseRejectReasons(String raw) {
+    if (raw.trim().isEmpty) return [];
+    final List<_RejectReasonItem> items = [];
+    final regex = RegExp(
+      r'-\s*\[[xX ]?\]\s*\*\*(.*?):\*\*\s*([\s\S]*?)(?=(?:-\s*\[[xX ]?\])|$)',
+    );
+    final matches = regex.allMatches(raw);
+
+    if (matches.isNotEmpty) {
+      for (final m in matches) {
+        final title = m.group(1)?.trim() ?? '';
+        final detail = m.group(2)?.trim() ?? '';
+
+        IconData icon = Icons.error_outline_rounded;
+        Color color = const Color(0xFFEF4444);
+
+        final lowerTitle = title.toLowerCase();
+        if (lowerTitle.contains('general')) {
+          icon = Icons.info_outline_rounded;
+          color = const Color(0xFF0284C7);
+        } else if (lowerTitle.contains('lesson') ||
+            lowerTitle.contains('content') ||
+            lowerTitle.contains('video') ||
+            lowerTitle.contains('material')) {
+          icon = Icons.play_circle_outline_rounded;
+          color = const Color(0xFF7C3AED);
+        } else if (lowerTitle.contains('quiz') || lowerTitle.contains('assessment')) {
+          icon = Icons.help_outline_rounded;
+          color = const Color(0xFFD97706);
+        } else if (lowerTitle.contains('other')) {
+          icon = Icons.report_problem_outlined;
+          color = const Color(0xFFEF4444);
+        }
+
+        items.add(_RejectReasonItem(
+          title: title,
+          detail: detail,
+          icon: icon,
+          color: color,
+        ));
+      }
+    } else {
+      items.add(_RejectReasonItem(
+        title: 'Feedback Details',
+        detail: raw.trim(),
+        icon: Icons.feedback_outlined,
+        color: const Color(0xFFEF4444),
+      ));
+    }
+    return items;
+  }
+
+  Widget _buildReasonCard(_RejectReasonItem item) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: item.color.withValues(alpha: 0.25)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: item.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(item.icon, size: 13, color: item.color),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  item.title,
+                  style: TextStyle(
+                    fontFamily: 'Outfit',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: item.color,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (item.detail.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Padding(
+              padding: const EdgeInsets.only(left: 4),
+              child: Text(
+                item.detail,
+                style: const TextStyle(
+                  fontFamily: 'Outfit',
+                  fontSize: 13,
+                  color: Color(0xFF334155),
+                  height: 1.35,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   @override
@@ -1499,3 +1933,17 @@ final List<CourseReviewCourse> _mockCourses = [
     ],
   ),
 ];
+
+class _RejectReasonItem {
+  final String title;
+  final String detail;
+  final IconData icon;
+  final Color color;
+
+  const _RejectReasonItem({
+    required this.title,
+    required this.detail,
+    required this.icon,
+    required this.color,
+  });
+}
