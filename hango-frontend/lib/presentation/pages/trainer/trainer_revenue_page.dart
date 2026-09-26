@@ -254,19 +254,11 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
                 ),
                 const SizedBox(height: 16),
                 _buildPolicyRow(
-                  icon: Icons.hourglass_top_rounded,
-                  title: isVi ? '2. Thời gian giữ tiền bảo hành 7 ngày' : '2. 7-Day Pending Hold Warranty',
-                  content: isVi
-                      ? '• Doanh thu khóa học mới mua sẽ giữ ở trạng thái Tạm giữ trong 7 ngày để phục vụ chính sách hoàn tiền cho học viên.\n• Sau 7 ngày, tiền tự động chuyển sang Số dư khả dụng.'
-                      : '• Course sales are held in Pending Hold for 7 days to cover student refund warranties.\n• After 7 days, funds automatically transfer to Available Balance.',
-                ),
-                const SizedBox(height: 16),
-                _buildPolicyRow(
                   icon: Icons.calendar_month_rounded,
-                  title: isVi ? '3. Chốt sổ doanh thu hàng tháng' : '3. Monthly Revenue Settlement',
+                  title: isVi ? '2. Chốt sổ và thanh toán doanh thu hàng tháng' : '2. Monthly Revenue Settlement & Payout',
                   content: isVi
-                      ? '• Quản lý đào tạo thực hiện chốt sổ báo cáo doanh thu định kỳ hàng tháng.\n• Báo cáo chi tiết và xác nhận quyết toán được gửi trực tiếp đến Email và chuông thông báo hệ thống của bạn.'
-                      : '• Monthly revenue statements are cut off at the end of each billing cycle.\n• Summary notices and reports are dispatched directly to your Email and In-App notifications.',
+                      ? '• Quản lý đào tạo thực hiện chốt sổ báo cáo doanh thu định kỳ hàng tháng.\n• Tiền được quyết toán trực tiếp vào tài khoản ngân hàng của Giảng viên.\n• Báo cáo chi tiết và xác nhận quyết toán được gửi trực tiếp đến Email và chuông thông báo hệ thống của bạn.'
+                      : '• Monthly revenue statements are cut off at the end of each billing cycle.\n• Funds are transferred directly to your registered bank account.\n• Summary notices and reports are dispatched directly to your Email and In-App notifications.',
                 ),
                 const SizedBox(height: 24),
                 Align(
@@ -317,37 +309,15 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
   }
 
   Widget _buildKpiCards(bool isVi) {
-    final available = _summaryData?['availableBalance'] ?? 0;
-    final pendingHold = _summaryData?['pendingHoldBalance'] ?? 0;
     final totalPaid = _summaryData?['totalPaid'] ?? 0;
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final cardWidth = (constraints.maxWidth - 32) / 3;
+        final cardWidth = constraints.maxWidth < 420 ? constraints.maxWidth : 380.0;
         return Wrap(
           spacing: 16,
           runSpacing: 16,
           children: [
-            _buildKpiCard(
-              title: isVi ? 'Số dư khả dụng (Sẵn sàng chốt)' : 'Available Balance',
-              amount: _formatVND(available),
-              subtitle: isVi ? 'Đã qua 7 ngày bảo hành' : 'Passed 7-day warranty hold',
-              icon: Icons.account_balance_wallet_outlined,
-              iconColor: const Color(0xFF10B981),
-              bgColor: const Color(0xFFECFDF5),
-              borderColor: const Color(0xFFA7F3D0),
-              width: cardWidth < 280 ? constraints.maxWidth : cardWidth,
-            ),
-            _buildKpiCard(
-              title: isVi ? 'Tạm tính (Bảo lưu 7 ngày)' : '7-Day Pending Hold',
-              amount: _formatVND(pendingHold),
-              subtitle: isVi ? 'Chờ hết hạn đổi trả học phí' : 'Holding for money-back policy',
-              icon: Icons.hourglass_top_rounded,
-              iconColor: const Color(0xFFF59E0B),
-              bgColor: const Color(0xFFFFFBEB),
-              borderColor: const Color(0xFFFDE68A),
-              width: cardWidth < 280 ? constraints.maxWidth : cardWidth,
-            ),
             _buildKpiCard(
               title: isVi ? 'Tổng tiền đã nhận (Net Paid)' : 'Total Net Paid',
               amount: _formatVND(totalPaid),
@@ -356,7 +326,7 @@ class _TrainerRevenuePageState extends State<TrainerRevenuePage> {
               iconColor: const Color(0xFF28B79B),
               bgColor: const Color(0xFFF0FDF4),
               borderColor: const Color(0xFFBBF7D0),
-              width: cardWidth < 280 ? constraints.maxWidth : cardWidth,
+              width: cardWidth,
             ),
           ],
         );

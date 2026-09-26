@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.util.retry.Retry;
+
 /**
  * Centralized service for invoking Gemini API endpoints.
  * Initializes an internal WebClient with Base URL and API Key header.
@@ -46,26 +47,29 @@ public class GeminiClientService {
         private final AiUsageLogRepository aiUsageLogRepository;
         private final SystemConfigService systemConfigService;
 
-        public GeminiClientService(GeminiProperties geminiProperties, AiUsageLogRepository aiUsageLogRepository, SystemConfigService systemConfigService) {
+        public GeminiClientService(GeminiProperties geminiProperties, AiUsageLogRepository aiUsageLogRepository,
+                        SystemConfigService systemConfigService) {
                 this.geminiProperties = geminiProperties;
                 this.aiUsageLogRepository = aiUsageLogRepository;
                 this.systemConfigService = systemConfigService;
         }
 
         public String getApiKey() {
-            return systemConfigService.getConfigValue("AI", "GEMINI_API_KEY", geminiProperties.getApiKey());
+                return systemConfigService.getConfigValue("AI", "GEMINI_API_KEY", geminiProperties.getApiKey());
         }
 
         public String getChatModel() {
-            return systemConfigService.getConfigValue("AI", "GEMINI_CHAT_MODEL", geminiProperties.getChatModel());
+                return systemConfigService.getConfigValue("AI", "GEMINI_CHAT_MODEL", geminiProperties.getChatModel());
         }
 
         public String getEmbeddingModel() {
-            return systemConfigService.getConfigValue("AI", "GEMINI_EMBEDDING_MODEL", geminiProperties.getEmbeddingModel());
+                return systemConfigService.getConfigValue("AI", "GEMINI_EMBEDDING_MODEL",
+                                geminiProperties.getEmbeddingModel());
         }
 
         public int getTimeoutSeconds() {
-            return Integer.parseInt(systemConfigService.getConfigValue("AI", "GEMINI_TIMEOUT_SECONDS", String.valueOf(geminiProperties.getTimeoutSeconds())));
+                return Integer.parseInt(systemConfigService.getConfigValue("AI", "GEMINI_TIMEOUT_SECONDS",
+                                String.valueOf(geminiProperties.getTimeoutSeconds())));
         }
 
         private void recordUsage(String callType, boolean success, long durationMs, String errorMessage) {
@@ -94,8 +98,9 @@ public class GeminiClientService {
 
         /**
          * Hàm khởi tạo (Lifecycle hook): Chạy ngay khi Spring Boot vừa khởi động.
-         * Tác dụng: Cấu hình sẵn WebClient với BaseURL (địa chỉ máy chủ Google) 
-         * và tự động nhúng API_KEY vào Header (x-goog-api-key) để dùng chung cho mọi cuộc gọi mạng sau này.
+         * Tác dụng: Cấu hình sẵn WebClient với BaseURL (địa chỉ máy chủ Google)
+         * và tự động nhúng API_KEY vào Header (x-goog-api-key) để dùng chung cho mọi
+         * cuộc gọi mạng sau này.
          */
         @PostConstruct
         public void init() {
@@ -112,19 +117,22 @@ public class GeminiClientService {
                                 .baseUrl(baseUrl)
                                 .defaultHeader("Content-Type", "application/json")
                                 .filter((request, next) -> {
-                                    org.springframework.web.reactive.function.client.ClientRequest newRequest = org.springframework.web.reactive.function.client.ClientRequest.from(request)
-                                            .header("x-goog-api-key", getApiKey())
-                                            .build();
-                                    return next.exchange(newRequest);
+                                        org.springframework.web.reactive.function.client.ClientRequest newRequest = org.springframework.web.reactive.function.client.ClientRequest
+                                                        .from(request)
+                                                        .header("x-goog-api-key", getApiKey())
+                                                        .build();
+                                        return next.exchange(newRequest);
                                 })
                                 .build();
                 log.info("Gemini WebClient initialized successfully with base URL: {}", baseUrl);
         }
 
         /**
-         * Hàm Bắt Mạch (Health Check): Dùng để ping kiểm tra Google Gemini xem có bị sập không.
+         * Hàm Bắt Mạch (Health Check): Dùng để ping kiểm tra Google Gemini xem có bị
+         * sập không.
          * Cơ chế: Gửi một câu lệnh siêu ngắn "Reply with OK only." để thử.
-         * Cải tiến: Kết quả được Cache (lưu tạm) lại để tránh gọi API liên tục gây tốn tiền.
+         * Cải tiến: Kết quả được Cache (lưu tạm) lại để tránh gọi API liên tục gây tốn
+         * tiền.
          */
         @Cacheable(value = "geminiStatus")
         public AiHealthResponse checkAvailability() {
@@ -187,32 +195,43 @@ public class GeminiClientService {
         }
 
         /**
-         * Hàm Giao Tiếp Chính (Chat Completion): Nơi chính thức "nói chuyện" với con bot Gemini.
-         * Đầu vào: Lời nhắc hệ thống (System Prompt - Ép AI làm giáo viên) và Toàn bộ Lịch sử Chat.
+         * Hàm Giao Tiếp Chính (Chat Completion): Nơi chính thức "nói chuyện" với con
+         * bot Gemini.
+         * Đầu vào: Lời nhắc hệ thống (System Prompt - Ép AI làm giáo viên) và Toàn bộ
+         * Lịch sử Chat.
          */
         public String generateChatResponse(String systemPrompt, List<GeminiGenerateRequest.Content> chatHistory) {
                 return generateChatResponse(systemPrompt, chatHistory, false);
         }
 
-        public String generateChatResponse(String systemPrompt, List<GeminiGenerateRequest.Content> chatHistory, boolean enableSearchGrounding) {
+        public String generateChatResponse(String systemPrompt, List<GeminiGenerateRequest.Content> chatHistory,
+                        boolean enableSearchGrounding) {
                 return generateChatResponseDetailed(systemPrompt, chatHistory, enableSearchGrounding).getText();
         }
 
-        public String generateChatResponse(String systemPrompt, List<GeminiGenerateRequest.Content> chatHistory, boolean enableSearchGrounding, boolean responseJson) {
-                return generateChatResponseDetailed(systemPrompt, chatHistory, enableSearchGrounding, responseJson).getText();
+        public String generateChatResponse(String systemPrompt, List<GeminiGenerateRequest.Content> chatHistory,
+                        boolean enableSearchGrounding, boolean responseJson) {
+                return generateChatResponseDetailed(systemPrompt, chatHistory, enableSearchGrounding, responseJson)
+                                .getText();
         }
 
         /**
-         * Gọi Gemini Chat có hỗ trợ Google Search Grounding để tra cứu thông tin thời sự thật trên Internet.
+         * Gọi Gemini Chat có hỗ trợ Google Search Grounding để tra cứu thông tin thời
+         * sự thật trên Internet.
          * Trả về kết quả kèm danh sách nguồn (URL, Tiêu đề bài viết).
          */
-        public GeminiChatResult generateChatResponseDetailed(String systemPrompt, List<GeminiGenerateRequest.Content> chatHistory, boolean enableSearchGrounding) {
-                boolean isJson = systemPrompt != null && (systemPrompt.contains("JSON") || systemPrompt.contains("json"));
+        public GeminiChatResult generateChatResponseDetailed(String systemPrompt,
+                        List<GeminiGenerateRequest.Content> chatHistory, boolean enableSearchGrounding) {
+                boolean isJson = systemPrompt != null
+                                && (systemPrompt.contains("JSON") || systemPrompt.contains("json"));
                 return generateChatResponseDetailed(systemPrompt, chatHistory, enableSearchGrounding, isJson);
         }
 
-        public GeminiChatResult generateChatResponseDetailed(String systemPrompt, List<GeminiGenerateRequest.Content> chatHistory, boolean enableSearchGrounding, boolean responseJson) {
-                GeminiGenerateRequest.GenerationConfig.GenerationConfigBuilder configBuilder = GeminiGenerateRequest.GenerationConfig.builder()
+        public GeminiChatResult generateChatResponseDetailed(String systemPrompt,
+                        List<GeminiGenerateRequest.Content> chatHistory, boolean enableSearchGrounding,
+                        boolean responseJson) {
+                GeminiGenerateRequest.GenerationConfig.GenerationConfigBuilder configBuilder = GeminiGenerateRequest.GenerationConfig
+                                .builder()
                                 .temperature(0.4)
                                 .maxOutputTokens(8192);
                 if (responseJson) {
@@ -235,7 +254,8 @@ public class GeminiClientService {
 
                 String chatModel = getChatModel();
                 String path = String.format("v1beta/models/%s:generateContent", chatModel);
-                log.info("[GeminiClientService] Calling Gemini chat model: {} (grounding: {}, responseJson: {}, timeout: {}s)", chatModel, enableSearchGrounding, responseJson, getTimeoutSeconds());
+                log.info("[GeminiClientService] Calling Gemini chat model: {} (grounding: {}, responseJson: {}, timeout: {}s)",
+                                chatModel, enableSearchGrounding, responseJson, getTimeoutSeconds());
                 long startedAt = System.currentTimeMillis();
 
                 try {
@@ -256,8 +276,10 @@ public class GeminiClientService {
                                 throw new ApiException("AI returned an invalid response", HttpStatus.BAD_GATEWAY);
                         }
                         recordUsage("CHAT", true, System.currentTimeMillis() - startedAt, null);
-                        
-                        List<GeminiGenerateResponse.WebSource> sources = response != null ? response.extractGroundingSources() : List.of();
+
+                        List<GeminiGenerateResponse.WebSource> sources = response != null
+                                        ? response.extractGroundingSources()
+                                        : List.of();
                         return GeminiChatResult.builder()
                                         .text(text)
                                         .sources(sources)
@@ -270,9 +292,11 @@ public class GeminiClientService {
                                 String errorDetail = (e instanceof org.springframework.web.reactive.function.client.WebClientResponseException wcre)
                                                 ? "status=" + wcre.getStatusCode()
                                                 : e.getMessage();
-                                log.warn("Gemini chat with search grounding failed ({}), falling back to standard generation without grounding.", errorDetail);
+                                log.warn("Gemini chat with search grounding failed ({}), falling back to standard generation without grounding.",
+                                                errorDetail);
                                 try {
-                                        String fallbackText = generateChatResponse(systemPrompt, chatHistory, false, responseJson);
+                                        String fallbackText = generateChatResponse(systemPrompt, chatHistory, false,
+                                                        responseJson);
                                         return GeminiChatResult.builder()
                                                         .text(fallbackText)
                                                         .sources(List.of())
@@ -282,7 +306,8 @@ public class GeminiClientService {
                                 }
                         } else {
                                 if (e instanceof org.springframework.web.reactive.function.client.WebClientResponseException wcre) {
-                                        log.error("Error calling Gemini chat API: status={}, responseBody={}", wcre.getStatusCode(), wcre.getResponseBodyAsString());
+                                        log.error("Error calling Gemini chat API: status={}, responseBody={}",
+                                                        wcre.getStatusCode(), wcre.getResponseBodyAsString());
                                 } else {
                                         log.error("Error calling Gemini chat API: {}", e.getMessage(), e);
                                 }
@@ -310,7 +335,8 @@ public class GeminiClientService {
 
                 String embedModel = getEmbeddingModel();
                 String path = String.format("v1beta/models/%s:embedContent", embedModel);
-                log.info("[GeminiClientService] Calling Gemini embedding model: {} (timeout: {}s)", embedModel, getTimeoutSeconds());
+                log.info("[GeminiClientService] Calling Gemini embedding model: {} (timeout: {}s)", embedModel,
+                                getTimeoutSeconds());
                 long startedAt = System.currentTimeMillis();
 
                 try {
@@ -478,7 +504,8 @@ public class GeminiClientService {
         /**
          * Tính năng Đọc Hiểu Hình Ảnh Bằng Cấp (Vision AI / OCR).
          * Tác dụng: Dành riêng cho luồng Đăng ký làm Giảng viên (Trainer Onboarding).
-         * Khi ứng viên up ảnh chứng chỉ (IELTS, bằng đại học), hàm này nhờ Gemini đọc ảnh, 
+         * Khi ứng viên up ảnh chứng chỉ (IELTS, bằng đại học), hàm này nhờ Gemini đọc
+         * ảnh,
          * bóc tách họ tên, loại văn bằng và tự động chấm điểm hồ sơ.
          */
         public String analyzeDocumentImage(byte[] imageBytes, String mimeType) {
@@ -633,7 +660,8 @@ public class GeminiClientService {
                 String detectedType = bestScoringDocumentType(scores);
                 int detectedScore = scores.getOrDefault(detectedType, 0);
 
-                if (normalizedExplicitType != null && scores.containsKey(normalizedExplicitType) && detectedScore <= 2) {
+                if (normalizedExplicitType != null && scores.containsKey(normalizedExplicitType)
+                                && detectedScore <= 2) {
                         return normalizedExplicitType;
                 }
 
